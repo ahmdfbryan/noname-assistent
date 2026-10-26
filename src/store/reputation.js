@@ -12,6 +12,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
+const UI = require('../ui');
 const { color, rupiah, num, GROUPS, getProduct } = require('./config');
 const { state, kindOf } = require('./state');
 
@@ -89,7 +90,7 @@ function buildReputation(guild, cfg) {
   const name = cfg.storeName || guild.name;
   const r = computeReputation(cfg);
   const s = state.stats;
-  const box = new ContainerBuilder().setAccentColor(color(cfg, 'brand', 0x3498db));
+  const box = UI.accent(new ContainerBuilder(), color(cfg, 'brand', 0x3498db));
 
   // ── Header
   const header = `# ${fill(rc.title || '⭐ Reputasi Toko | {server}', { server: guild.name, name })}\n-# ${fill(rc.subtitle || '{name} • Store Reputation', { server: guild.name, name })}`;
