@@ -62,7 +62,8 @@ function summaryText(sections, lang, cfg) {
 
 /**
  * Ubah daftar section menjadi beberapa pesan (masing-masing ≤ batas Discord).
- * Satu section = satu kotak berwarna, tiap teks dipisah garis tipis sampai ujung.
+ * Satu section = satu kotak (garis tepi saja, tanpa warna di kiri — kecuali rules.json "showAccent": true),
+ * tiap teks dipisah garis tipis sampai ujung.
  * Kotak pertama memakai logo server di kanan atas + ringkasan aturan; kotak terakhir berisi footer.
  */
 function buildMessages(sections, { guild, lang, cfg }) {
@@ -78,7 +79,8 @@ function buildMessages(sections, { guild, lang, cfg }) {
   let first = true;
 
   (sections || []).forEach((section, si) => {
-    const color = parseColor(section.color || cfg.color);
+    // Default tanpa warna aksen (hanya garis kotak). rules.json → "showAccent": true untuk memakai warna section lagi.
+    const color = cfg.showAccent === true ? parseColor(section.color || cfg.color) : null;
     let box = null;
     const texts = [...(section.texts || [])];
     if (si === 0 && summary) texts.push(summary);
@@ -91,7 +93,8 @@ function buildMessages(sections, { guild, lang, cfg }) {
         box = null;
       }
       if (!box) {
-        box = new ContainerBuilder().setAccentColor(color);
+        box = new ContainerBuilder();
+        if (color != null) box.setAccentColor(color);
         current.containers.push(box);
         current.count += 1;
       } else {
