@@ -345,10 +345,6 @@ function buildDmClosed(guild, cfg, t) {
 /** Siapa yang diminta memberi testimoni: pembeli Robux / pihak pembeli di rekber. */
 const testimonyUserId = (t) => (kindOf(t) === 'rekber' ? t.buyerId : t.userId);
 
-/** Info batas waktu ulasan (setelah lewat → ticket ditutup otomatis dengan ⭐ 5). */
-const testimonyTimerLine = (t) =>
-  t.testimonyDeadline ? `\n\n⏰ Batas memberi ulasan ${`<t:${Math.floor(t.testimonyDeadline / 1000)}:R>`}. Kalau tidak ada ulasan, ticket **ditutup otomatis** dengan rating ⭐⭐⭐⭐⭐.` : '';
-
 function buildTestimonyPrompt(guild, cfg, t) {
   if (kindOf(t) === 'rekber') return buildRekberTestimonyPrompt(guild, cfg, t);
   const embed = new EmbedBuilder()
@@ -356,8 +352,7 @@ function buildTestimonyPrompt(guild, cfg, t) {
     .setTitle('⭐ Bagaimana Pengalaman Belanjamu?')
     .setDescription(
       `<@${t.userId}>, pesananmu sudah selesai! 🎉\n\nBantu kami jadi lebih baik dengan memberikan **rating & testimoni** ` +
-        `lewat tombol di bawah. Testimonimu akan ditampilkan di channel testimoni.` +
-        testimonyTimerLine(t),
+        `lewat tombol di bawah. Testimonimu akan ditampilkan di channel testimoni.`
     )
     .setFooter(serverFooter(guild, storeName(cfg, guild)));
   if (t.proofUrl) embed.setImage(t.proofUrl);
@@ -879,7 +874,7 @@ function buildRekberTestimonyPrompt(guild, cfg, t) {
     .setTitle('⭐ Bagaimana Pengalaman Rekber-mu?')
     .setDescription(
       `<@${t.buyerId}>, transaksi rekber **${t.id}** sudah selesai! 🎉\n\n` +
-        'Bantu kami jadi lebih baik dengan memberikan **rating & testimoni** lewat tombol di bawah.' + testimonyTimerLine(t),
+        'Bantu kami jadi lebih baik dengan memberikan **rating & testimoni** lewat tombol di bawah.',
     )
     .setFooter(serverFooter(guild, storeName(cfg, guild)));
   if (t.proofUrl) embed.setImage(t.proofUrl);
