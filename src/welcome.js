@@ -7,6 +7,8 @@ const {
   ThumbnailBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -38,7 +40,7 @@ function fill(text, member) {
     .replace(/\{username\}/g, member.user.username)
     .replace(/\{mention\}/g, `<@${member.id}>`)
     .replace(/\{server\}/g, member.guild.name)
-    .replace(/\{memberCount\}/g, String(member.guild.memberCount))
+    .replace(/\{memberCount\}/g, Number(member.guild.memberCount || 0).toLocaleString('id-ID'))
     .replace(/\{channel:(\d{17,20})\}/g, '<#$1>');
 }
 
@@ -54,57 +56,88 @@ function buttonUrl(btn, guildId) {
   return null;
 }
 
-/** Susun pesan welcome (2 kotak) untuk satu member. */
+/** Banner / GIF di bawah welcome: path file di folder bot (contoh "assets/welcome-banner.gif") atau link https. */
+function bannerPart(cfg) {
+  const src = String(cfg.banner || '').trim();
+  if (!src) return null;
+  if (/^https?:\/\//i.test(src)) return { url: src, files: [] };
+  const file = path.join(__dirname, '..', src);
+  if (!fs.existsSync(file)) {
+    console.warn(`[welcome] banner ${src} tidak ditemukan — welcome dikirim tanpa banner.`);
+    return null;
+  }
+  const name = `welcome-banner${path.extname(file) || '.gif'}`;
+  return { url: `attachment://${name}`, files: [{ attachment: file, name }] };
+}
+
+const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
+const td = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000));
+
+/**
+ * Susun pesan welcome (1 kotak Components V2) untuk satu member:
+ * sambutan + foto → langkah awal → keuntungan member → GIF → footer → tombol.
+ * Default tanpa warna aksen di kiri (hanya garis kotak); welcome.json "showAccent": true untuk memakai accentColor.
+ */
 function buildWelcomeMessage(member, cfg) {
-  const color = parseColor(cfg.accentColor);
   const components = [];
+  if (cfg.mentionMember) components.push(td(`<@${member.id}>`));
 
-  if (cfg.mentionMember) {
-    components.push(new TextDisplayBuilder().setContent(`<@${member.id}>`));
-  }
+  const box = new ContainerBuilder();
+  if (cfg.showAccent === true) box.setAccentColor(parseColor(cfg.accentColor));
 
-  // Kotak 1 — Selamat datang (+ foto di kanan)
+  // Sambutan + foto profil di kanan
   const w = cfg.welcome || {};
-  const welcomeText = new TextDisplayBuilder().setContent(
-    `## ${fill(w.title, member)}\n${fill(w.description, member)}`.trim(),
-  );
-  const box1 = new ContainerBuilder().setAccentColor(color);
+  const head = [
+    `# ${fill(w.title || '👋 Selamat Datang, {name}!', member)}`,
+    w.subtitle ? `-# ${fill(w.subtitle, member)}` : null,
+    fill(w.description || '', member) || null,
+  ]
+    .filter(Boolean)
+    .join('\n');
   const thumb = thumbnailUrl(w.thumbnail, member);
-  if (thumb) {
-    box1.addSectionComponents(
-      new SectionBuilder()
-        .addTextDisplayComponents(welcomeText)
-        .setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)),
+  if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(td(head)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
+  else box.addTextDisplayComponents(td(head));
+
+  // Langkah awal (bernomor)
+  const steps = (cfg.steps?.items || []).map((x) => fill(x, member)).filter(Boolean);
+  if (steps.length) {
+    box.addSeparatorComponents(line());
+    box.addTextDisplayComponents(
+      td(`### ${fill(cfg.steps.title || '🚀 Mulai dari Sini', member)}\n${steps.map((x, i) => `\`${String(i + 1).padStart(2, '0')}\` ${x}`).join('\n')}`),
     );
-  } else {
-    box1.addTextDisplayComponents(welcomeText);
   }
-  components.push(box1);
 
-  // Kotak 2 — Rules & Guide Server (+ tombol, dipisah garis)
-  const r = cfg.rules || {};
-  const box2 = new ContainerBuilder()
-    .setAccentColor(color)
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`## ${fill(r.title, member)}\n${fill(r.description, member)}`.trim()),
-    );
+  // Keuntungan / apa yang ada di server
+  const perks = (cfg.perks?.items || []).map((x) => fill(x, member)).filter(Boolean);
+  if (perks.length) {
+    box.addSeparatorComponents(line());
+    box.addTextDisplayComponents(td(`### ${fill(cfg.perks.title || '💎 Yang Bisa Kamu Nikmati', member)}\n${perks.map((x) => `▸ ${x}`).join('\n')}`));
+  }
 
-  const buttons = (r.buttons || [])
-    .map((b) => ({ label: b.label, url: buttonUrl(b, member.guild.id) }))
-    .filter((b) => b.label && b.url);
+  // GIF / banner di bawah
+  const banner = bannerPart(cfg);
+  if (banner) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(banner.url)));
 
-  buttons.forEach((b, i) => {
-    if (i > 0) box2.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
-    box2.addActionRowComponents(
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(b.label.slice(0, 80)).setURL(b.url),
-      ),
-    );
-  });
-  components.push(box2);
+  // Footer
+  box.addSeparatorComponents(line());
+  box.addTextDisplayComponents(td(`-# ${fill(cfg.footer || '{server} • Selamat bergabung & have fun!', member)} • <t:${Math.floor(Date.now() / 1000)}:f>`));
 
+  // Tombol (maks 5)
+  const buttons = (cfg.buttons || [])
+    .map((b) => ({ ...b, url: buttonUrl(b, member.guild.id) }))
+    .filter((b) => b.label && b.url)
+    .slice(0, 5)
+    .map((b) => {
+      const btn = new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(String(b.label).slice(0, 80)).setURL(b.url);
+      if (b.emoji) btn.setEmoji(b.emoji);
+      return btn;
+    });
+  if (buttons.length) box.addActionRowComponents(new ActionRowBuilder().addComponents(buttons));
+
+  components.push(box);
   return {
     components,
+    files: banner?.files || [],
     flags: MessageFlags.IsComponentsV2,
     allowedMentions: { users: cfg.mentionMember ? [member.id] : [] },
   };
