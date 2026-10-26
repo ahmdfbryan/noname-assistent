@@ -21,6 +21,7 @@ const {
   TextInputStyle,
   UserSelectMenuBuilder,
 } = require('discord.js');
+const UI = require('./ui');
 const { userInfoCommand, robloxCommand } = require('./profile-info');
 const { serverCheckCommand } = require('./server-check');
 
@@ -56,7 +57,7 @@ function savePanel() {
 
 // ───────────────────────── Tampilan panel ─────────────────────────
 function buildPanel(guild, client) {
-  const box = new ContainerBuilder().setAccentColor(BRAND);
+  const box = UI.accent(new ContainerBuilder(), BRAND);
   const avatar = client.user.displayAvatarURL({ extension: 'png', size: 256 });
   box.addSectionComponents(
     new SectionBuilder()
@@ -139,8 +140,8 @@ async function publishResult(i, commandName, payload) {
     return null;
   });
   if (!sent) return i.editReply(payload);
-  const box = new ContainerBuilder()
-    .setAccentColor(0x2ecc71)
+  const box = UI.accent(new ContainerBuilder(),
+    0x2ecc71)
     .addTextDisplayComponents(text(`## ✅ Pengecekan Selesai!\nHasil **${KIND[commandName] || 'pengecekan'}** sudah dikirim ke <#${RESULT_CHANNEL}>.\nSilakan cek hasilnya di channel tersebut 👇`))
     .addActionRowComponents(
       new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Lihat Hasil').setEmoji('📬').setURL(sent.url)),
