@@ -120,7 +120,7 @@ function buildWelcomeMessage(member, cfg) {
 
   // Footer
   box.addSeparatorComponents(line());
-  box.addTextDisplayComponents(td(`-# ${fill(cfg.footer || '{server} • Selamat bergabung & have fun!', member)} • <t:${Math.floor(Date.now() / 1000)}:f>`));
+  box.addTextDisplayComponents(td(`-# ${fill(cfg.footer || '{server}', member)} • <t:${Math.floor(Date.now() / 1000)}:f>`));
 
   // Tombol (maks 5)
   const buttons = (cfg.buttons || [])
