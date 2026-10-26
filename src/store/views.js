@@ -493,6 +493,147 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
   return e;
 }
 
+/**
+ * Pengumuman di channel stock (Components V2, premium):
+ * open / close → extra.products • stock → extra.product + extra.text • sold → extra.product, amount, count • returned → extra.ticket.
+ * ping = mention @everyone di atas kotak.
+ */
+function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
+  const onlyDigital = (extra.products || []).length && (extra.products || []).every((x) => groupOf(x) === 'digital');
+  const robux = (cfg.products || []).find((x) => x.type === 'robux');
+  const name = storeName(cfg, guild);
+  const products = extra.products || [];
+  const single = products.length === 1 ? products[0] : null;
+  const listText = products.map((p) => `▸ ${p.emoji || '🛒'} **${p.label}**`).join('\n');
+  const robuxIncluded = products.some((p) => p.type === 'robux');
+  const gamepass = products.filter((p) => p.type === 'gamepass');
+  const slotProducts = products.filter((p) => hasStock(p) && p.type !== 'robux');
+  const now = `<t:${Math.floor(Date.now() / 1000)}:f>`;
+  const icon = icon256(guild);
+  const orderBtn = (group) => {
+    const url = panelUrlFor(guild, group);
+    return url ? btnRow([new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Order Sekarang').setEmoji('🛒').setURL(url)]) : null;
+  };
+  const stockBar = (left, total) => {
+    const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((left / total) * 100))) : 0;
+    const f = Math.round(pct / 10);
+    return `${'🟦'.repeat(f)}${'⬛'.repeat(10 - f)} \`${pct}%\``;
+  };
+  const statusBadge = (sp) => (sp && isProductOpen(sp) ? '`🟢 BUKA`' : '`🔴 TUTUP`');
+  let card;
+
+  if (kind === 'open') {
+    const info = [];
+    if (robuxIncluded) info.push(`**💎 Stock Robux:** \`${num(state.stock)} Robux\``, `**💱 Rate Visend:** \`${rupiah(robux ? rateOf(cfg, robux) : 0)} / Robux\``);
+    for (const gp of gamepass) info.push(`**${gp.emoji || '🎟️'} Rate ${gp.label}:** \`${rupiah(rateOf(cfg, gp))} / Robux\``);
+    for (const sp of slotProducts) info.push(`**${sp.emoji || '📦'} Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
+    card = pcard({
+      accent: color(cfg, 'open', 0x2ecc71),
+      thumb: icon,
+      header: `# 🟢 ${single ? single.label : name} Resmi Dibuka!\n-# ${name} • Store Update`,
+      blocks: [
+        single
+          ? `Kabar baik! **${single.label}** sekarang **BUKA** dan siap melayani pesananmu ✨\nProses **cepat, aman & terpercaya** — dibantu admin sampai selesai.`
+          : `Kabar baik! **${name}** sekarang **BUKA** dan siap melayani pesananmu ✨\n${listText}`,
+        info.length ? `### 📊 Info Hari Ini\n${info.join('\n')}` : null,
+        '### ⚡ Jangan Sampai Kehabisan\nStock terbatas — **siapa cepat dia dapat!** Klik tombol di bawah untuk langsung order. 🚀',
+      ],
+      footer: `${name} • Dibuka ${now}`,
+      rows: [orderBtn(onlyDigital ? 'digital' : 'main')],
+    });
+  } else if (kind === 'close') {
+    const left = [];
+    if (robuxIncluded) left.push(`**💎 Sisa Stock Robux:** \`${num(state.stock)} Robux\``);
+    for (const sp of slotProducts) left.push(`**${sp.emoji || '📦'} Sisa Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
+    card = pcard({
+      accent: color(cfg, 'closed', 0xe74c3c),
+      thumb: icon,
+      header: `# 🔴 ${single ? single.label : name} Sementara Ditutup\n-# ${name} • Store Update`,
+      blocks: [
+        extra.reason
+          ? `${extra.reason}${single ? '' : `\n${listText}`}`
+          : single
+            ? `Terima kasih atas antusiasmenya! 🙏\n**${single.label}** saat ini **tidak menerima pesanan baru**.`
+            : `Terima kasih atas antusiasmenya! 🙏\n**${name}** saat ini **tidak menerima pesanan baru**.\n${listText}`,
+        left.length ? `### 📦 Sisa Stock\n${left.join('\n')}` : null,
+        '### 🔔 Info Selanjutnya\nPesanan yang **sudah masuk tetap diproses** sampai selesai ✅\nPantau terus channel ini — kami kabari begitu **dibuka kembali**! 💙',
+      ],
+      footer: `${name} • Ditutup ${now}`,
+    });
+  } else if (kind === 'stock') {
+    const sp = extra.product || robux;
+    const unit = stockUnit(sp);
+    const lines = [
+      `**${sp?.type === 'boost' ? '🚀 Total Stock' : '📦 Stock Sekarang'}:** \`${num(stockOf(sp))} ${unit}\``,
+      `**🏪 Status:** ${statusBadge(sp)}`,
+      sp?.type === 'robux' ? `**💱 Rate:** \`${rupiah(rateOf(cfg, sp))} / Robux\`` : null,
+    ].filter(Boolean);
+    card = pcard({
+      accent: color(cfg, 'brand', 0x3498db),
+      thumb: icon,
+      header: `# 📦 Stock ${sp?.label || 'Robux'} Diperbarui!\n-# ${name} • Stock Update`,
+      blocks: [
+        extra.text ? `${extra.text}\n${sp && isProductOpen(sp) ? 'Stock sudah siap — yuk langsung order! 🛒' : 'Order dibuka kembali segera, pantau terus ya! 🔔'}` : null,
+        `### 📊 Detail Stock\n${lines.join('\n')}`,
+        sp?.type === 'boost' ? `### 🚀 Stock per Paket\n${boostStockLines(sp) || '-'}` : null,
+      ],
+      footer: `${name} • Diperbarui ${now}`,
+      rows: [sp && isProductOpen(sp) ? orderBtn(groupOf(sp)) : null],
+    });
+  } else if (kind === 'sold') {
+    const sp = extra.product || robux;
+    const unit = stockUnit(sp);
+    const left = stockOf(sp);
+    const sold = Number(extra.amount) || 0;
+    const total = Math.max(Number(state.stockBase) || 0, left + sold);
+    card = pcard({
+      accent: color(cfg, 'brand', 0x3498db),
+      thumb: icon,
+      header: `# 🛒 ${sp?.label || 'Robux'} Baru Saja Terjual!\n-# ${name} • Live Sales`,
+      blocks: [
+        `🎉 ${extra.count > 1 ? `**${num(extra.count)} pesanan**` : '**Pesanan baru**'} masuk sebanyak **${num(sold)} ${unit}**!\nSisa stock tinggal **${num(left)} ${unit}** — amankan bagianmu sebelum kehabisan! 🔥`,
+        [
+          '### 📊 Ringkasan',
+          `**📤 Terjual:** \`${num(sold)} ${unit}\` • **📦 Sisa:** \`${num(left)} ${unit}\``,
+          sp?.type === 'robux' ? `**💱 Rate:** \`${rupiah(rateOf(cfg, sp))} / Robux\`` : null,
+          `**📈 Ketersediaan:** ${stockBar(left, total)}`,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      ],
+      footer: `${name} • ${now}`,
+      rows: [orderBtn(groupOf(sp))],
+    });
+  } else if (kind === 'returned') {
+    const t = extra.ticket;
+    const sp = (cfg.products || []).find((x) => x.id === t.productId) || robux;
+    const unit = stockUnit(sp);
+    const qty = kindOf(t) === 'robux' ? t.amount : Number(t.qty) || 1;
+    card = pcard({
+      accent: color(cfg, 'refund', 0xe67e22),
+      thumb: icon,
+      header: `# ♻️ Stock ${sp?.label || t.productLabel} Kembali Tersedia!\n-# ${name} • Stock Update`,
+      blocks: [
+        `Pesanan \`${t.id}\` ${t.status === 'refund' ? '**di-refund**' : '**dibatalkan**'} — stock dikembalikan ke toko${sp && isProductOpen(sp) ? ' dan **bisa dipesan lagi**! ✨' : '. 🔔'}`,
+        [
+          '### 📊 Detail Stock',
+          `**♻️ Stock Kembali:** \`+${num(qty)} ${unit}\`${kindOf(t) === 'boost' && t.plan ? ` • ${t.plan.label}` : ''}`,
+          `**📦 Stock Sekarang:** \`${num(stockOf(sp))} ${unit}\``,
+          `**🏪 Status:** ${statusBadge(sp)}`,
+        ].join('\n'),
+      ],
+      footer: `${name} • ${now}`,
+      rows: [sp && isProductOpen(sp) ? orderBtn(groupOf(sp)) : null],
+    });
+  }
+  if (!card) return null;
+  if (ping) {
+    card.components.unshift(v2Text('@everyone'));
+    card.allowedMentions = { parse: ['everyone'] };
+  }
+  return card;
+}
+
 // ═════════════════════════════════════ REKBER ═════════════════════════════════════
 /** Hitung fee rekber dari tabel fee di store.json. */
 function rekberFee(product, nominal) {
@@ -2465,4 +2606,5 @@ module.exports = {
   buildTestimony: buildTestimonyV2,
   buildTestimonyLegacy: buildTestimony,
   buildStoreAnnouncement,
+  buildStoreAnnouncementV2,
 };
