@@ -182,7 +182,7 @@ function buildReputation(guild, cfg) {
   // ── Footer + tombol
   box.addSeparatorComponents(line());
   box.addTextDisplayComponents(
-    text(`-# ${rc.tip || '💡 Rating dihitung otomatis dari testimoni pembeli asli setelah order selesai.'}\n-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`),
+    text(`${rc.tip ? `-# ${rc.tip}\n` : ''}-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`),
   );
   const buttons = [];
   const testi = cfg.channels?.testimoni;
