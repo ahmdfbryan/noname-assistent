@@ -138,7 +138,9 @@ const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorS
 
 /** Satu kotak V2 per platform: header (+ avatar) → garis → info → tombol → footer (khusus kotak terakhir). */
 function box({ accent, header, thumb, blocks = [], image, button }) {
-  const c = new ContainerBuilder().setAccentColor(accent);
+  // Tanpa warna aksen di kiri (hanya garis kotak), kecuali social.json "showAccent": true.
+  const c = new ContainerBuilder();
+  if (loadConfig()?.showAccent === true && accent != null) c.setAccentColor(accent);
   if (thumb) c.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else c.addTextDisplayComponents(text(header));
   if (image) c.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image)));
