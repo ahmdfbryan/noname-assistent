@@ -22,6 +22,7 @@ const {
   TextInputStyle,
   AttachmentBuilder,
 } = require('discord.js');
+const UI = require('./ui');
 
 /**
  * Canva Manager — daftar pelanggan Canva Pro (dari WhatsApp / luar Discord + order ticket Discord)
@@ -214,7 +215,7 @@ function buildDashboard(guild) {
   view.page = Math.min(Math.max(0, view.page), pages - 1);
   const slice = list.slice(view.page * PER_PAGE, view.page * PER_PAGE + PER_PAGE);
 
-  const box = new ContainerBuilder().setAccentColor(0x3498db);
+  const box = UI.accent(new ContainerBuilder(), 0x3498db);
   const header = `# 🎨 Canva Manager\n-# Noname Store • Pelanggan Canva Pro\nSemua pelanggan Canva Pro — dari **WhatsApp / luar Discord** & **order Discord** — di satu tempat.`;
   const icon = guild?.iconURL?.({ extension: 'png', size: 256 });
   if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
@@ -280,7 +281,7 @@ function buildDashboard(guild) {
 function manageCard(it, note) {
   const st = statusOf(it);
   const accent = st.key === 'done' ? 0x95a5a6 : st.key === 'expired' ? 0xe74c3c : st.key === 'soon' ? 0xf1c40f : 0x3498db;
-  const box = new ContainerBuilder().setAccentColor(accent);
+  const box = UI.accent(new ContainerBuilder(), accent);
   box.addTextDisplayComponents(
     text(
       [
@@ -337,7 +338,7 @@ function reminderCard(it, stage, cfg) {
         ? '🔴 Canva Pro Habis Hari Ini!'
         : `🟡 Canva Pro Habis dalam ${Math.max(1, daysLeft(it))} Hari`;
   const ping = isId(cfg.pingUserId) ? cfg.pingUserId : it.createdBy || null;
-  const box = new ContainerBuilder().setAccentColor(stage === 'soon' ? 0xf1c40f : 0xe74c3c);
+  const box = UI.accent(new ContainerBuilder(), stage === 'soon' ? 0xf1c40f : 0xe74c3c);
   box.addTextDisplayComponents(
     text(
       [
@@ -584,7 +585,8 @@ async function resolveReminderMsg(i, note) {
   const box = comps.find((c) => c.type === 17);
   if (!box) return;
   box.components = box.components.filter((c) => c.type !== 1);
-  box.accent_color = 0x2ecc71;
+  if (UI.showAccent()) box.accent_color = 0x2ecc71;
+  else delete box.accent_color;
   box.components.push({ type: 14, divider: true, spacing: 1 }, { type: 10, content: `✅ ${note}` });
   await i.message.edit({ components: comps.filter((c) => c.type === 17), flags: V2, allowedMentions: { parse: [] } }).catch(() => {});
 }
@@ -758,7 +760,7 @@ function searchResult(q) {
     .filter((it) => [it.id, it.email, it.buyer, it.contact, it.buyerId].some((v) => String(v || '').toLowerCase().includes(s)))
     .sort((a, b) => a.done - b.done || a.expiresAt - b.expiresAt)
     .slice(0, 25);
-  const box = new ContainerBuilder().setAccentColor(0x3498db);
+  const box = UI.accent(new ContainerBuilder(), 0x3498db);
   box.addTextDisplayComponents(
     text(hits.length ? `## 🔎 Hasil Cari: \`${s.slice(0, 40)}\` (${hits.length})\n${hits.slice(0, 8).map(itemRow).join('\n\n')}${hits.length > 8 ? `\n-# +${hits.length - 8} lainnya — pilih di dropdown` : ''}` : `## 🔎 Tidak Ditemukan\nTidak ada pelanggan yang cocok dengan \`${s.slice(0, 40)}\`.`),
   );
