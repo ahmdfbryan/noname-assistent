@@ -19,6 +19,7 @@ const {
   SeparatorSpacingSize,
   version: djsVersion,
 } = require('discord.js');
+const UI = require('./ui');
 
 /**
  * System Operational (Components V2): 1 pesan dashboard status bot yang ter-update otomatis.
@@ -216,7 +217,7 @@ async function buildDashboard(guild) {
   const humans = cacheFull ? guild.members.cache.filter((m) => !m.user.bot).size : guild.memberCount;
   const bots = cacheFull ? guild.members.cache.filter((m) => m.user.bot).size : null;
 
-  const box = new ContainerBuilder().setAccentColor(hex(cfg.colors?.[all.state], colors[all.state]));
+  const box = UI.accent(new ContainerBuilder(), hex(cfg.colors?.[all.state], colors[all.state]));
   const header = `# ${cfg.title}\n-# ${name(cfg.subtitle)}`;
   const avatar = client.user.displayAvatarURL({ extension: 'png', size: 256 });
   box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar)));
