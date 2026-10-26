@@ -147,13 +147,11 @@ function buildCatalogCard(guild, cfg, p) {
     const pct = (p.feeTiers || []).find((x) => x.percent != null);
     info.push(`💱 **Fee:** \`${fees.length ? `Mulai ${rupiah(Math.min(...fees))}` : pct ? `${pct.percent}%` : '-'}\``);
   }
-  info.push(`🏪 **Status:** ${statusBadge(p)}`);
+  if (!soon) info.push(`🏪 **Status:** ${statusBadge(p)}`);
 
   // Tombol: Beli Sekarang (→ panel tempat produk dijual) + Cara Order
   const buttons = [];
-  if (soon) {
-    buttons.push(new ButtonBuilder().setCustomId(`store:buy:${p.id}`).setLabel('Segera Hadir').setEmoji('🔒').setStyle(ButtonStyle.Secondary).setDisabled(true));
-  } else {
+  if (!soon) {
     const panelUrl = open ? V.panelUrlFor(guild, groupOf(p)) : null;
     buttons.push(
       panelUrl
@@ -173,8 +171,9 @@ function buildCatalogCard(guild, cfg, p) {
     accent: color(cfg, 'brand', 0x3498db),
     thumb: img.url,
     header: `## ${p.emoji || '🛒'} ${p.label}${tagline ? `\n${tagline}` : ''}`,
-    blocks: [info.join('\n')],
-    rows: [new ActionRowBuilder().addComponents(buttons)],
+    // Coming Soon: hanya nama, tagline & gambar (tanpa status & tombol).
+    blocks: [info.length ? info.join('\n') : null],
+    rows: [buttons.length ? new ActionRowBuilder().addComponents(buttons) : null],
   });
   if (img.files.length) payload.files = img.files;
   return payload;
