@@ -279,7 +279,9 @@ function buildLeaderboard(guild, cfg) {
 
   const text = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000));
   const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
-  const box = new ContainerBuilder().setAccentColor(color(cfg, 'brand', 0x3498db));
+  // Tanpa warna aksen di kiri (hanya garis kotak), kecuali invites.json "showAccent": true.
+  const box = new ContainerBuilder();
+  if (cfg.showAccent === true) box.setAccentColor(color(cfg, 'brand', 0x3498db));
   const header = `# ${fill(lb.title || '🏆 Top 10 Inviter | {server}', guild)}\n-# ${fill(lb.subtitle || '{server} • Invite Leaderboard', guild)}`;
   const icon = guild.iconURL({ extension: 'png', size: 256 });
   if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
