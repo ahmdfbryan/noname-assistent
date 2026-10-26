@@ -175,13 +175,21 @@ async function announce(guild, kind, extra = {}, ping = false) {
   if (!isId(cfg?.channels?.stock)) return;
   const channel = await guild.channels.fetch(cfg.channels.stock).catch(() => null);
   if (!channel?.isTextBased()) return;
-  await channel
-    .send({
+  // Components V2 (premium). Kalau gagal dibuat, pakai tampilan embed lama.
+  let payload = null;
+  try {
+    payload = V.buildStoreAnnouncementV2(guild, cfg, kind, extra, ping);
+  } catch (e) {
+    console.warn('[store] pengumuman V2 gagal dibuat, pakai embed:', e.message);
+  }
+  if (!payload) {
+    payload = {
       content: ping ? '@everyone' : undefined,
       embeds: [V.buildStoreAnnouncement(guild, cfg, kind, extra)],
       allowedMentions: { parse: ping ? ['everyone'] : [] },
-    })
-    .catch((e) => console.error('[store] gagal kirim pengumuman:', e.message));
+    };
+  }
+  await channel.send(payload).catch((e) => console.error('[store] gagal kirim pengumuman:', e.message));
 }
 
 /**
