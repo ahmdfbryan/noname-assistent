@@ -44,7 +44,7 @@
   },
 
   "banner": "assets/welcome-banner.gif",
-  "footer": "{server} • Selamat bergabung & have fun!",
+  "footer": "{server}",
 
   "buttons": [
     { "label": "Verifikasi", "emoji": "✅", "channelId": "1552529630127456326" },
