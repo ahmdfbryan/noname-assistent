@@ -24,6 +24,7 @@ const {
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
 } = require('discord.js');
+const UI = require('./ui');
 const giveaway = require('./giveaway');
 const { archiveNcsTicket } = require('./ticket-archive');
 
@@ -89,7 +90,7 @@ function buildPanel(guild, cfg) {
   const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
   const text = (content) => new TextDisplayBuilder().setContent(String(content).slice(0, 4000));
 
-  const box = new ContainerBuilder().setAccentColor(brand(cfg));
+  const box = UI.accent(new ContainerBuilder(), brand(cfg));
   const header = `# ${p.title || '🎫 NCS Ticket Center'}\n${p.description || ''}`;
   const icon = guild.iconURL({ extension: 'png', size: 256 });
   if (icon) {
@@ -289,7 +290,7 @@ const isV2Msg = (m) => Boolean(m?.flags?.has?.(V2));
 
 /** Kotak V2 sederhana untuk pesan-pesan di dalam ticket. */
 function card({ color, header, thumb, blocks = [], footer: foot, rows = [], top }) {
-  const box = new ContainerBuilder().setAccentColor(color);
+  const box = UI.accent(new ContainerBuilder(), color);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(v2text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(v2text(header));
   for (const b of blocks.filter(Boolean)) {
@@ -466,7 +467,7 @@ function buildHistoryCard(guild, cfg, t) {
   const type = typeOf(cfg, t.type) || { label: t.type, emoji: '🎫' };
   const st = t.status !== 'open' ? HSTATUS.closed : t.claimedBy ? HSTATUS.claimed : HSTATUS.waiting;
   const h = cfg.history || {};
-  const box = new ContainerBuilder().setAccentColor(st.color);
+  const box = UI.accent(new ContainerBuilder(), st.color);
   box.addTextDisplayComponents(htext(`## ${type.emoji || '🎫'} ${t.id} • ${st.text}\n-# Tickets History`));
   box.addSeparatorComponents(hline());
 
