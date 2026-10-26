@@ -16,6 +16,30 @@ const UI = require('../ui');
 const { color, rupiah, num, fill, productsOf, groupOf, groupText } = require('./config');
 const { state, isProductOpen, productStatsOf, stockOf, stockUnit } = require('./state');
 const V = require('./views');
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Gambar kecil (kanan atas) tiap kartu produk.
+ * Urutan: store.json → products[].catalog.thumbnail (link https ATAU path file di folder bot)
+ *         → file otomatis assets/products/<id produk>.png (Coming Soon: assets/products/coming-soon.png)
+ *         → logo server.
+ * File lokal ikut dikirim bersama kartu (attachment) supaya tidak pernah kedaluwarsa.
+ */
+function productImage(guild, p) {
+  const set = String(p.catalog?.thumbnail || '').trim();
+  if (/^https?:\/\//i.test(set)) return { url: set, files: [] };
+  const root = path.join(__dirname, '..', '..');
+  const candidates = [set, `assets/products/${p.id}.png`, p.type === 'soon' ? 'assets/products/coming-soon.png' : null].filter(Boolean);
+  for (const rel of candidates) {
+    const file = path.join(root, rel);
+    if (fs.existsSync(file)) {
+      const name = `product-${String(p.id).replace(/[^\w-]/g, '')}${path.extname(file) || '.png'}`;
+      return { url: `attachment://${name}`, files: [{ attachment: file, name }] };
+    }
+  }
+  return { url: guild.iconURL({ extension: 'png', size: 256 }), files: [] };
+}
 
 /**
  * Channel Catalog (Components V2): 1 kotak header + 1 kotak per produk (masing-masing dengan tombolnya sendiri).
@@ -144,13 +168,16 @@ function buildCatalogCard(guild, cfg, p) {
     if (p.howTo) buttons.push(new ButtonBuilder().setCustomId(`store:howtobtn:${p.id}`).setLabel('Cara Order').setEmoji('📖').setStyle(ButtonStyle.Secondary));
   }
 
-  return card({
+  const img = productImage(guild, p);
+  const payload = card({
     accent: color(cfg, 'brand', 0x3498db),
-    thumb: cc.thumbnail || guild.iconURL({ extension: 'png', size: 256 }),
+    thumb: img.url,
     header: `## ${p.emoji || '🛒'} ${p.label}${tagline ? `\n${tagline}` : ''}`,
     blocks: [info.join('\n')],
     rows: [new ActionRowBuilder().addComponents(buttons)],
   });
+  if (img.files.length) payload.files = img.files;
+  return payload;
 }
 
 module.exports = { buildCatalogHeader, buildCatalogCard, catalogProducts };
