@@ -248,7 +248,7 @@ async function buildDashboard(guild) {
     data.history.length
       ? `### 📜 Riwayat Status\n${data.history.map((h) => `${DOT[h.to]} ${h.name}: ${DOT[h.from]} → ${DOT[h.to]} • ${ts(h.at)}`).join('\n')}`
       : null,
-    `-# ${DOT.ok} Normal • ${DOT.warn} Lambat • ${DOT.down} Gangguan • ${DOT.off} Belum diaktifkan\n-# ${guild.name} • Diperbarui ${ts(Date.now())} • otomatis tiap ${num(Math.max(30, Number(cfg.updateSeconds) || 60))} detik`,
+    `-# ${DOT.ok} Normal • ${DOT.warn} Lambat • ${DOT.down} Gangguan • ${DOT.off} Belum diaktifkan\n-# ${guild.name} • Diperbarui ${ts(Date.now())}`,
   ];
   for (const b of blocks.filter(Boolean)) {
     box.addSeparatorComponents(line());
