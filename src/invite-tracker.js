@@ -7,7 +7,6 @@ const {
   ChannelType,
   MessageFlags,
   Events,
-  RESTJSONErrorCodes,
   ContainerBuilder,
   SectionBuilder,
   TextDisplayBuilder,
@@ -18,9 +17,11 @@ const {
 
 /**
  * Invite Log + Top 10 Inviter (channel terpisah, ter-update otomatis).
- * - Member masuk → log siapa yang mengundang (link siapa, kode, total undangan inviter).
+ * - Member masuk → log siapa yang mengundang (link siapa, kode, total undangan inviter) + STATUS VERIFIKASI.
  * - Undangan baru dihitung VALID setelah member yang diundang verifikasi (dapat role verifikasi di verify.json).
  *   Tidak ada sistem "fake" — akun baru tetap valid asalkan sudah verifikasi.
+ * - Status verifikasi di pesan log join ter-update otomatis: ⏳ Belum verifikasi → ✅ Sudah verifikasi
+ *   (atau 📤 Keluar sebelum verifikasi), jadi admin bisa melihat siapa yang sudah klik tombol Verifikasi.
  * - Member keluar → log + jumlah undangan inviter dikurangi.
  * - Top 10 Inviter di channel terpisah (leaderboardChannelId), 1 pesan yang di-edit otomatis.
  * Setiap member hanya dihitung 1x per inviter (keluar-masuk tidak menggandakan hitungan).
@@ -161,13 +162,13 @@ function inviterText(rec) {
 }
 
 /** Kotak V2 untuk log invite. */
-function logCard({ accent, header, thumb, blocks, guild }) {
+function logCard({ accent, header, thumb, blocks, guild, at }) {
   const text = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000));
   const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
   const box = new ContainerBuilder().setAccentColor(accent);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(text(header));
-  for (const b of [...blocks.filter(Boolean), `-# ${guild.name} • Invite Log • ${ts(Date.now(), 'f')}`]) {
+  for (const b of [...blocks.filter(Boolean), `-# ${guild.name} • Invite Log • ${ts(at || Date.now(), 'f')}`]) {
     box.addSeparatorComponents(line());
     box.addTextDisplayComponents(text(b));
   }
@@ -175,28 +176,56 @@ function logCard({ accent, header, thumb, blocks, guild }) {
 }
 const userLine = (member) => `**👤 Member:** \`${member.user.globalName || member.user.username}\` • @${member.user.username}`;
 
+/** Status verifikasi member baru (tampil di log join & ter-update otomatis). */
+function verifyStatus(rec) {
+  if (rec?.left && rec.verified === false) {
+    return {
+      accent: 0x95a5a6,
+      text: `### 📤 Status Verifikasi\n**Keluar sebelum verifikasi** ${rec.leftAt ? ts(rec.leftAt) : ''}\n-# Undangan ini tidak dihitung.`,
+    };
+  }
+  if (rec?.verified === false) {
+    return {
+      accent: 0xf1c40f,
+      text: '### ⏳ Status Verifikasi\n**Belum klik tombol Verifikasi**\n-# Undangan dihitung **valid** setelah member ini menyelesaikan verifikasi.',
+    };
+  }
+  return {
+    accent: null,
+    text: `### ✅ Status Verifikasi\n**Sudah verifikasi**${rec?.verifiedAt ? ` ${ts(rec.verifiedAt)} (${ts(rec.verifiedAt, 'f')})` : ''}${
+      rec?.inviterId && rec.inviterId !== 'vanity' ? '\n-# Undangan sudah dihitung **valid** untuk inviter.' : ''
+    }`,
+  };
+}
+
 function buildJoinLog(member, rec, cfg) {
   const guild = member.guild;
   const s = rec?.inviterId && rec.inviterId !== 'vanity' ? statsOf(rec.inviterId) : null;
-  const notes = [];
-  if (rec?.inviterId && rec.inviterId !== 'vanity' && rec.verified === false) notes.push('⏳ **Menunggu Verifikasi** — undangan dihitung **valid** setelah member ini menyelesaikan verifikasi.');
-  if (rec?.rejoin) notes.push('🔁 **Rejoin** — member ini pernah bergabung sebelumnya.');
+  const vs = verifyStatus(rec);
   return logCard({
     guild,
-    accent: color(cfg, 'join', 0x2ecc71),
+    at: rec?.joinedAt,
+    accent: vs.accent ?? color(cfg, 'join', 0x2ecc71),
     thumb: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
     header: `## 📥 Member Baru Bergabung\n<@${member.id}> bergabung ke **${guild.name}**! 🎉`,
     blocks: [
-      [userLine(member), `**📅 Akun Dibuat:** ${ts(member.user.createdTimestamp, 'D')} (${ts(member.user.createdTimestamp, 'R')})`, `**🔢 Member Ke:** \`#${num(guild.memberCount)}\``].join('\n'),
+      [
+        userLine(member),
+        `**📅 Akun Dibuat:** ${ts(member.user.createdTimestamp, 'D')} (${ts(member.user.createdTimestamp, 'R')})`,
+        rec?.memberNo ? `**🔢 Member Ke:** \`#${num(rec.memberNo)}\`` : null,
+      ]
+        .filter(Boolean)
+        .join('\n'),
       [
         '### 🎫 Info Undangan',
         `**🙋 Diundang Oleh:** ${inviterText(rec)}`,
         `**🔗 Kode Undangan:** ${rec?.code ? `\`${rec.code}\`` : '`-`'}`,
-        s ? `**📊 Undangan Inviter:** \`✅ ${num(s.valid)} valid\` • \`📥 ${num(s.total)} total\`` : null,
+        s ? `**📊 Undangan Inviter:** \`✅ ${num(s.valid)} valid\` • \`⏳ ${num(s.pending)} menunggu\` • \`📥 ${num(s.total)} total\`` : null,
       ]
         .filter(Boolean)
         .join('\n'),
-      notes.length ? notes.join('\n') : null,
+      vs.text,
+      rec?.rejoin ? '🔁 **Rejoin** — member ini pernah bergabung sebelumnya.' : null,
     ],
   });
 }
@@ -215,6 +244,7 @@ function buildLeaveLog(member, rec, cfg) {
       [
         '### 🎫 Info Undangan',
         `**🙋 Diundang Oleh:** ${inviterText(rec)}`,
+        rec ? `**🛡️ Verifikasi:** ${rec.verified === false ? '`⏳ Belum sempat verifikasi`' : '`✅ Sudah verifikasi`'}` : null,
         s ? `**📊 Undangan Inviter:** \`✅ ${num(s.valid)} valid\` • \`📤 ${num(s.left)} keluar\`` : null,
       ]
         .filter(Boolean)
@@ -276,27 +306,23 @@ async function updateLeaderboard(client) {
   if (!loc) return;
   const channel = await client.channels.fetch(loc.channelId).catch(() => null);
   if (!channel) return;
+  const payload = buildLeaderboard(channel.guild, loadConfig());
   try {
-    await channel.messages.edit(loc.messageId, buildLeaderboard(channel.guild, loadConfig()));
+    await channel.messages.edit(loc.messageId, payload);
   } catch (err) {
-    if (err.code === RESTJSONErrorCodes.UnknownMessage) {
-      data.leaderboard = null; // pesan dihapus manual → berhenti di-update (kirim ulang dengan /invite-log leaderboard)
+    if (err.code === 10008) {
+      data.leaderboard = null; // pesan dihapus manual → berhenti di-update
       save();
-    } else {
-      // Leaderboard lama format embed tidak bisa diubah ke Components V2 → kirim baru & hapus yang lama.
-      const sent = await channel.send(buildLeaderboard(channel.guild, loadConfig())).catch((e) => {
-        console.error('[invites] gagal update leaderboard:', err.message, '|', e.message);
-        return null;
-      });
-      if (sent) {
-        await channel.messages.delete(loc.messageId).catch(() => {});
-        data.leaderboard = { channelId: channel.id, messageId: sent.id };
-        save();
-      }
+      return;
     }
+    // Pesan lama format embed tidak bisa diubah ke Components V2 → kirim baru & hapus yang lama.
+    const sent = await channel.send(payload).catch(() => null);
+    if (!sent) return;
+    await channel.messages.delete(loc.messageId).catch(() => {});
+    data.leaderboard = { channelId: channel.id, messageId: sent.id };
+    save();
   }
 }
-/** Jeda singkat supaya banyak member masuk bersamaan cukup 1x edit. */
 function scheduleLeaderboard(client) {
   clearTimeout(lbTimer);
   lbTimer = setTimeout(() => updateLeaderboard(client).catch(() => {}), 3000);
@@ -310,18 +336,65 @@ async function sendLog(guild, payload) {
   // Coba 2x (jaga-jaga koneksi VPS sedang bermasalah).
   for (let i = 0; i < 2; i++) {
     try {
-      await channel.send(payload);
-      return;
+      return await channel.send(payload);
     } catch (e) {
       if (i === 1 || e.code === 50013 || e.code === 50001) {
-        return console.error(`[invites] gagal kirim log (${e.code || ''} ${e.message}) — cek izin bot di channel invite log: View Channel, Send Messages.`);
+        console.error(`[invites] gagal kirim log (${e.code || ''} ${e.message}) — cek izin bot di channel invite log: View Channel, Send Messages.`);
+        return null;
       }
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
+  return null;
+}
+
+/** Perbarui pesan log join (status verifikasi berubah). */
+async function updateJoinLog(member, rec) {
+  if (!rec?.logMessageId || !rec.logChannelId) return;
+  const channel = await member.client.channels.fetch(rec.logChannelId).catch(() => null);
+  if (!channel?.isTextBased()) return;
+  await channel.messages.edit(rec.logMessageId, buildJoinLog(member, rec, loadConfig())).catch((e) => {
+    if (e.code === 10008) {
+      rec.logMessageId = null; // pesan log dihapus manual
+      save();
+    }
+  });
 }
 
 // ───────────────────────── Event ─────────────────────────
+/** Saat bot menyala: cocokkan status verifikasi semua member tercatat (role bisa berubah saat bot mati). */
+function syncVerified(guild) {
+  const rid = verifyRoleId();
+  let changed = false;
+  const toUpdate = [];
+  for (const [id, rec] of Object.entries(data.members)) {
+    if (rec.left) continue;
+    const m = guild.members.cache.get(id);
+    if (!m) continue;
+    const v = !rid || m.roles.cache.has(rid);
+    if (rec.verified !== v) {
+      if (v && rec.verified === false) {
+        rec.verifiedAt = Date.now();
+        toUpdate.push([m, rec]);
+      }
+      rec.verified = v;
+      changed = true;
+    }
+    if ('fake' in rec) {
+      delete rec.fake;
+      changed = true;
+    }
+  }
+  if (changed) save();
+  // Perbarui log join yang statusnya berubah saat bot mati (bertahap, tidak spam API).
+  (async () => {
+    for (const [m, rec] of toUpdate.slice(0, 50)) {
+      await updateJoinLog(m, rec);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  })().catch(() => {});
+}
+
 function registerInviteTracker(client) {
   client.once(Events.ClientReady, async () => {
     for (const guild of client.guilds.cache.values()) {
@@ -349,11 +422,14 @@ function registerInviteTracker(client) {
         const cfg = loadConfig();
         const found = member.user.bot ? null : await detectInvite(member.guild);
         const old = data.members[member.id];
+        const verified = isVerifiedMember(member);
         const rec = {
           inviterId: found?.inviterId || null,
           code: found?.code || null,
           joinedAt: Date.now(),
-          verified: isVerifiedMember(member),
+          memberNo: member.guild.memberCount,
+          verified,
+          verifiedAt: verified ? Date.now() : null,
           left: false,
           rejoin: Boolean(old),
           bot: member.user.bot || undefined,
@@ -364,14 +440,19 @@ function registerInviteTracker(client) {
           data.members[member.id] = rec;
           save();
         }
-        await sendLog(member.guild, buildJoinLog(member, rec, cfg));
+        const msg = await sendLog(member.guild, buildJoinLog(member, rec, cfg));
+        if (msg && !member.user.bot) {
+          rec.logChannelId = msg.channelId;
+          rec.logMessageId = msg.id;
+          save();
+        }
         if (!member.user.bot) scheduleLeaderboard(client);
       })
       .catch((e) => console.error('[invites] join:', e.message));
     queues.set(member.guild.id, next);
   });
 
-  // Member mendapat role verifikasi → undangannya menjadi valid.
+  // Member mendapat role verifikasi (klik tombol Verifikasi) → undangan valid & status di log join berubah.
   client.on(Events.GuildMemberUpdate, (oldM, newM) => {
     if (newM.user?.bot) return;
     const rec = data.members[newM.id];
@@ -380,6 +461,7 @@ function registerInviteTracker(client) {
     rec.verified = true;
     rec.verifiedAt = Date.now();
     save();
+    updateJoinLog(newM, rec).catch(() => {});
     if (rec.inviterId && rec.inviterId !== 'vanity') scheduleLeaderboard(client);
   });
 
@@ -393,31 +475,12 @@ function registerInviteTracker(client) {
       rec.left = true;
       rec.leftAt = Date.now();
       save();
+      // Keluar sebelum verifikasi → status di log join ikut berubah.
+      if (rec.verified === false) updateJoinLog(member, rec).catch(() => {});
     }
     await sendLog(member.guild, buildLeaveLog(member, rec, loadConfig())).catch(() => {});
     if (rec) scheduleLeaderboard(client);
   });
-}
-
-/** Saat bot menyala: cocokkan status verifikasi semua member tercatat (role bisa berubah saat bot mati). */
-function syncVerified(guild) {
-  const rid = verifyRoleId();
-  let changed = false;
-  for (const [id, rec] of Object.entries(data.members)) {
-    if (rec.left) continue;
-    const m = guild.members.cache.get(id);
-    if (!m) continue;
-    const v = !rid || m.roles.cache.has(rid);
-    if (rec.verified !== v) {
-      rec.verified = v;
-      changed = true;
-    }
-    if ('fake' in rec) {
-      delete rec.fake;
-      changed = true;
-    }
-  }
-  if (changed) save();
 }
 
 // ───────────────────────── Command ─────────────────────────
@@ -490,7 +553,7 @@ const inviteLogCommand = {
     await refreshCache(interaction.guild);
     const canRead = cache.has(interaction.guild.id);
     return interaction.editReply(
-      `✅ Top 10 Inviter dikirim ke ${channel} dan akan ter-update otomatis setiap ada member masuk / keluar.` +
+      `✅ Top 10 Inviter dikirim ke ${channel} dan akan ter-update otomatis setiap ada member masuk / keluar / verifikasi.` +
         (canRead ? '' : '\n⚠️ Bot belum bisa membaca daftar undangan — beri bot izin **Manage Server** supaya invite log berjalan.'),
     );
   },
