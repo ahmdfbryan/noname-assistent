@@ -1,0 +1,15 @@
+{
+  "_petunjuk": [
+    "Prefix command: bot yang mengirim pesan (bukan akun admin). Pesan admin otomatis dihapus.",
+    "prefix = awalan command. Contoh dengan \"!\": !say Halo semua!",
+    "!say <pesan> → kirim di channel ini • !say #channel <pesan> → kirim ke channel lain",
+    "!edit <link pesan> <pesan baru> → edit pesan bot • !reply <link pesan> <pesan> → bot membalas pesan (atau ketik sambil reply pesannya)",
+    "Lampiran (gambar / file) ikut dikirim bot. Bisa multi-baris, markdown, emoji, mention, @everyone (kalau kamu punya izin Mention Everyone).",
+    "Yang bisa memakai: Administrator / Manage Server + role di allowedRoleIds (isi ID role, opsional).",
+    "deleteCommand false = pesan command admin tidak dihapus.",
+    "WAJIB: aktifkan 'Message Content Intent' di Discord Developer Portal → Bot → Privileged Gateway Intents."
+  ],
+  "prefix": "!",
+  "allowedRoleIds": [],
+  "deleteCommand": true
+}
