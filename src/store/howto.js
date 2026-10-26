@@ -13,6 +13,7 @@ const {
   MediaGalleryItemBuilder,
   MessageFlags,
 } = require('discord.js');
+const UI = require('../ui');
 const { color, rupiah, num, fill } = require('./config');
 const { state, isProductOpen, stockOf, stockUnit } = require('./state');
 const V = require('./views');
@@ -33,7 +34,7 @@ const V2 = MessageFlags.IsComponentsV2;
 
 /** Kotak V2: header (+ logo), lalu blok-blok teks dipisah garis. */
 function card(cfg, guild, { header, blocks = [], image, rows = [], thumb = true }) {
-  const box = new ContainerBuilder().setAccentColor(color(cfg, 'brand', 0x3498db));
+  const box = UI.accent(new ContainerBuilder(), color(cfg, 'brand', 0x3498db));
   const icon = thumb ? guild.iconURL({ extension: 'png', size: 256 }) : null;
   if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
   else box.addTextDisplayComponents(text(header));
