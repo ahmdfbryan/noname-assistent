@@ -165,7 +165,9 @@ function inviterText(rec) {
 function logCard({ accent, header, thumb, blocks, guild, at }) {
   const text = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000));
   const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
-  const box = new ContainerBuilder().setAccentColor(accent);
+  // Default tanpa warna aksen di kiri (hanya garis kotak). invites.json → "showAccent": true untuk memakai warna lagi.
+  const box = new ContainerBuilder();
+  if (loadConfig().showAccent === true && accent != null) box.setAccentColor(accent);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(text(header));
   for (const b of [...blocks.filter(Boolean), `-# ${guild.name} • Invite Log • ${ts(at || Date.now(), 'f')}`]) {
