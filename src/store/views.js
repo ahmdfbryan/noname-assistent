@@ -2452,7 +2452,7 @@ function buildLeaderboardV2(guild, cfg) {
       rest.length ? `### 📋 Peringkat 4 – 10\n${rest.join('\n')}` : null,
       [`🧾 **Total Transaksi:** \`${num(state.stats.transactions)} transaksi\``, `👥 **Total Pembeli:** \`${num(Object.keys(state.spenders).length)} pembeli\``].join('\n'),
     ],
-    footer: `💡 Cek total belanja & tier kamu dengan \`/spender\`\n-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
+    footer: `${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
   });
 }
 
