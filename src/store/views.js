@@ -69,7 +69,8 @@ function buildPanel(guild, cfg) {
     { name: '⭐ Rating Pembeli', value: `\`${avg} / 5 (${num(s.ratingCount)} ulasan)\``, inline: true },
   );
 
-  const styles = { robux: ButtonStyle.Success, gamepass: ButtonStyle.Success, canva: ButtonStyle.Primary, rekber: ButtonStyle.Primary };
+  // Tombol produk tanpa warna (abu-abu). store.json → "panelButtonColors": true untuk memakai warna lagi.
+  const styles = cfg.panelButtonColors === true ? { robux: ButtonStyle.Success, gamepass: ButtonStyle.Success, canva: ButtonStyle.Primary, rekber: ButtonStyle.Primary } : {};
   const buttons = (cfg.products || []).slice(0, 5).map((prod) =>
     new ButtonBuilder()
       .setCustomId(`store:buy:${prod.id}`)
@@ -2268,7 +2269,8 @@ function buildPanelV2(guild, cfg, group = 'main') {
   const name = { name: storeName(cfg, guild) };
   const s = state.stats;
   const products = productsOf(cfg, group);
-  const styles = { robux: ButtonStyle.Success, gamepass: ButtonStyle.Success, canva: ButtonStyle.Primary, rekber: ButtonStyle.Primary };
+  // Tombol produk tanpa warna (abu-abu). store.json → "panelButtonColors": true untuk memakai warna lagi.
+  const styles = cfg.panelButtonColors === true ? { robux: ButtonStyle.Success, gamepass: ButtonStyle.Success, canva: ButtonStyle.Primary, rekber: ButtonStyle.Primary } : {};
   const buttons = products.slice(0, 5).map((prod) =>
     new ButtonBuilder()
       .setCustomId(`store:buy:${prod.id}`)
