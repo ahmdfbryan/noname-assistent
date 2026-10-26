@@ -134,7 +134,9 @@ const linkRow = (url, label = 'Lihat Giveaway') =>
 
 /** Kotak V2: header (+ logo) → blok-blok teks dipisah garis → gambar → footer kecil → tombol. */
 function card({ color: c, header, thumb, blocks = [], image, footer, rows = [], top }) {
-  const box = new ContainerBuilder().setAccentColor(c);
+  // Tanpa warna aksen di kiri (hanya garis kotak), kecuali giveaway.json "showAccent": true.
+  const box = new ContainerBuilder();
+  if (loadConfig()?.showAccent === true && c != null) box.setAccentColor(c);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(text(header));
   for (const b of blocks.filter(Boolean)) {
