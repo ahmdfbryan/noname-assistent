@@ -294,7 +294,7 @@ function buildLeaderboard(guild, cfg) {
       `✅ **Total Undangan Valid:** \`${num(all.reduce((a, s) => a + s.valid, 0))}\``,
       `🙋 **Total Inviter:** \`${num(all.filter((s) => s.valid > 0).length)}\``,
     ].join('\n'),
-    `-# ✅ Undangan dihitung valid setelah member yang diundang menyelesaikan verifikasi.\n-# 💡 ${lb.tip || 'Cek jumlah undanganmu dengan `/invites`'}\n-# ${guild.name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
+    `-# ✅ Undangan dihitung valid setelah member yang diundang menyelesaikan verifikasi.\n${lb.tip ? `-# 💡 ${lb.tip}\n` : ''}-# ${guild.name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
   ];
   for (const b of blocks.filter(Boolean)) {
     box.addSeparatorComponents(line());
