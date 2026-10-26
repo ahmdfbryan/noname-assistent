@@ -21,6 +21,7 @@ const {
   SeparatorBuilder,
   SeparatorSpacingSize,
 } = require('discord.js');
+const UI = require('./ui');
 
 /**
  * Suggestions (Components V2).
@@ -101,7 +102,7 @@ const text = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000)
 const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
 
 function card({ color, header, thumb, blocks = [], footer, rows = [] }) {
-  const box = new ContainerBuilder().setAccentColor(color);
+  const box = UI.accent(new ContainerBuilder(), color);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(text(header));
   for (const b of blocks.filter(Boolean)) {
