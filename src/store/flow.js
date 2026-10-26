@@ -16,7 +16,6 @@ const {
   ChannelType,
   RESTJSONErrorCodes,
   Events,
-  EmbedBuilder,
 } = require('discord.js');
 const { loadConfig, isId, rupiah, num, getProduct, GROUPS, productsOf } = require('./config');
 const { archiveStoreTicket } = require('../ticket-archive');
@@ -2211,25 +2210,10 @@ async function housekeeping() {
         state.stats.ratingSum += rating;
         state.stats.ratingCount += 1;
         t.testimonyPosted = true;
-        const secs = Number(cfg.ticket?.deleteAfterSeconds) || 15;
-        t.deleteAt = now + secs * 1000;
+        t.deleteAt = now;
         save();
         if (cfg?.ticket?.postWithoutReview !== false && guild) await postTestimony(guild, t).catch((e) => console.warn(`[store] testimoni otomatis ${t.id}:`, e.message));
         logOrder(guild, t, `⏰ Tidak ada ulasan — otomatis rating ${rating}/5`);
-        const ch = await client.channels.fetch(t.channelId).catch(() => null);
-        await ch
-          ?.send(
-            v2({
-              embeds: [
-                new EmbedBuilder()
-                  .setTitle('⏰ Waktu Ulasan Habis')
-                  .setDescription(
-                    `Tidak ada ulasan dari pembeli, jadi pesanan ini otomatis diberi rating **${'⭐'.repeat(rating)}**.\nTerima kasih sudah berbelanja! 💙\n\nChannel ini akan dihapus dalam **${secs} detik**.`,
-                  ),
-              ],
-            }),
-          )
-          .catch(() => {});
         refreshPanel();
         refreshLeaderboard();
       }
