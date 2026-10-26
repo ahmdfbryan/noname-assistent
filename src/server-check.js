@@ -15,6 +15,7 @@ const {
   ButtonStyle,
   SnowflakeUtil,
 } = require('discord.js');
+const UI = require('./ui');
 
 /**
  * /cekserver <link> — cek server lain lewat link invite (Components V2).
@@ -128,7 +129,7 @@ function buildCard(invite, requester) {
   features.sort((a, b) => (order.indexOf(a) === -1 ? 999 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 999 : order.indexOf(b)));
   const badges = [features.includes('VERIFIED') ? '☑️' : '', features.includes('PARTNERED') ? '🤝' : ''].join('');
 
-  const box = new ContainerBuilder().setAccentColor(BRAND);
+  const box = UI.accent(new ContainerBuilder(), BRAND);
   if (banner || splash) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(banner || splash).setDescription(`Banner ${g.name}`)));
 
   const header = [
@@ -224,7 +225,7 @@ function buildCard(invite, requester) {
 }
 
 function errorCard(title, desc) {
-  return { components: [new ContainerBuilder().setAccentColor(0xe74c3c).addTextDisplayComponents(text(`## ${title}\n${desc}`))], flags: V2 };
+  return { components: [UI.accent(new ContainerBuilder(), 0xe74c3c).addTextDisplayComponents(text(`## ${title}\n${desc}`))], flags: V2 };
 }
 
 // Cooldown per member (anti spam API Discord).
