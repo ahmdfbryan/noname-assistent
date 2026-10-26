@@ -12,6 +12,7 @@ const {
   MediaGalleryItemBuilder,
   MessageFlags,
 } = require('discord.js');
+const UI = require('../ui');
 const { color, rupiah, num, fill, productsOf, groupOf, groupText } = require('./config');
 const { state, isProductOpen, productStatsOf, stockOf, stockUnit } = require('./state');
 const V = require('./views');
@@ -35,7 +36,7 @@ const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorS
 
 /** Kotak V2: header (+ thumbnail) → blok dipisah garis → gambar → footer → tombol. */
 function card({ accent, header, thumb, blocks = [], image, footer, rows = [] }) {
-  const box = new ContainerBuilder().setAccentColor(accent);
+  const box = UI.accent(new ContainerBuilder(), accent);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(text(header));
   for (const b of blocks.filter(Boolean)) {
