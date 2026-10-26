@@ -66,7 +66,7 @@ function buildPanel(guild, cfg) {
   // Total = semua transaksi selesai dari semua produk (Robux Visend, Robux Gamepass, Rekber, dst.).
   embed.addFields(
     { name: '🧾 Total Transaksi', value: `\`${num((s.transactions || 0) + (s.rekber || 0))} transaksi\``, inline: true },
-    { name: '⭐ Rating Pembeli', value: `\`${avg} / 5 (${num(s.ratingCount)} ulasan)\``, inline: true },
+    { name: '⭐ Rating Toko', value: `\`${avg} / 5 (${num(s.ratingCount)} ulasan)\``, inline: true },
   );
 
   // Tombol produk tanpa warna (abu-abu). store.json → "panelButtonColors": true untuk memakai warna lagi.
@@ -2249,7 +2249,7 @@ const ratingLine = () => {
   const s = state.stats;
   const avg = s.ratingCount ? (s.ratingSum / s.ratingCount).toFixed(1) : '-';
   const stars = s.ratingCount ? STARS(Math.round(s.ratingSum / s.ratingCount)) : '☆☆☆☆☆';
-  return `⭐ **Rating Pembeli:** ${stars} \`${avg} / 5\` (${num(s.ratingCount)} ulasan)`;
+  return `⭐ **Rating Toko:** ${stars} \`${avg} / 5\` (${num(s.ratingCount)} ulasan)`;
 };
 const termsButton = (product, label) =>
   product.terms?.description
