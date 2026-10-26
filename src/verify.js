@@ -90,9 +90,11 @@ const DEFAULT_PERKS = [
 ];
 const DEFAULT_STEPS = ['Klik tombol **Verify Sekarang** di bawah', 'Role diberikan **otomatis** dalam hitungan detik', 'Semua channel langsung **terbuka** — selamat bergabung! 🎉'];
 
-/** Kotak V2: header (+ gambar kecil) → blok teks dipisah garis → banner → footer → tombol. */
+/** Kotak V2 (garis kotak tanpa warna kiri): header (+ gambar kecil) → blok teks dipisah garis → banner → footer → tombol. */
 function card({ color, header, thumb, blocks = [], image, footer, rows = [] }) {
-  const box = new ContainerBuilder().setAccentColor(color);
+  // Default tanpa warna aksen di kiri (hanya garis kotak). verify.json → "showAccent": true untuk memakai warna lagi.
+  const box = new ContainerBuilder();
+  if (loadConfig()?.showAccent === true && color != null) box.setAccentColor(color);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(text(header));
   for (const b of blocks.filter(Boolean)) {
