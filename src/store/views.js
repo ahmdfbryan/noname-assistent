@@ -14,6 +14,7 @@ const {
   MediaGalleryItemBuilder,
   MessageFlags,
 } = require('discord.js');
+const UI = require('../ui');
 const { color, rupiah, num, fill, ts, loadConfig, GROUPS, groupOf, productsOf, groupText } = require('./config');
 const SP = require('./spender');
 const { state, productState, productStatsOf, hasStock, stockOf, stockUnit, isProductOpen, kindOf, planStockOf } = require('./state');
@@ -2084,7 +2085,7 @@ function buildBoostExpiry(guild, cfg, t, who) {
 
 // ══════════════════════ Panel & info produk (Components V2) ══════════════════════
 function pcard({ accent, header, thumb, image, blocks = [], footer, rows = [] }) {
-  const box = new ContainerBuilder().setAccentColor(accent);
+  const box = UI.accent(new ContainerBuilder(), accent);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(v2Text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(v2Text(header));
   if (image) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image)));
