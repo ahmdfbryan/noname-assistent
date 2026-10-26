@@ -1,0 +1,7 @@
+{
+  "_petunjuk": [
+    "Pengaturan tampilan bersama untuk: reputasi, suggestions, how to order, catalog, panel store & produk digital, leaderboard spender, Canva Manager, ticket NCS, cari voice, system operational, panel bot command, serta hasil /userinfo /roblox /cekserver.",
+    "showAccent false = kotak hanya garis tepi (tanpa warna di kiri). true = warna di kiri dipakai lagi."
+  ],
+  "showAccent": false
+}
