@@ -16,6 +16,7 @@ const {
   ButtonStyle,
   PermissionFlagsBits,
 } = require('discord.js');
+const UI = require('./ui');
 const { request, DOMAIN } = require('./store/roblox');
 
 /**
@@ -70,7 +71,7 @@ function onCooldown(interaction, sec = 8) {
 }
 
 function card({ accent, thumb, header, banner, blocks, footer, buttons }) {
-  const box = new ContainerBuilder().setAccentColor(accent);
+  const box = UI.accent(new ContainerBuilder(), accent);
   if (banner) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(banner)));
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(text(header));
@@ -91,7 +92,7 @@ function card({ accent, thumb, header, banner, blocks, footer, buttons }) {
 const link = (label, emoji, url) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setEmoji(emoji).setURL(url);
 const footerOf = (interaction) => `${interaction.guild?.name || 'Noname Studios Creative'} • Diminta oleh @${interaction.user.username} • ${ts(Date.now(), 'f')}`;
 const errorCard = (title, desc) => ({
-  components: [new ContainerBuilder().setAccentColor(0xe74c3c).addTextDisplayComponents(text(`## ${title}\n${desc}`))],
+  components: [UI.accent(new ContainerBuilder(), 0xe74c3c).addTextDisplayComponents(text(`## ${title}\n${desc}`))],
   flags: V2,
 });
 
