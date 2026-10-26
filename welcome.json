@@ -1,29 +1,54 @@
 {
   "_petunjuk": [
     "File ini dibaca ulang setiap ada member join, jadi perubahan langsung berlaku TANPA restart bot.",
-    "Placeholder yang bisa dipakai di teks: {name} = nama tampilan member, {username} = username, {mention} = @member,",
-    "{server} = nama server, {memberCount} = urutan member (mis. 95.661), {channel:ID} = link ke channel (mis. {channel:123456789}).",
-    "thumbnail: \"avatar\" = foto profil member, \"server\" = logo server, atau isi link gambar langsung.",
-    "Tombol: isi \"url\" untuk link bebas, ATAU \"channelId\" untuk langsung membuka channel di server ini."
+    "Placeholder: {name} = nama tampilan member, {username} = username, {mention} = @member, {server} = nama server,",
+    "{memberCount} = urutan member (mis. 1.250), {channel:ID} = link ke channel (mis. {channel:123456789}).",
+    "Welcome = 1 kotak: sambutan + foto → steps (langkah awal) → perks (yang bisa dinikmati) → banner GIF → footer → tombol.",
+    "thumbnail: \"avatar\" = foto profil member, \"server\" = logo server, atau link gambar langsung.",
+    "banner: path file di folder bot (contoh \"assets/welcome-banner.gif\") atau link https. Kosongkan untuk tanpa banner.",
+    "buttons (maks 5): isi \"url\" untuk link bebas, ATAU \"channelId\" untuk membuka channel di server ini. emoji opsional.",
+    "showAccent: true = pakai garis warna accentColor di kiri kotak. false = hanya garis kotak."
   ],
 
   "enabled": true,
   "channelId": "1523618383902408797",
   "mentionMember": false,
-  "accentColor": "#E53935",
+  "showAccent": false,
+  "accentColor": "#3498DB",
 
   "welcome": {
-    "title": "Selamat datang, {name} di {server}!",
-    "description": "Kamu member ke #{memberCount}. Wajib untuk membaca **Rules & Guide Server** di bawah ini.",
+    "title": "👋 Selamat Datang, {name}!",
+    "subtitle": "{server} • Welcome to the Community",
+    "description": "Hai {mention}! Kamu resmi jadi **member ke #{memberCount}** di **{server}** 🎉\nTempatnya nongkrong, mabar, ikut event seru, sampai belanja kebutuhan Roblox & produk digital dengan **aman dan terpercaya**. ✨",
     "thumbnail": "avatar"
   },
 
-  "rules": {
-    "title": "🔔 Rules & Guide Server",
-    "description": "Before you join our active gaming parties, please verify and review community terms.\n\nSilahkan ambil role di pencet Verify Disini kanan atas\n\nAnnouncement 📢 {channel:1553660580282368070}",
-    "buttons": [
-      { "label": "Verify Disini", "channelId": "1552529630127456326" },
-      { "label": "Baca Rules", "channelId": "1552532239902838894" }
+  "steps": {
+    "title": "🚀 Mulai dari Sini",
+    "items": [
+      "✅ **Verifikasi akun** di {channel:1552529630127456326} untuk membuka semua channel",
+      "📜 **Baca rules** di {channel:1552532239902838894} supaya nyaman bersama",
+      "📢 **Pantau info terbaru** di {channel:1553660580282368070}",
+      "🛒 **Cek store** di {channel:1553667092711088160} — Robux, Gamepass, Canva Pro & lainnya"
     ]
-  }
+  },
+
+  "perks": {
+    "title": "💎 Yang Bisa Kamu Nikmati",
+    "items": [
+      "🎮 **Mabar & event komunitas** bareng member lain",
+      "🎁 **Giveaway rutin** dengan hadiah menarik",
+      "🎙️ **Nongkrong di voice** & naik level dari keaktifanmu",
+      "🛡️ **Transaksi aman** lewat store & rekber resmi"
+    ]
+  },
+
+  "banner": "assets/welcome-banner.gif",
+  "footer": "{server} • Selamat bergabung & have fun!",
+
+  "buttons": [
+    { "label": "Verifikasi", "emoji": "✅", "channelId": "1552529630127456326" },
+    { "label": "Baca Rules", "emoji": "📜", "channelId": "1552532239902838894" },
+    { "label": "Store", "emoji": "🛒", "channelId": "1553667092711088160" }
+  ]
 }
