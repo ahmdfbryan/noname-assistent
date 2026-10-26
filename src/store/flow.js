@@ -152,7 +152,14 @@ async function refreshCatalog(group = 'main') {
   for (const [messageId, build] of jobs) {
     if (!messageId) continue;
     try {
-      await channel.messages.edit(messageId, build());
+      const payload = build();
+      // Gambar produk sudah ada di pesan → tidak perlu upload ulang setiap update.
+      if (payload.files?.length) {
+        const msg = await channel.messages.fetch(messageId).catch(() => null);
+        const names = new Set(msg ? [...msg.attachments.values()].map((a) => a.name) : []);
+        if (msg && payload.files.every((f) => names.has(f.name))) delete payload.files;
+      }
+      await channel.messages.edit(messageId, payload);
     } catch (err) {
       if (err.code === RESTJSONErrorCodes.UnknownMessage) continue;
       // Katalog lama format embed tidak bisa diubah ke Components V2 → kirim ulang semuanya (urutan tetap).
