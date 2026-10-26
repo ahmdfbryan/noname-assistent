@@ -76,6 +76,12 @@ function loadConfig() {
     return DEFAULT;
   }
 }
+/** Kotak V2 tanpa warna aksen di kiri (hanya garis kotak), kecuali leveling.json "showAccent": true. */
+const boxFor = (cfg) => {
+  const box = new ContainerBuilder();
+  if (cfg.showAccent === true) box.setAccentColor(brand(cfg));
+  return box;
+};
 const brand = (cfg) => {
   const n = parseInt(String(cfg.color || '').replace('#', ''), 16);
   return Number.isNaN(n) ? 0x3498db : n;
@@ -144,7 +150,7 @@ function rankCard(guild, cfg, user, member) {
   const total = ranking().length;
   const avgMsgXp = (Number(cfg.xp.messageMin) + Number(cfg.xp.messageMax)) / 2 || 20;
   const left = info.need - info.current;
-  const box = new ContainerBuilder().setAccentColor(brand(cfg));
+  const box = boxFor(cfg);
   const header = `# ${member?.displayName || user.globalName || user.username}\n-# @${user.username} • ${guild.name}\n**${title.name}** • Level **${info.level}**${rank ? ` • Peringkat **#${rank}**` : ''}`;
   box.addSectionComponents(
     new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL((member || user).displayAvatarURL({ extension: 'png', size: 256 }))),
@@ -204,7 +210,7 @@ function buildLeaderboard(guild, cfg) {
   const podium = top.slice(0, 3).map(row).map((r, k) => `${medals[k]} <@${r.id}>\n┗ 🏅 **Level ${r.i.level}** • ${r.title.name} • \`${num(r.u.xp)} XP\``);
   const rest = top.slice(3).map(row).map((r, k) => `\`#${k + 4}\` <@${r.id}> • **Lv ${r.i.level}** • \`${num(r.u.xp)} XP\``);
   const all = Object.values(data.users);
-  const box = new ContainerBuilder().setAccentColor(brand(cfg));
+  const box = boxFor(cfg);
   const header = `# ${fill(lb.title)}\n-# ${fill(lb.subtitle)}`;
   const icon = guild.iconURL({ extension: 'png', size: 256 });
   if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
@@ -234,7 +240,7 @@ function levelUpCard(guild, cfg, member, from, to, newRoles = []) {
   const oldTitle = titleFor(cfg, from);
   const newTitle = titleFor(cfg, to);
   const info = levelInfo(u.xp);
-  const box = new ContainerBuilder().setAccentColor(brand(cfg));
+  const box = boxFor(cfg);
   const msg = String(cfg.levelUp.message || '').replace(/\{user\}/g, `<@${member.id}>`).replace(/\{level\}/g, to).replace(/\{server\}/g, guild.name);
   box.addSectionComponents(
     new SectionBuilder()
