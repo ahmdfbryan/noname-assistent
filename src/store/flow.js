@@ -16,6 +16,7 @@ const {
   ChannelType,
   RESTJSONErrorCodes,
   Events,
+  EmbedBuilder,
 } = require('discord.js');
 const { loadConfig, isId, rupiah, num, getProduct, GROUPS, productsOf } = require('./config');
 const { archiveStoreTicket } = require('../ticket-archive');
@@ -2011,7 +2012,7 @@ async function onCloseModal(interaction, ticketId) {
     if (status === 'completed') {
       state.stats.rekber += 1;
       state.stats.rekberVolume += t.nominal;
-      t.testimonyDeadline = Date.now() + (Number(cfg.ticket?.testimonyTimeoutHours) || 24) * 3600 * 1000;
+      t.testimonyDeadline = Date.now() + testimonyTimeoutMs(cfg);
     } else {
       t.deleteAt = Date.now() + (Number(cfg.ticket?.deleteAfterSeconds) || 15) * 1000;
     }
@@ -2030,7 +2031,7 @@ async function onCloseModal(interaction, ticketId) {
     ps.robux += t.amount;
     ps.revenue += t.price;
     if (kindOf(t) === 'canva' || kindOf(t) === 'boost') t.expiresAt = t.closedAt + (Number(t.plan?.days) || 30) * 86400000;
-    t.testimonyDeadline = Date.now() + (Number(cfg.ticket?.testimonyTimeoutHours) || 24) * 3600 * 1000;
+    t.testimonyDeadline = Date.now() + testimonyTimeoutMs(cfg);
   } else {
     if (kindOf(t) === 'robux') state.stock += t.amount; // stock Robux dikembalikan (gamepass tidak memakai stock)
     if (kindOf(t) === 'canva' || kindOf(t) === 'boost') returnSlot(cfg, t); // slot Canva / stock boost dikembalikan
@@ -2181,6 +2182,9 @@ async function onTestimonyModal(interaction, ticketId) {
   refreshPanel();
 }
 
+/** Batas waktu ulasan: store.json → ticket.testimonyTimeoutMinutes (default 10 menit). */
+const testimonyTimeoutMs = (cfg) => Math.max(1, Number(cfg?.ticket?.testimonyTimeoutMinutes) || 10) * 60 * 1000;
+
 // ══════════════════════ Tugas berkala: batas testimoni & hapus channel ══════════════════════
 /** Hapus sesi order yang ditinggalkan (tidak dikonfirmasi) supaya memori tidak menumpuk. */
 function sweepSessions() {
@@ -2198,12 +2202,36 @@ async function housekeeping() {
   for (const t of Object.values(state.tickets)) {
     try {
       // Pembeli tidak memberi testimoni sampai batas waktu.
+      // → otomatis diberi rating ⭐ 5 dengan keterangan "tidak ada ulasan", testimoni diposting, lalu ticket ditutup.
       if (t.status === 'completed' && !t.testimony && !t.testimonyPosted && !t.deleted && t.testimonyDeadline < now) {
         const guild = client.guilds.cache.get(t.guildId) || client.guilds.cache.first();
-        if (cfg?.ticket?.postWithoutReview !== false && guild) await postTestimony(guild, t);
+        const auto = cfg?.ticket?.autoTestimony || {};
+        const rating = Math.min(5, Math.max(1, Number(auto.rating) || 5));
+        t.testimony = { rating, comment: auto.comment || 'Tidak ada ulasan dari pembeli.', at: now, auto: true };
+        state.stats.ratingSum += rating;
+        state.stats.ratingCount += 1;
         t.testimonyPosted = true;
-        t.deleteAt = now;
+        const secs = Number(cfg.ticket?.deleteAfterSeconds) || 15;
+        t.deleteAt = now + secs * 1000;
         save();
+        if (cfg?.ticket?.postWithoutReview !== false && guild) await postTestimony(guild, t).catch((e) => console.warn(`[store] testimoni otomatis ${t.id}:`, e.message));
+        logOrder(guild, t, `⏰ Tidak ada ulasan — otomatis rating ${rating}/5`);
+        const ch = await client.channels.fetch(t.channelId).catch(() => null);
+        await ch
+          ?.send(
+            v2({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle('⏰ Waktu Ulasan Habis')
+                  .setDescription(
+                    `Tidak ada ulasan dari pembeli, jadi pesanan ini otomatis diberi rating **${'⭐'.repeat(rating)}**.\nTerima kasih sudah berbelanja! 💙\n\nChannel ini akan dihapus dalam **${secs} detik**.`,
+                  ),
+              ],
+            }),
+          )
+          .catch(() => {});
+        refreshPanel();
+        refreshLeaderboard();
       }
       // Canva Pro: ingatkan pembeli H-3 & beri tahu admin saat masa aktif habis.
       if ((kindOf(t) === 'canva' || kindOf(t) === 'boost') && t.status === 'completed' && t.expiresAt) {
