@@ -20,6 +20,7 @@ const system = require('./system');
 const leveling = require('./leveling');
 const botPanel = require('./bot-panel');
 const canvaManager = require('./canva-manager');
+const { registerPrefix } = require('./prefix');
 
 const byName = new Map(commands.map((c) => [c.data.name, c]));
 // GuildMembers wajib untuk fitur welcome → aktifkan "Server Members Intent" di Discord Developer Portal.
@@ -29,8 +30,9 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildMessages, // untuk panel sticky (tidak membaca isi pesan)
+    GatewayIntentBits.GuildMessages, // panel sticky & prefix command
     GatewayIntentBits.GuildInvites, // invite log: mendeteksi link undangan yang dipakai member baru
+    GatewayIntentBits.MessageContent, // prefix command (!say) → aktifkan "Message Content Intent" di Developer Portal
   ],
   // Partials: event member keluar tetap diterima walau member belum tersimpan di cache bot (member lama / setelah restart).
   partials: [Partials.GuildMember, Partials.User],
@@ -49,6 +51,7 @@ system.registerSystem(client);
 leveling.registerLeveling(client);
 botPanel.registerBotPanel(client);
 canvaManager.registerCanvaManager(client);
+registerPrefix(client);
 
 const wib = () => new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'medium' });
 client.once(Events.ClientReady, (c) => {
