@@ -3,9 +3,9 @@ const { loadConfig, color, rupiah, num, isId } = require('./config');
 const { state } = require('./state');
 
 /**
- * Role Spender: Buyer (order pertama) + tier berdasarkan total belanja (order Completed).
- * Pengaturan di store.json → spenderRoles. Hanya tier tertinggi yang dipakai (tier di bawahnya dilepas),
- * kecuali keepLowerTiers = true. Rekber tidak dihitung sebagai belanja.
+ * Role Spender: Buyer (order pertama) → diganti tier sesuai total belanja (order Completed), seperti role level.
+ * Pengaturan di store.json → spenderRoles. Member hanya memegang 1 role (tier tertinggi yang dicapai),
+ * kecuali keepLowerTiers / keepBuyerRole = true. Rekber tidak dihitung sebagai belanja.
  */
 const settings = (cfg = loadConfig()) => cfg?.spenderRoles || {};
 const tiers = (cfg) =>
@@ -42,14 +42,18 @@ async function applySpenderRoles(guild, userId, cfg = loadConfig()) {
   const sp = spentOf(userId);
   const tier = tierFor(sp.revenue, cfg);
   const want = new Set();
-  if (sp.orders > 0 && isId(s.buyerRoleId)) want.add(s.buyerRoleId);
   const all = tiers(cfg).filter((x) => isId(x.roleId));
-  if (tier && isId(tier.roleId)) {
+  const hasTier = tier && isId(tier.roleId);
+  // Buyer = "tier 0": dipasang saat order pertama, lalu DIGANTI role tier begitu tier pertama tercapai
+  // (kecuali keepBuyerRole = true).
+  if (sp.orders > 0 && isId(s.buyerRoleId) && (!hasTier || s.keepBuyerRole)) want.add(s.buyerRoleId);
+  if (hasTier) {
     if (s.keepLowerTiers) all.filter((x) => x.min <= tier.min).forEach((x) => want.add(x.roleId));
     else want.add(tier.roleId);
   }
+  const managed = [...all.map((x) => x.roleId), ...(isId(s.buyerRoleId) ? [s.buyerRoleId] : [])];
   const add = [...want].filter((id) => !member.roles.cache.has(id));
-  const remove = all.map((x) => x.roleId).filter((id) => !want.has(id) && member.roles.cache.has(id));
+  const remove = [...new Set(managed)].filter((id) => !want.has(id) && member.roles.cache.has(id));
   const usable = (id) => {
     const role = guild.roles.cache.get(id);
     return role && role.position < me.roles.highest.position;
