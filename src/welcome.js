@@ -89,7 +89,8 @@ function buildWelcomeMessage(member, cfg) {
   const w = cfg.welcome || {};
   const head = [
     `# ${fill(w.title || '👋 Selamat Datang, {name}!', member)}`,
-    w.subtitle ? `-# ${fill(w.subtitle, member)}` : null,
+    // Tanpa subtitle → 1 baris kosong sebagai jarak di bawah judul.
+    w.subtitle ? `-# ${fill(w.subtitle, member)}` : '\u200b',
     fill(w.description || '', member) || null,
   ]
     .filter(Boolean)
