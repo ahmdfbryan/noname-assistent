@@ -18,7 +18,7 @@
 
   "welcome": {
     "title": "👋 Selamat Datang, {name}!",
-    "subtitle": "{server} • Welcome to the Community",
+    "subtitle": "",
     "description": "Hai {mention}! Kamu resmi jadi **member ke #{memberCount}** di **{server}** 🎉\nTempatnya nongkrong, mabar, ikut event seru, sampai belanja kebutuhan Roblox & produk digital dengan **aman dan terpercaya**. ✨",
     "thumbnail": "avatar"
   },
