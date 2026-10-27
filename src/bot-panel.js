@@ -78,7 +78,7 @@ function buildPanel(guild, client) {
   box.addSectionComponents(item('🔍 Cek Server Discord', 'Member, online, boost, fitur & info invite server lain.', 'bp:server', 'Cek Server', '🔍'));
 
   box.addSeparatorComponents(line());
-  box.addTextDisplayComponents(text(`-# 📬 Hasil pengecekan dikirim ke <#${RESULT_CHANNEL}>\n-# ⌨️ Bisa juga lewat \`/userinfo\` • \`/roblox\` • \`/cekserver\``));
+  box.addTextDisplayComponents(text(`-# 📬 Hasil pengecekan dikirim ke <#${RESULT_CHANNEL}>`));
   return { components: [box], flags: V2, allowedMentions: { parse: [] } };
 }
 
