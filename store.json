@@ -18,7 +18,7 @@
     "Catalog: channels.catalog = channel katalog. Teks header di catalog (title, description, bannerImage). Kartu tiap produk di products[].catalog (tagline, highlights, priceList = daftar jumlah Robux di tabel harga, thumbnail, image = banner kartu). Kirim dengan /store catalog — kirim ulang setelah menambah / menghapus produk.",
     "Canva Pro (type canva): plans = paket (id, label, price, days). Stock = jumlah slot email, atur dengan /store stok-set produk:Canva Pro (habis → tutup otomatis, slot kembali → buka otomatis). remindDays = DM pengingat ke pembeli sebelum masa aktif habis; saat habis admin yang menutup ticket mendapat DM untuk mengeluarkan email dari team. ticket.idPrefix / categoryName = ID & kategori ticket Canva.",
     "Pembayaran: payment.methods = daftar rekening (bank, number, emoji, holder opsional = atas nama per rekening). payment.accountName = atas nama untuk semua rekening (opsional). Tampil di semua ticket + tombol 💳 Konfirmasi Pembayaran & 📋 Salin No. Rekening. Admin konfirmasi dengan tombol ✅ Dana Masuk di bukti pembayaran atau /danamasuk [nominal] [catatan] di channel ticket.",
-    "Role Spender (spenderRoles): buyerRoleId = role order pertama. tiers = role berdasarkan total belanja (min dalam Rupiah, dari order Completed; rekber tidak dihitung). keepLowerTiers false = member hanya memegang 1 role tier tertinggi (role lama diganti, seperti role level); true = semua tier yang dicapai tetap terpasang. Role Buyer otomatis diganti tier pertama begitu tercapai (isi keepBuyerRole: true kalau Buyer mau tetap dipasang). announce = ucapan naik level di ticket + DM. Bot butuh izin Manage Roles & role bot harus di atas semua role ini. /store sinkron-role untuk memasang ulang ke semua pembeli."
+    "Role Spender (spenderRoles): buyerRoleId = role order pertama. tiers = role berdasarkan total belanja (min dalam Rupiah, dari order Completed; rekber tidak dihitung). keepLowerTiers false = member hanya memegang 1 role tier tertinggi (role lama diganti, seperti role level); true = semua tier yang dicapai tetap terpasang. keepBuyerRole true = role Buyer tetap dipasang untuk semua yang pernah order (Buyer + 1 tier); false = Buyer diganti tier pertama begitu tercapai. announce = ucapan naik level di ticket + DM. Bot butuh izin Manage Roles & role bot harus di atas semua role ini. /store sinkron-role untuk memasang ulang ke semua pembeli."
   ],
   "storeName": "Noname Store",
   "channels": {
@@ -586,6 +586,7 @@
     "enabled": true,
     "buyerRoleId": "1560193067083112468",
     "keepLowerTiers": false,
+    "keepBuyerRole": true,
     "announce": true,
     "tiers": [
       {
