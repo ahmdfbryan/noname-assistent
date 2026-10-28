@@ -66,6 +66,10 @@ function productSummary(cfg, p) {
   if (p.type === 'rekber') return `Mulai ${rupiah(p.minNominal || 0)} • Dana aman`;
   if (p.type === 'canva') return `Mulai ${rupiah(V.minPlanPrice(p))} • Slot ${num(stockOf(p))}`;
   if (p.type === 'boost') return `Mulai ${rupiah(V.minPlanPrice(p))}/boost • Stock ${num(stockOf(p))} boost`;
+  if (p.type === 'instant') {
+    const s = require('./instant').summaryOf(p);
+    return s.min ? `Mulai ${rupiah(s.min)} • ${num(s.products)} produk • Kirim otomatis` : 'Kirim otomatis';
+  }
   return p.howTo?.short || '';
 }
 
@@ -143,6 +147,10 @@ function buildHowToGuide(guild, cfg, value) {
   else if (p.type === 'gamepass') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, `⏱️ **Estimasi:** \`± ${num(p.pendingDays || 5)} hari\``);
   else if (p.type === 'boost') info.push(`💱 **Harga:** \`Mulai ${rupiah(V.minPlanPrice(p))} / boost\``, `⏱️ **Estimasi:** \`${p.estimate || '1x24 jam'}\``, `🚀 **Stock per Paket:**\n${V.boostStockLines(p)}`);
   else if (p.type === 'canva') info.push(`💱 **Harga:** \`Mulai ${rupiah(V.minPlanPrice(p))}\``, `🎟️ **Sisa Slot:** \`${num(stockOf(p))} ${stockUnit(p)}\``);
+  else if (p.type === 'instant') {
+    const s = require('./instant').summaryOf(p);
+    info.push(`💱 **Harga:** \`${s.min ? `Mulai ${rupiah(s.min)}` : '-'}\``, `📦 **Tersedia:** \`${num(s.products)} produk\``, '⚡ **Pengiriman:** `Otomatis ke ticket & DM`');
+  }
   else if (p.type === 'rekber') {
     info.push(
       `💵 **Nominal:** \`${rupiah(p.minNominal || 0)} – ${rupiah(p.maxNominal || 0)}\``,
