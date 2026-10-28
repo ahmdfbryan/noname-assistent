@@ -226,6 +226,7 @@ function buildTicketMessage(guild, cfg, t) {
   if (kindOf(t) === 'gamepass') return buildGamepassTicket(guild, cfg, t);
   if (kindOf(t) === 'canva') return buildCanvaTicket(guild, cfg, t);
   if (kindOf(t) === 'boost') return buildBoostTicket(guild, cfg, t);
+  if (kindOf(t) === 'instant') return require('./instant').buildTicket(guild, cfg, t);
   const statusColor = {
     open: color(cfg, 'brand', 0x3498db),
     completed: color(cfg, 'open', 0x2ecc71),
@@ -309,8 +310,13 @@ function buildDmClosed(guild, cfg, t) {
   const gp = kindOf(t) === 'gamepass';
   const canva = kindOf(t) === 'canva';
   const boost = kindOf(t) === 'boost';
+  const instant = kindOf(t) === 'instant';
   const desc = {
-    completed: boost
+    completed: instant
+      ? `**${t.ins?.product || t.productLabel} — ${t.ins?.variant || ''}** (${num(t.qty || 1)} akun) sudah **dikirim otomatis**! ⚡\n` +
+        `Data akun ada di ticket & DM kamu — simpan baik-baik ya.\n\n` +
+        `Terima kasih sudah berbelanja di **${storeName(cfg, guild)}**! 💜 Jangan lupa beri testimoni di ticket kamu ya ⭐`
+      : boost
       ? `**${num(t.qty)} Server Boost (${t.plan.label})** untuk server **${t.server?.name || '-'}** sudah **AKTIF**! 🚀\n` +
         `Masa aktif sekitar **${t.plan.duration || `${num(t.plan.days)} hari`}** dengan **garansi penuh** selama masa aktif boost. 🛡️\n\n` +
         `Terima kasih sudah berbelanja di **${storeName(cfg, guild)}**! 💜 Jangan lupa beri testimoni di ticket kamu ya ⭐`
@@ -1318,6 +1324,7 @@ function buildGamepassCheck(cfg, t, live, problems) {
 // ═════════════════════════════════════ CANVA PRO ═════════════════════════════════════
 /** Teks item di DM / status: paket Canva atau jumlah Robux. */
 function itemText(t) {
+  if (kindOf(t) === 'instant') return `${t.ins?.variant || '-'} × ${num(t.qty || 1)}`;
   if (kindOf(t) === 'canva') return t.plan?.label || '-';
   if (kindOf(t) === 'boost') return `${num(t.qty)} Boost • ${t.plan?.label || '-'}`;
   return `${num(t.amount)} Robux`;
@@ -1700,6 +1707,7 @@ function nextStepText(t) {
   }
   if (k === 'canva') return `Admin akan segera mengirim **undangan Team Canva Pro** ke \`${t.email}\`. Pantau inbox email kamu ya! 📨`;
   if (k === 'boost') return `Admin akan segera mem-boost server **${t.server?.name || 'kamu'}** dengan **${num(t.qty)} boost** 🚀 (estimasi ${t.estimate || '1x24 jam'}).`;
+  if (k === 'instant') return 'Akun sedang **dikirim otomatis** ke ticket ini & DM kamu. ⚡';
   if (k === 'rekber') return `<@${t.sellerId}>, silakan kirim barang / jasa ke pembeli. Pembeli klik **📦 Barang Sudah Diterima** setelah barang sesuai.`;
   return `Admin sedang memproses pengiriman **${num(t.amount)} Robux** ke akun Roblox \`@${t.roblox?.name}\`. 🚀`;
 }
@@ -1897,6 +1905,14 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
       row('Server', `\`${t.server?.name || '-'}\``),
       row('Harga', `\`${rupiah(t.price)}\``),
     ];
+  } else if (k === 'instant') {
+    lines = [
+      row('Pembeli', `<@${t.userId}>`),
+      row('Produk', `\`${t.ins?.product || t.productLabel}\``),
+      row('Varian', `\`${t.ins?.variant || '-'} × ${num(t.qty || 1)}\``),
+      row('Pengiriman', '`⚡ Otomatis`'),
+      row('Harga', `\`${rupiah(t.price)}\``),
+    ];
   } else {
     lines = [
       row('Pembeli', `<@${t.userId}>`),
@@ -1948,6 +1964,10 @@ function buildOrderLogV2(guild, cfg, t) {
   } else if (k === 'boost') {
     if (pl.showBuyer) lines.push(row('Pembeli', `<@${t.userId}>`));
     lines.push(row('Produk', `\`${t.productLabel}\``), row('Paket', `\`${num(t.qty)} Boost • ${t.plan.label}\``));
+    if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
+  } else if (k === 'instant') {
+    if (pl.showBuyer) lines.push(row('Pembeli', `<@${t.userId}>`));
+    lines.push(row('Produk', `\`${t.ins?.product || t.productLabel}\``), row('Varian', `\`${t.ins?.variant || '-'} × ${num(t.qty || 1)}\``), row('Pengiriman', '`⚡ Otomatis`'));
     if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
   } else {
     if (pl.showBuyer) lines.push(row('Pembeli', `<@${t.userId}>`));
@@ -2555,6 +2575,8 @@ module.exports = {
   panelUrlFor,
   payAmount,
   isPaid,
+  paymentEmbeds,
+  paymentRows,
   payMethods,
   buildCopyAccounts,
   buildPaymentProof,
