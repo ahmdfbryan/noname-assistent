@@ -266,6 +266,14 @@ function logOrder(guild, t, text) {
       if (!isId(cfg?.channels?.log) || !guild) return;
       const channel = await guild.channels.fetch(cfg.channels.log).catch(() => null);
       if (!channel?.isTextBased()) return;
+      // Foto profil pembeli untuk kartu history (diambil sekali, disimpan di data ticket).
+      if (!t.buyerAvatar) {
+        const u = await guild.client.users.fetch(buyerOf(t)).catch(() => null);
+        if (u) {
+          t.buyerAvatar = u.displayAvatarURL({ extension: 'png', size: 256 });
+          save();
+        }
+      }
       const payload = V.buildOrderLog(guild, cfg, t); // tanpa gambar — gambar bukti hanya di testimoni
 
       if (t.logMessageId) {
