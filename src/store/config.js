@@ -33,10 +33,11 @@ function getProduct(cfg, id) {
 const GROUPS = {
   main: { panelKey: 'panel', catalogKey: 'catalog' },
   digital: { panelKey: 'digitalPanel', catalogKey: 'digitalCatalog' },
+  instant: { panelKey: 'instantPanel', catalogKey: null }, // ⚡ Produk Instan: panel sendiri, kartu katalog ikut katalog digital
 };
-const DEFAULT_CHANNELS = { digitalPanel: '1560602559062999120', digitalCatalog: '1560602363553775686', reputation: '1561325807559901234' };
+const DEFAULT_CHANNELS = { instantPanel: '1565040089573101588', digitalPanel: '1560602559062999120', digitalCatalog: '1560602363553775686', reputation: '1561325807559901234' };
 /** Grup produk: store.json → products[].group, atau otomatis (Canva = digital). */
-const groupOf = (p) => p?.group || (['canva', 'boost'].includes(p?.type) ? 'digital' : 'main');
+const groupOf = (p) => (p?.type === 'instant' ? 'instant' : p?.group || (['canva', 'boost'].includes(p?.type) ? 'digital' : 'main'));
 /** Daftar produk per grup. Panel digital otomatis punya tombol Coming Soon kalau belum ada. */
 function productsOf(cfg, group = 'main') {
   const list = (cfg?.products || []).filter((p) => groupOf(p) === group);
