@@ -161,9 +161,101 @@ function guessRewardType(prize) {
   return null;
 }
 
+// ───────────────────────── ⚡ Bantuan Produk Instan ─────────────────────────
+const INSTANT_HELP = 'instant-help';
+const DEFAULT_ISSUES = [
+  { id: 'login', label: 'Akun tidak bisa login', emoji: '🔐' },
+  { id: 'password', label: 'Email / password salah', emoji: '🔑' },
+  { id: 'expired', label: 'Akun expired / kena limit', emoji: '⌛' },
+  { id: 'not-received', label: 'Sudah bayar, akun belum diterima', emoji: '📭' },
+  { id: 'warranty', label: 'Klaim garansi / minta pengganti', emoji: '🛡️' },
+  { id: 'other', label: 'Lainnya', emoji: '💬' },
+];
+const instantIssues = () => {
+  const list = loadConfig().instantIssues;
+  return (Array.isArray(list) && list.length ? list : DEFAULT_ISSUES).slice(0, 25);
+};
+/** Pesanan Produk Instan milik member (terbaru dulu). */
+function instantOrdersOf(userId) {
+  try {
+    const { state } = require('./store/state');
+    return Object.values(state.tickets || {})
+      .filter((t) => t.kind === 'instant' && t.userId === userId && ['open', 'completed'].includes(t.status))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  } catch {
+    return [];
+  }
+}
+/** Status garansi pesanan instan. */
+function warrantyOf(o) {
+  const i = o?.ins || {};
+  if (o.status !== 'completed') return { state: 'pending', text: '`⏳ Pesanan belum selesai`' };
+  if (i.noWarranty) return { state: 'none', text: '`⚠️ Tanpa Garansi`' };
+  if (!i.warrantyDays) return { state: 'unknown', text: '`🛡️ Sesuai S&K produk`' };
+  const until = (i.deliveredAt || o.closedAt) + i.warrantyDays * 86400000;
+  return until > Date.now()
+    ? { state: 'active', text: `\`✅ Aktif\` sampai ${ts(until, 'D')} (${ts(until, 'R')})`, until }
+    : { state: 'expired', text: `\`❌ Habis\` sejak ${ts(until, 'D')}`, until };
+}
+const orderLabel = (o) => `${o.id} • ${o.ins?.product || o.productLabel} ${o.ins?.variant ? `— ${o.ins.variant}` : ''}`.slice(0, 100);
+
 // ───────────────────────── Form ─────────────────────────
 function buildForm(type, userId) {
   const modal = new ModalBuilder().setCustomId(`st:form:${type.id}`).setTitle(`${type.label}`.slice(0, 45));
+  if (type.id === INSTANT_HELP) {
+    const orders = instantOrdersOf(userId).slice(0, 25);
+    const first = orders.length
+      ? new LabelBuilder()
+          .setLabel('Pesanan yang Bermasalah')
+          .setDescription('Pilih pesanan Produk Instan kamu.')
+          .setStringSelectMenuComponent(
+            new StringSelectMenuBuilder()
+              .setCustomId('order')
+              .setPlaceholder('Pilih pesanan...')
+              .setRequired(true)
+              .addOptions(
+                orders.map((o, i) => {
+                  const w = warrantyOf(o);
+                  return {
+                    label: orderLabel(o),
+                    value: o.id,
+                    description: `${new Date(o.createdAt).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })} • ${{ active: 'Garansi aktif', expired: 'Garansi habis', none: 'Tanpa garansi', pending: 'Belum selesai', unknown: 'Garansi sesuai S&K' }[w.state]}`.slice(0, 100),
+                    emoji: { active: '🛡️', expired: '⌛', none: '⚠️', pending: '⏳', unknown: '📦' }[w.state],
+                    default: orders.length === 1 && i === 0,
+                  };
+                }),
+              ),
+          )
+      : new LabelBuilder()
+          .setLabel('ID Pesanan')
+          .setDescription('Contoh: INS-0001 (ada di DM / ticket pesananmu).')
+          .setTextInputComponent(new TextInputBuilder().setCustomId('ordertext').setStyle(TextInputStyle.Short).setPlaceholder('INS-0001').setMaxLength(30).setRequired(true));
+    modal.addLabelComponents(
+      first,
+      new LabelBuilder()
+        .setLabel('Jenis Kendala')
+        .setStringSelectMenuComponent(
+          new StringSelectMenuBuilder()
+            .setCustomId('issue')
+            .setPlaceholder('Pilih jenis kendala...')
+            .setRequired(true)
+            .addOptions(instantIssues().map((x) => ({ label: String(x.label).slice(0, 100), value: String(x.id), emoji: x.emoji || '💬' }))),
+        ),
+      new LabelBuilder()
+        .setLabel('Jelaskan Kendalamu')
+        .setDescription('Kirim screenshot error di ticket setelah dibuat.')
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId('detail')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('contoh: Login Netflix muncul "password salah" sejak tadi pagi.')
+            .setMinLength(10)
+            .setMaxLength(1000)
+            .setRequired(true),
+        ),
+    );
+    return modal;
+  }
   if (type.id === 'claim-giveaway') {
     const wins = giveaway.winsOf ? giveaway.winsOf(userId).slice(0, 25) : [];
     const first = wins.length
@@ -334,12 +426,27 @@ function buildTicketMessage(guild, cfg, t) {
     else short.push(`**${k}:** ${val}`);
   }
   const detailTitle = claim ? '### 🎁 Detail Klaim Hadiah' : '### 📋 Detail Ticket';
+  const instantHelp = t.type === INSTANT_HELP;
   const verify =
     t.verified == null
       ? null
-      : t.verified
+      : instantHelp
+        ? t.verified
+          ? '✅ **Pesanan terverifikasi** — pesanan ini milik member yang membuka ticket.'
+          : '⚠️ **Pesanan tidak cocok** — tidak ditemukan / bukan milik member ini. Staff perlu **cek manual**.'
+        : t.verified
         ? '✅ **Terverifikasi** — member ini tercatat sebagai **pemenang** giveaway tersebut.'
         : '⚠️ **Belum terverifikasi** — tidak ditemukan di data pemenang giveaway. Staff perlu **cek manual**.';
+  const instantChecklist =
+    instantHelp && !closed
+      ? [
+          '### 🛡️ Checklist Staff',
+          `${t.warranty === 'active' ? '✅' : '▫️'} Cek status garansi (${{ active: 'aktif', expired: 'habis', none: 'tanpa garansi', pending: 'pesanan belum selesai', unknown: 'sesuai S&K' }[t.warranty] || 'cek manual'})`,
+          `${t.claimedBy ? '✅' : '▫️'} Minta screenshot kendala & cek akun`,
+          '▫️ Klaim ke pusat (Waroengkuy) / kirim akun pengganti',
+          '▫️ Pastikan akun sudah normal, lalu tutup ticket',
+        ].join('\n')
+      : null;
   const checklist = claim && !closed
     ? [
         '### 🛡️ Checklist Staff',
@@ -378,7 +485,7 @@ function buildTicketMessage(guild, cfg, t) {
     color: accent,
     thumb: t.avatar || guild.iconURL({ extension: 'png', size: 256 }),
     header: `-# ${guild.name} • NCS Ticket Center\n## ${type.emoji || '🎫'} ${type.label} • ${t.id}\n${type.welcome || 'Tim kami akan segera membantumu.'}`,
-    blocks: [info, short.length || long.length ? [detailTitle, ...short].join('\n') : null, ...long, verify, checklist],
+    blocks: [info, short.length || long.length ? [instantHelp ? '### ⚡ Detail Kendala Produk Instan' : detailTitle, ...short].join('\n') : null, ...long, verify, checklist || instantChecklist],
     footer: `NCS Ticket Center • ${t.id} • ${ts(t.createdAt, 'f')}`,
     rows,
   });
@@ -725,6 +832,43 @@ async function handleInteraction(interaction) {
         extra.rewardType = reward.id;
         extra.verified = Boolean(won);
         extra.giveawayId = g?.id || null;
+      } else if (type.id === INSTANT_HELP) {
+        let picked = null;
+        try {
+          picked = interaction.fields.getStringSelectValues('order')?.[0] || null;
+        } catch {}
+        if (!picked) picked = (optional(interaction.fields, 'ordertext') || '').toUpperCase().replace(/\s+/g, '');
+        const mine = instantOrdersOf(interaction.user.id);
+        let o = mine.find((x) => x.id === picked) || null;
+        let other = false;
+        if (!o) {
+          try {
+            const { state } = require('./store/state');
+            o = state.tickets?.[picked]?.kind === 'instant' ? state.tickets[picked] : null;
+            other = Boolean(o);
+          } catch {}
+        }
+        let issue = null;
+        try {
+          issue = interaction.fields.getStringSelectValues('issue')?.[0] || null;
+        } catch {}
+        const iss = instantIssues().find((x) => String(x.id) === issue) || { label: issue || '-', emoji: '💬' };
+        if (o) {
+          const i = o.ins || {};
+          const w = warrantyOf(o);
+          answers.push(['🧾 Pesanan', `\`${o.id}\` • **${i.product || o.productLabel}** — ${i.variant || '-'} × ${o.qty || i.qty || 1}`]);
+          answers.push(['📅 Dibeli', `${ts(o.createdAt, 'f')}${i.deliveredAt ? ` • akun dikirim ${ts(i.deliveredAt, 'R')}` : ''}`]);
+          answers.push(['🛡️ Garansi', w.text]);
+          answers.push(['💰 Dibayar', `\`Rp ${Math.round(Number(o.payment?.amount || o.price) || 0).toLocaleString('id-ID')}\``]);
+          if (i.order?.ref) answers.push(['🏭 No. Pusat', `\`${i.order.ref}\``]);
+          extra.warranty = w.state;
+        } else {
+          answers.push(['🧾 Pesanan', `\`${picked || '-'}\` • ⚠️ tidak ditemukan — staff cek manual`]);
+        }
+        answers.push(['⚠️ Jenis Kendala', `${iss.emoji || '💬'} \`${iss.label}\``]);
+        answers.push(['💬 Detail Kendala', interaction.fields.getTextInputValue('detail').trim()]);
+        extra.orderId = o?.id || picked || null;
+        extra.verified = o ? !other : false;
       } else {
         answers.push(['📌 Topik', `\`${interaction.fields.getTextInputValue('topic').trim()}\``]);
         answers.push(['💬 Detail Kendala', interaction.fields.getTextInputValue('detail').trim()]);
@@ -771,7 +915,9 @@ async function handleInteraction(interaction) {
         blocks: [
           claimTicket
             ? 'Mohon tunggu sebentar — staff sedang **memverifikasi** data giveaway & data penerimaanmu. Jika ada data yang kurang, staff akan menanyakannya di sini.'
-            : 'Silakan jelaskan kendalamu di sini dan lampirkan **screenshot** bila ada.',
+            : t.type === INSTANT_HELP
+              ? 'Kirim **screenshot kendala** (misal pesan error saat login) di sini ya. Staff akan mengecek akun & garansimu.'
+              : 'Silakan jelaskan kendalamu di sini dan lampirkan **screenshot** bila ada.',
         ],
         footer: `NCS Ticket Center • ${t.id}`,
       });
