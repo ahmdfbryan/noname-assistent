@@ -467,7 +467,7 @@ const ORDER_STATUS = {
   refund: { label: '💸 Refund', key: 'refund' },
 };
 const PAY_STATUS = { paid: '✅ Lunas / Dana Masuk', pending: '⏳ Menunggu Konfirmasi', rejected: '⛔ Ditolak' };
-const KIND_LABEL = { robux: 'Robux Visend', gamepass: 'Robux Gamepass', canva: 'Canva Pro', boost: 'Server Boost', rekber: 'Rekber' };
+const KIND_LABEL = { robux: 'Robux Visend', gamepass: 'Robux Gamepass', canva: 'Canva Pro', boost: 'Server Boost', rekber: 'Rekber', instant: 'Produk Instan' };
 
 async function archiveStoreTicket(guild, t, source) {
   if (!guild || !t || t.archived) return null;
@@ -517,6 +517,14 @@ async function archiveStoreTicket(guild, t, source) {
       t.server ? `**🌐 Server:** \`${t.server.name}\` • \`${t.server.id}\`` : null,
       t.invite ? `**🔗 Invite:** ${t.invite}` : null,
       t.expiresAt ? `**⌛ Aktif Sampai:** ${ts(t.expiresAt, 'D')}` : null,
+    );
+  }
+  if (kind === 'instant' && t.ins) {
+    det.push(
+      `**🏷️ Varian:** \`${t.ins.variant || '-'}\` • **🔢 Jumlah:** \`${num(t.ins.qty)} akun\``,
+      `**💱 Harga Jual:** \`${rupiah(t.ins.unitPrice)}\` • **🏭 Modal:** \`${rupiah(t.ins.unitCost)}\` / akun`,
+      `**⚡ Waroengkuy:** ref_id \`${t.ins.refId}\`${t.ins.order?.ref ? ` • No. \`${t.ins.order.ref}\`` : ''} • mode \`${t.ins.mode}\``,
+      t.ins.deliveredAt ? `**📬 Akun Terkirim:** ${ts(t.ins.deliveredAt, 'f')}${t.ins.dmSent === false ? ' (DM gagal)' : ''}` : null,
     );
   }
   if (kind === 'rekber') {
@@ -601,6 +609,7 @@ async function archiveStoreTicket(guild, t, source) {
             ...(t.plan ? [['Paket', t.plan.label]] : []),
             ...(kind === 'canva' ? [['Email', t.email || '-']] : []),
             ...(kind === 'boost' ? [['Jumlah Boost', `${num(t.qty)} boost`], ['Server', t.server?.name || '-'], ['Invite', t.invite || '-']] : []),
+            ...(kind === 'instant' && t.ins ? [['Varian', t.ins.variant || '-'], ['Jumlah', `${num(t.ins.qty)} akun`], ['Modal', rupiah((t.ins.unitCost || 0) * (t.ins.qty || 1))], ['Waroengkuy', t.ins.order?.ref || t.ins.refId]] : []),
             ...(kind === 'rekber'
               ? [['Objek', t.item || '-'], ['Nominal', rupiah(t.nominal)], ['Fee', rupiah(t.fee)], ['Diterima Penjual', rupiah(t.sellerGets)]]
               : []),
