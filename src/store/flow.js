@@ -110,6 +110,7 @@ async function editTracked(key, build) {
 const refreshPanel = () => {
   debounce('panel', () => editTracked('panel', (g, c) => V.buildPanel(g, c, 'main')));
   debounce('digitalPanel', () => editTracked('digitalPanel', (g, c) => V.buildPanel(g, c, 'digital')), 2000);
+  debounce('instantPanel', () => editTracked('instantPanel', I.buildPanel), 3000);
   debounce('howto', () => editTracked('howto', H.buildHowToPanel), 2500);
   debounce('catalog', () => refreshCatalog('main'), 3500);
   debounce('digitalCatalog', () => refreshCatalog('digital'), 4500);
