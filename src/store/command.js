@@ -6,6 +6,7 @@ const V = require('./views');
 const SP = require('./spender');
 const H = require('./howto');
 const C = require('./catalog');
+const I = require('./instant');
 const { setProductsOpen, reopenIfAutoClosed, closeIfSoldOut, announce, refreshPanel, onDanaMasukCommand, migrateToV2, postCatalog } = require('./flow');
 
 const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
@@ -143,6 +144,7 @@ const storeCommand = {
         }),
     )
     .addSubcommand((s) => s.setName('status').setDescription('Lihat ringkasan toko'))
+    .addSubcommand((s) => s.setName('instan').setDescription('Status Produk Instan: koneksi API Waroengkuy, saldo, pesanan bermasalah'))
     .addSubcommand((s) => s.setName('sinkron-role').setDescription('Pasang ulang role Buyer & tier spender ke semua pembeli'))
     .addSubcommand((s) => s.setName('perbarui-tampilan').setDescription('Ubah history order & testimoni lama ke tampilan baru (Components V2)')),
 
@@ -286,6 +288,8 @@ const storeCommand = {
       );
     }
 
+    if (sub === 'instan') return interaction.editReply(await I.adminStatus(guild));
+
     if (sub === 'status') {
       const active = Object.values(state.tickets).filter((t) => t.status === 'open');
       const reserved = active.filter((t) => !t.kind || t.kind === 'robux').reduce((a, t) => a + t.amount, 0);
@@ -320,7 +324,9 @@ const storeCommand = {
           value: active
             .slice(0, 15)
             .map((t) =>
-              t.kind === 'canva'
+              t.kind === 'instant'
+                ? `\`${t.id}\` <#${t.channelId}> • ⚡ ${t.productLabel} ×${num(t.qty)} • <@${t.userId}>`
+                : t.kind === 'canva'
                 ? `\`${t.id}\` <#${t.channelId}> • 🎨 ${t.plan.label} • <@${t.userId}>`
                 : t.kind === 'boost'
                 ? `\`${t.id}\` <#${t.channelId}> • 🚀 ${num(t.qty)} boost ${t.plan.label} • <@${t.userId}>`
