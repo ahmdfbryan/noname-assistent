@@ -6,7 +6,8 @@
     "logChannelId = channel log ticket + transcript (opsional, kosongkan kalau tidak perlu).",
     "types = pilihan di dropdown. comingSoon: true = muncul di dropdown tapi belum bisa dibuka. enabled: false = disembunyikan.",
     "maxOpenPerUser = jumlah ticket aktif per member per jenis.",
-    "historyChannelId = channel Tickets History (1 kartu per ticket, ter-update otomatis: dibuka → ditangani → ditutup). history.showTopic / showCloseReason = tampilkan topik & alasan tutup (false = sembunyikan, cocok kalau channel publik)."
+    "historyChannelId = channel Tickets History (1 kartu per ticket, ter-update otomatis: dibuka → ditangani → ditutup). history.showTopic / showCloseReason = tampilkan topik & alasan tutup (false = sembunyikan, cocok kalau channel publik).",
+    "Jenis instant-help (⚡ Bantuan Produk Instan): form otomatis menampilkan pesanan Produk Instan milik member + status garansinya. Pilihan jenis kendala bisa diubah lewat instantIssues: [{ id, label, emoji }] (opsional)."
   ],
   "panelChannelId": "1553814079293095986",
   "categoryId": "",
@@ -50,6 +51,15 @@
       "prefix": "CLM",
       "enabled": true,
       "welcome": "Selamat atas kemenanganmu! 🎉\nTim kami akan **memverifikasi** data giveaway lalu memproses pengiriman hadiahmu. Pastikan data penerimaan yang kamu isi sudah benar."
+    },
+    {
+      "id": "instant-help",
+      "label": "Bantuan Produk Instan",
+      "emoji": "⚡",
+      "description": "Kendala akun Produk Instan: login gagal, garansi, akun belum diterima",
+      "prefix": "INH",
+      "enabled": true,
+      "welcome": "Terima kasih sudah menghubungi kami! ⚡\nTim kami akan **mengecek pesanan & garansi** Produk Instan kamu. Sambil menunggu, kirim **screenshot kendala** (misal pesan error saat login) di sini ya."
     },
     {
       "id": "coming-soon",
