@@ -16,6 +16,7 @@ const UI = require('../ui');
 const { color, rupiah, num, fill, productsOf, groupOf, groupText } = require('./config');
 const { state, isProductOpen, productStatsOf, stockOf, stockUnit } = require('./state');
 const V = require('./views');
+const I = require('./instant');
 const fs = require('fs');
 const path = require('path');
 
@@ -142,6 +143,13 @@ function buildCatalogCard(guild, cfg, p) {
     info.push(`💱 **Harga:** \`Mulai ${rupiah(V.minPlanPrice(p))}\``, `📦 **Stock:** \`${num(stockOf(p))} ${stockUnit(p)}\``);
   } else if (p.type === 'boost') {
     info.push(`💱 **Harga:** \`Mulai ${rupiah(V.minPlanPrice(p))} / boost\``, `📦 **Stock:** \`${num(stockOf(p))} ${stockUnit(p)}\``);
+  } else if (p.type === 'instant') {
+    const s = I.summaryOf(p);
+    info.push(
+      `💱 **Harga:** \`${s.min ? `Mulai ${rupiah(s.min)}` : '-'}\``,
+      `📦 **Stock:** \`${s.ready ? `${num(s.products)} produk • ${num(s.variants)} varian` : 'Memuat...'}\``,
+      '⚡ **Pengiriman:** `Otomatis`',
+    );
   } else if (p.type === 'rekber') {
     const fees = (p.feeTiers || []).map((x) => (x.percent != null ? null : Number(x.fee))).filter((x) => x != null);
     const pct = (p.feeTiers || []).find((x) => x.percent != null);
