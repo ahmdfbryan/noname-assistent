@@ -295,10 +295,113 @@ function categoryView(guild, cfg, p, items, cat, page = 0) {
 async function onCategory(interaction, p) {
   const cfg = loadConfig();
   const cat = interaction.values[0];
+  // Dipilih dari panel publik → hasil dikirim sebagai pesan pribadi & pilihan di panel direset.
+  const fromPanel = interaction.message && !interaction.message.flags?.has?.(MessageFlags.Ephemeral);
+  if (fromPanel) await interaction.deferReply({ flags: EPH });
   const { items } = await loadItems();
   const view = categoryView(interaction.guild, cfg, p, items, cat, 0);
   setSession(interaction.user.id, { cat, page: view.page, pid: p.id });
-  return interaction.update(view.payload);
+  if (!fromPanel) return interaction.update(view.payload);
+  await interaction.editReply(view.payload);
+  interaction.message.edit(buildPanel(interaction.guild, cfg)).catch(() => {});
+}
+
+// ═════════════════════════════ Panel publik (channel Produk Instan) ═════════════════════════════
+const KEYCAPS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'];
+/** Panel ⚡ Produk Instan di channel sendiri: dropdown kategori langsung di panel. Ter-update otomatis. */
+function buildPanel(guild, cfg) {
+  const p = instantProduct(cfg);
+  if (!p) return card(cfg, { header: '❌ Produk Instan belum diatur di store.json.' });
+  const pt = p.panel || {};
+  const name = { name: V.storeName(cfg, guild) };
+  const open = isProductOpen(p);
+  const items = W.cachedProducts();
+  const cats = [...groupCatalog(p, items).entries()]
+    .map(([c, prods]) => {
+      const list = [...prods.values()].map((x) => ({ ...x, sum: productSummary(p, x) }));
+      const ready = list.filter((x) => x.sum.available);
+      return { c, ready: ready.length, total: list.length, min: ready.length ? Math.min(...ready.map((x) => x.sum.min)) : 0 };
+    })
+    .sort((a, b) => b.ready - a.ready || a.c.localeCompare(b.c));
+  const s = summaryOf(p);
+  const ps = productStatsOf(p.id);
+  const st = state.stats;
+  const avg = st.ratingCount ? (st.ratingSum / st.ratingCount).toFixed(1) : '-';
+  const stars = st.ratingCount ? '⭐'.repeat(Math.round(st.ratingSum / st.ratingCount)) + '☆'.repeat(5 - Math.round(st.ratingSum / st.ratingCount)) : '☆☆☆☆☆';
+
+  const catLines = cats
+    .filter((x) => x.ready)
+    .slice(0, 12)
+    .map((x) => `📂 **${clip(x.c, 40)}** — \`${num(x.ready)} produk\` • mulai \`${rupiah(x.min)}\``);
+  const moreCats = cats.filter((x) => x.ready).length - catLines.length;
+  const features = pt.features || [
+    '⚡ **Kirim Otomatis** — akun masuk ke ticket & DM dalam hitungan detik',
+    '💳 **QRIS Semua E-Wallet** — DANA, OVO, GoPay, ShopeePay & m-banking',
+    '📦 **Stok & Harga Real-time** — yang tampil = yang tersedia',
+    '🕐 **Buka 24 Jam** — tanpa menunggu admin online',
+  ];
+  const steps = pt.steps || [
+    'Pilih **kategori** di menu bawah',
+    'Pilih **produk** & **varian** yang kamu mau',
+    'Bayar lewat **QRIS** di ticket pribadimu',
+    'Akun **terkirim otomatis** — simpan & selamat menikmati! ✨',
+  ];
+
+  const options = cats.slice(0, 25).map((x) => ({
+    label: clip(x.c, 100),
+    value: clip(x.c, 100),
+    description: clip(x.ready ? `${x.ready} produk tersedia • mulai ${rupiah(x.min)}` : 'Stok sedang habis', 100),
+    emoji: x.ready ? '📂' : '⛔',
+  }));
+  const select = new StringSelectMenuBuilder().setCustomId(`store:inscat:${p.id}`);
+  if (open && options.length) select.setPlaceholder('📂 Pilih kategori untuk mulai belanja...').addOptions(options);
+  else select.setPlaceholder(open ? '⏳ Produk sedang dimuat...' : '🔴 Produk Instan sedang tutup').addOptions({ label: '-', value: '-' }).setDisabled(true);
+
+  return card(cfg, {
+    thumb: pt.thumbnail || p.thumbnail || guild.iconURL({ extension: 'png', size: 256 }),
+    header: `# ${fill(pt.title || '⚡ Produk Instan | {server}', name)}\n-# ${fill(pt.subtitle || 'Auto Delivery 24 Jam • {server}', name)}`,
+    image: pt.bannerImage || null,
+    blocks: [
+      fill(
+        pt.description ||
+          'Belanja **akun premium siap pakai** tanpa ribet! 💎\nPilih produk, bayar via **QRIS**, dan akun **langsung dikirim otomatis** ke ticket & DM kamu — kapan pun, **24 jam nonstop**. ⚡',
+        name,
+      ),
+      `### ✨ Kenapa Belanja di Sini?\n${features.join('\n')}`,
+      catLines.length ? `### 🛍️ Kategori Tersedia\n${catLines.join('\n')}${moreCats > 0 ? `\n-# +${moreCats} kategori lainnya di menu bawah` : ''}` : open ? '### 🛍️ Kategori Tersedia\n_Produk sedang dimuat..._' : null,
+      [
+        `🏪 **Status:** ${open ? '`🟢 BUKA 24 JAM`' : '`🔴 TUTUP`'}`,
+        `📦 **Tersedia:** \`${num(s.products)} produk • ${num(s.variants)} varian\``,
+        s.min ? `💱 **Harga:** \`Mulai ${rupiah(s.min)}\`` : null,
+        `💳 **Pembayaran:** \`${PAY_LABEL[payMode(p)]}\`${minTotal(p) ? ` • min. \`${rupiah(minTotal(p))}\`` : ''}`,
+        `✅ **Order Selesai:** \`${num(ps.orders)} order\``,
+        `⭐ **Rating Toko:** ${stars} \`${avg} / 5\` (${num(st.ratingCount)} ulasan)`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      `### 🔄 Cara Order\n${steps.map((x, i) => `${KEYCAPS[i] || `\`${i + 1}\``} ${x}`).join('\n')}`,
+    ],
+    footer: `${name.name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
+    rows: [
+      row(select),
+      row(
+        btn(`store:insmine:${p.id}`, 'Pesanan Saya', '🎫'),
+        p.howTo ? btn(`store:howtobtn:${p.id}`, 'Cara Order', '📖') : null,
+        p.terms?.description ? btn(`store:terms:${p.id}`, p.terms.button || 'Syarat & Ketentuan', '📌') : null,
+      ),
+    ],
+  });
+}
+
+/** Tombol "Pesanan Saya" di panel. */
+async function onMine(interaction) {
+  const list = Object.values(state.tickets)
+    .filter((t) => kindOf(t) === 'instant' && t.userId === interaction.user.id && (t.status === 'open' || (t.status === 'completed' && !t.deleted)))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 5);
+  if (!list.length) return interaction.reply({ content: '📭 Kamu belum punya pesanan instan yang aktif. Pilih kategori di panel untuk mulai belanja! ⚡', flags: EPH });
+  const lines = list.map((t) => `▸ \`${t.id}\` • **${clip(t.productLabel, 60)}** ×${num(t.qty)} • ${t.status === 'open' ? STAGE_TEXT[t.ins?.stage] || '⏳ Diproses' : '✅ Selesai'}${t.channelId ? ` • <#${t.channelId}>` : ''}`);
+  return interaction.reply({ content: `🎫 **Pesanan Instan Kamu**\n${lines.join('\n')}`, flags: EPH });
 }
 
 async function onPage(interaction, dir) {
@@ -1363,6 +1466,7 @@ async function handle(interaction, action, arg) {
     if (action === 'inscancel') return run(() => onCancel(interaction, arg));
     if (action === 'insretry') return run(() => onRetry(interaction, arg));
     if (action === 'inscopy') return run(() => onCopy(interaction, arg));
+    if (action === 'insmine') return run(() => onMine(interaction));
   } else if (interaction.isStringSelectMenu()) {
     if (action === 'inscat') return run(() => onCategory(interaction, p()));
     if (action === 'insprod') return run(() => onProduct(interaction, p()));
@@ -1419,6 +1523,7 @@ module.exports = {
   init,
   start,
   handle,
+  buildPanel,
   onInfo,
   onPaid,
   buildTicket,
