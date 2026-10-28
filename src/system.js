@@ -103,6 +103,28 @@ async function checkRoblox() {
   return roblox;
 }
 
+// Waroengkuy (API Produk Instan) — dicek maks tiap 5 menit. Saldo TIDAK ditampilkan (dashboard publik).
+let wrk = { ok: null, ms: 0, at: 0, code: null };
+async function checkWaroengkuy() {
+  if (Date.now() - wrk.at < 5 * 60 * 1000 && wrk.ok !== null) return wrk;
+  const W = require('./store/waroengkuy');
+  if (!W.hasKey()) return (wrk = { ok: false, ms: 0, at: Date.now(), code: 'no_api_key' });
+  const t0 = Date.now();
+  try {
+    await W.getBalance();
+    wrk = { ok: true, ms: Date.now() - t0, at: Date.now(), code: null };
+  } catch (e) {
+    wrk = { ok: false, ms: 0, at: Date.now(), code: e.code || 'error' };
+  }
+  return wrk;
+}
+const WRK_NOTE = { no_api_key: 'API key belum diisi', unauthorized: 'API key ditolak', ip_not_allowed: 'IP VPS belum di-whitelist', rate_limited: 'Terlalu banyak permintaan' };
+/** Awal hari ini (WIB). */
+const todayWib = () => {
+  const d = new Date(Date.now() + 7 * 3600000);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - 7 * 3600000;
+};
+
 /** Daftar layanan + statusnya: { key, name, state: ok|warn|down|off, note } */
 async function services(guild) {
   const list = [];
@@ -126,6 +148,32 @@ async function services(guild) {
     add('store', '🛒 Noname Store', !cfg ? 'down' : open ? 'ok' : 'warn', !cfg ? 'store.json bermasalah' : `${open}/${sellable.length} produk buka • ${num(tickets)} ticket aktif`);
   } catch (e) {
     add('store', '🛒 Noname Store', 'down', 'Gagal dimuat');
+  }
+
+  // ⚡ Produk Instan (Waroengkuy)
+  try {
+    const { state, isProductOpen } = require('./store/state');
+    const { loadConfig: storeCfg } = require('./store/config');
+    const I = require('./store/instant');
+    const p = I.instantProduct(storeCfg());
+    if (p) {
+      const w = await checkWaroengkuy();
+      add('waroengkuy', '🔌 Waroengkuy API', w.ok ? (w.ms > 3000 ? 'warn' : 'ok') : 'down', w.ok ? `Respon ${num(w.ms)} ms` : WRK_NOTE[w.code] || 'Tidak bisa dihubungi');
+      const list = Object.values(state.tickets || {}).filter((t) => t.kind === 'instant' && t.status === 'open');
+      const help = list.filter((t) => t.ins?.stage === 'need_help').length;
+      const proc = list.filter((t) => t.ins?.stage !== 'waiting_payment').length;
+      const sum = I.summaryOf(p);
+      if (!isProductOpen(p)) add('instant', '⚡ Produk Instan', 'off', 'Sedang tutup');
+      else
+        add(
+          'instant',
+          '⚡ Produk Instan',
+          !w.ok ? 'down' : help ? 'warn' : 'ok',
+          `${num(sum.products)} produk tersedia • ${num(list.length - proc)} menunggu bayar • ${num(proc)} diproses${help ? ` • ${num(help)} dibantu admin` : ''}`,
+        );
+    }
+  } catch (e) {
+    add('instant', '⚡ Produk Instan', 'down', 'Gagal dimuat');
   }
 
   // NCS Ticket Center
@@ -169,6 +217,14 @@ async function services(guild) {
   const so = readJson('data/social-state.json', {});
   add('social', '🌐 Social Media', so?.message ? 'ok' : 'off', so?.message ? 'Update tiap 1 jam' : 'Belum dikirim');
 
+  // Leveling
+  const lv = readJson('data/leveling.json', null);
+  add('leveling', '📈 Leveling', lv?.panel ? 'ok' : 'off', lv?.panel ? `${num(Object.keys(lv.users || {}).length)} member tercatat` : 'Panel belum dikirim');
+
+  // Canva Manager
+  const cv = readJson('data/canva-manager.json', null);
+  add('canva', '🎨 Canva Manager', cv?.dashboard ? 'ok' : 'off', cv?.dashboard ? `${num(Object.keys(cv.entries || {}).length)} pelanggan manual + order Discord` : 'Dashboard belum dikirim');
+
   return list;
 }
 
@@ -197,6 +253,32 @@ function trackHistory(list) {
 // ───────────────────────── Tampilan ─────────────────────────
 const text = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000));
 const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
+
+/** Aktivitas store hari ini (WIB): semua order + Produk Instan. */
+function storeActivity() {
+  try {
+    const { state } = require('./store/state');
+    const all = Object.values(state.tickets || {});
+    const from = todayWib();
+    const done = all.filter((t) => t.status === 'completed' && t.closedAt >= from);
+    const inst = done.filter((t) => t.kind === 'instant');
+    const speeds = all
+      .filter((t) => t.kind === 'instant' && t.ins?.deliveredAt && t.payment?.paidAt)
+      .sort((a, b) => b.ins.deliveredAt - a.ins.deliveredAt)
+      .slice(0, 20)
+      .map((t) => Math.max(0, t.ins.deliveredAt - t.payment.paidAt));
+    const avg = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null;
+    return [
+      '### 🛒 Aktivitas Store Hari Ini',
+      `**🧾 Order Selesai:** \`${num(done.length)}\` • **⚡ Instan:** \`${num(inst.length)}\` • **🎫 Ticket Aktif:** \`${num(all.filter((t) => t.status === 'open').length)}\``,
+      avg != null ? `**🚀 Rata-rata Kirim Instan:** \`${avg < 60000 ? `${Math.max(1, Math.round(avg / 1000))} detik` : `${Math.round(avg / 60000)} menit`}\` setelah bayar` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  } catch {
+    return null;
+  }
+}
 
 async function buildDashboard(guild) {
   const cfg = loadConfig();
@@ -245,6 +327,7 @@ async function buildDashboard(guild) {
       `**👥 Member:** \`${num(humans)}\` • **🤖 Bot:** \`${bots == null ? 'memuat...' : num(bots)}\` • **🎧 Di Voice:** \`${num(guild.voiceStates.cache.filter((v) => v.channelId && !v.member?.user.bot).size)}\``,
       `**🚀 Boost:** \`${num(guild.premiumSubscriptionCount || 0)}\` • **🗂️ Channel:** \`${num(guild.channels.cache.size)}\` • **🏷️ Role:** \`${num(guild.roles.cache.size)}\``,
     ].join('\n'),
+    storeActivity(),
     data.history.length
       ? `### 📜 Riwayat Status\n${data.history.map((h) => `${DOT[h.to]} ${h.name}: ${DOT[h.from]} → ${DOT[h.to]} • ${ts(h.at)}`).join('\n')}`
       : null,
