@@ -26,6 +26,7 @@ const V = require('./views');
 const SP = require('./spender');
 const H = require('./howto');
 const C = require('./catalog');
+const I = require('./instant');
 
 const PROOF_DIR = path.join(__dirname, '..', '..', 'data', 'proofs');
 const SESSION_MS = 10 * 60 * 1000;
@@ -315,6 +316,7 @@ async function onProductInfo(interaction, productId) {
   if (product?.type === 'gamepass') return interaction.reply(eph(V.buildGamepassInfo(interaction.guild, cfg, product)));
   if (product?.type === 'canva') return interaction.reply(eph(V.buildCanvaInfo(interaction.guild, cfg, product)));
   if (product?.type === 'boost') return interaction.reply(eph(V.buildBoostInfo(interaction.guild, cfg, product)));
+  if (product?.type === 'instant') return I.onInfo(interaction, product);
   if (!product || product.type !== 'robux') {
     return interaction.reply({ content: '🔒 Produk ini **Coming Soon** — nantikan ya!', flags: EPH });
   }
@@ -338,6 +340,7 @@ async function onBuy(interaction, productId) {
   if (product?.type === 'gamepass') return onGamepassStart(interaction, product);
   if (product?.type === 'canva') return onCanvaStart(interaction, product);
   if (product?.type === 'boost') return onBoostStart(interaction, product);
+  if (product?.type === 'instant') return I.onInfo(interaction, product);
   if (!product || product.type !== 'robux') {
     return interaction.reply({ content: '🔒 Produk ini **Coming Soon** — nantikan ya!', flags: EPH });
   }
@@ -851,6 +854,7 @@ const STEP_LOG = {
 const CLOSE_LOG = {
   robux: { completed: '✅ Robux berhasil dikirim', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
   canva: { completed: '✅ Canva Pro aktif', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
+  instant: { completed: '✅ Akun terkirim', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
   boost: { completed: '✅ Server Boost aktif', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
   gamepass: { completed: '✅ Gamepass dibeli — Robux masuk setelah masa pending', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
   rekber: { completed: '✅ Dana dicairkan ke penjual', cancelled: '❌ Transaksi dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
@@ -1814,6 +1818,11 @@ async function markPaid(guild, channel, t, { by, amount, note }) {
     logOrder(guild, t, '💰 Dana masuk — pesanan diproses');
     await channel.send(v2(V.buildDanaMasuk(guild, cfg, t, { amount: nominal, note, by }))).catch(() => {});
   }
+  // Produk Instan: dana masuk (mode manual) → akun dikirim otomatis pakai saldo Waroengkuy.
+  if (kindOf(t) === 'instant') {
+    I.onPaid(t).catch((e) => console.error(`[instan] onPaid ${t.id}:`, e.message));
+    return null;
+  }
   // DM pembeli
   const buyer = await client.users.fetch(buyerOf(t)).catch(() => null);
   const dm = V.buildDanaMasuk(guild, cfg, t, { amount: nominal, note, by });
@@ -2398,6 +2407,8 @@ async function handleInteraction(interaction) {
   const [, action, arg] = id.split(':');
 
   try {
+    // ⚡ Produk Instan (Waroengkuy): semua customId "store:ins..."
+    if (action?.startsWith('ins') && (await I.handle(interaction, action, arg))) return true;
     if (interaction.isButton()) {
       if (action === 'buy') await onProductInfo(interaction, arg);
       else if (action === 'order') await onBuy(interaction, arg);
@@ -2459,10 +2470,14 @@ function registerStore(c) {
   c.once(Events.ClientReady, () => {
     housekeeping();
     setInterval(housekeeping, 30 * 1000);
+    I.start();
     refreshPanel();
     refreshLeaderboard();
   });
 }
+
+// Produk Instan memakai fungsi bersama dari file ini.
+I.init({ getClient: () => client, logOrder, refreshPanel, refreshLeaderboard, getTicketCategory, editTicketMsg, testimonyTimeoutMs });
 
 module.exports = {
   handleInteraction,
