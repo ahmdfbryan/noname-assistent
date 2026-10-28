@@ -75,8 +75,8 @@ const storeCommand = {
         .addStringOption((o) =>
           o
             .setName('jenis')
-            .setDescription('Store utama (default) atau Produk Digital')
-            .addChoices({ name: 'Store Utama', value: 'main' }, { name: 'Produk Digital', value: 'digital' }),
+            .setDescription('Store utama (default), Produk Digital, atau Produk Instan')
+            .addChoices({ name: 'Store Utama', value: 'main' }, { name: 'Produk Digital', value: 'digital' }, { name: 'Produk Instan', value: 'instant' }),
         )
         .addChannelOption((o) => o.setName('channel').setDescription('Default: channel panel di store.json').addChannelTypes(...TEXT)),
     )
@@ -161,8 +161,10 @@ const storeCommand = {
       const key = GROUPS[group].panelKey;
       const channel = await resolveChannel(interaction, key);
       if (!channel?.isTextBased()) return interaction.editReply('❌ Channel tidak ditemukan.');
-      await placeTracked(interaction, key, channel, (g, c) => V.buildPanel(g, c, group));
-      return interaction.editReply(`✅ Panel ${group === 'digital' ? '**Produk Digital**' : '**Store Utama**'} dikirim ke ${channel} dan akan ter-update otomatis.`);
+      if (group === 'instant' && !I.instantProduct(cfg)) return interaction.editReply('❌ Belum ada produk `"type": "instant"` di store.json.');
+      await placeTracked(interaction, key, channel, group === 'instant' ? I.buildPanel : (g, c) => V.buildPanel(g, c, group));
+      const names = { main: '**Store Utama**', digital: '**Produk Digital**', instant: '**⚡ Produk Instan**' };
+      return interaction.editReply(`✅ Panel ${names[group]} dikirim ke ${channel} dan akan ter-update otomatis.`);
     }
     if (sub === 'leaderboard') {
       const channel = await resolveChannel(interaction, sub);
