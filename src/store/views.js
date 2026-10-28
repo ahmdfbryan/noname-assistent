@@ -1923,9 +1923,13 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
     ];
   }
   lines.push(row('Order ID', `\`${t.id}\``));
+  // Total belanja pembeli di toko (semua order Completed) + tier spender.
+  const sp = state.spenders?.[buyerId];
+  const tier = sp ? SP.tierFor(sp.revenue, cfg) : null;
   const after = [
     r ? row('Rating', `${STARS(r.rating)}  **${r.rating}/5**`) : row('Status', '`✅ Transaksi Berhasil`'),
     `**💬 Komentar**\n${boxed(r ? r.comment : 'Pembeli tidak memberikan ulasan.')}`,
+    sp?.revenue ? row('Total Spend', `\`${rupiah(sp.revenue)}\` • ${num(sp.orders)} order${tier ? ` • ${SP.tierLabel(tier)}` : ''}`) : null,
   ];
   return v2Card({
     color: color(cfg, 'brand', 0x3498db),
@@ -1987,7 +1991,8 @@ function buildOrderLogV2(guild, cfg, t) {
     color: statusColor,
     header: `## ${rekber ? '🤝' : '🧾'} ${t.id} • ${pub}\n-# ${rekber ? 'Rekber Log' : 'Order Log'}`,
     lines,
-    thumb: guild.iconURL({ extension: 'png', size: 256 }) || null,
+    // Foto profil pembeli (disimpan saat log dibuat); fallback ke logo server.
+    thumb: t.buyerAvatar || guild.client?.users?.cache?.get(rekber ? t.buyerId : t.userId)?.displayAvatarURL({ extension: 'png', size: 256 }) || guild.iconURL({ extension: 'png', size: 256 }) || null,
     after: [status.join('\n'), timeline ? `**🗂️ Progress**\n${timeline}` : null],
     footer: `🛒 ${storeName(cfg, guild)} • ${ts(t.closedAt || t.createdAt, 'f')}`,
   });
