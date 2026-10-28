@@ -53,7 +53,16 @@ const STARS = (avg) => {
 };
 const bullets = (list) => (list || []).map((x) => `▸ ${x}`).join('\n');
 /** Produk yang tampil di katalog sesuai grup (main = store utama, digital = produk digital). */
-const catalogProducts = (cfg, group = 'main') => productsOf(cfg, group).slice(0, 9);
+function catalogProducts(cfg, group = 'main') {
+  const list = productsOf(cfg, group);
+  // ⚡ Produk Instan punya panel sendiri, tapi kartunya tetap tampil di katalog Produk Digital (sebelum Coming Soon).
+  if (group === 'digital') {
+    const inst = productsOf(cfg, 'instant');
+    const soon = list.findIndex((p) => p.type === 'soon');
+    list.splice(soon < 0 ? list.length : soon, 0, ...inst);
+  }
+  return list.slice(0, 9);
+}
 
 const V2 = MessageFlags.IsComponentsV2;
 const text = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000));
