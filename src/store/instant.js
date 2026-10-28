@@ -910,6 +910,25 @@ function buildTicket(guild, cfg, t) {
   return { embeds, components: rows };
 }
 
+/** Channel panel NCS Ticket Center (tickets.json → panelChannelId). */
+function helpChannelId() {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const root = path.join(__dirname, '..', '..');
+    const cfg = JSON.parse(fs.readFileSync(path.join(root, 'tickets.json'), 'utf8'));
+    if (isId(cfg.panelChannelId)) return cfg.panelChannelId;
+    const d = JSON.parse(fs.readFileSync(path.join(root, 'data', 'support-tickets.json'), 'utf8'));
+    return isId(d?.panel?.channelId) ? d.panel.channelId : null;
+  } catch {
+    return null;
+  }
+}
+const helpText = (t) => {
+  const ch = helpChannelId();
+  return `Buat **ticket bantuan** di ${ch ? `<#${ch}>` : 'NCS Ticket Center'} (pilih **⚡ Bantuan Produk Instan**) & sertakan ID \`${t.id}\``;
+};
+
 /** Pesan pengiriman akun (di ticket & DM). */
 function buildDelivery(guild, cfg, t, { forDm = false } = {}) {
   const i = t.ins;
@@ -944,7 +963,9 @@ function buildDelivery(guild, cfg, t, { forDm = false } = {}) {
   box.addTextDisplayComponents(
     text(
       [
-        i.noWarranty ? '⚠️ **Produk tanpa garansi** — tidak ada penggantian / refund bila akun bermasalah.' : i.warrantyDays ? `🛡️ **Garansi ${num(i.warrantyDays)} hari.** Kendala? Hubungi admin & sertakan ID \`${t.id}\`.` : `🛡️ Kendala? Hubungi admin & sertakan ID \`${t.id}\`.`,
+        i.noWarranty
+          ? `⚠️ **Produk tanpa garansi** — tidak ada penggantian / refund bila akun bermasalah. Butuh bantuan? ${helpText(t)}.`
+          : `🛡️ ${i.warrantyDays ? `**Garansi ${num(i.warrantyDays)} hari.** ` : ''}Ada kendala? ${helpText(t)}.`,
         '🔒 **Jangan bagikan** data akun ke siapa pun & **jangan ganti password** kecuali diizinkan.',
         forDm ? '💾 Simpan pesan ini baik-baik ya.' : '💾 **Salin & simpan sekarang** — ticket ini akan ditutup otomatis setelah testimoni. Salinannya juga dikirim ke DM kamu.',
       ].join('\n'),
@@ -952,7 +973,9 @@ function buildDelivery(guild, cfg, t, { forDm = false } = {}) {
   );
   box.addSeparatorComponents(line());
   box.addTextDisplayComponents(text(`-# ${name} • ${ts(Date.now(), 'f')}`));
-  if (!forDm && accounts.length) box.addActionRowComponents(row(btn(`store:inscopy:${t.id}`, 'Salin Data Akun', '📋')));
+  const help = helpChannelId();
+  const buttons = [!forDm && accounts.length ? btn(`store:inscopy:${t.id}`, 'Salin Data Akun', '📋') : null, help ? linkBtn(channelUrl(guild.id, help), 'Ticket Bantuan', '🛟') : null].filter(Boolean);
+  if (buttons.length) box.addActionRowComponents(row(...buttons));
   return { components: [...(forDm ? [] : [text(`<@${t.userId}>`)]), box], flags: V2F, allowedMentions: { users: forDm ? [] : [t.userId] } };
 }
 
