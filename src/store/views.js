@@ -611,6 +611,37 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
       footer: `${name} • ${now}`,
       rows: [orderBtn(groupOf(sp))],
     });
+  } else if (kind === 'price') {
+    // extra.product + extra.changes = [{ label, before, after, suffix }]
+    const sp = extra.product;
+    const changes = (extra.changes || []).filter((c) => Number(c.before) !== Number(c.after));
+    const down = changes.length && changes.every((c) => c.after < c.before);
+    const up = changes.length && changes.every((c) => c.after > c.before);
+    const arrow = (c) => {
+      if (c.after < c.before) return `⬇️ \`hemat ${Math.round(((c.before - c.after) / c.before) * 100)}%\``;
+      return '⬆️';
+    };
+    const lines = changes.map((c) => `**${c.label}:** ~~${rupiah(c.before)}~~ ➜ **${rupiah(c.after)}${c.suffix || ''}** ${arrow(c)}`);
+    const rate = sp && (sp.type === 'robux' || sp.type === 'gamepass') ? rateOf(cfg, sp) : 0;
+    const examples = rate
+      ? [100, 500, 1000].map((n) => `\`${num(n).padStart(5)} Robux\` ➜ **${rupiah(sp.type === 'gamepass' ? gpBeforeTax(sp, n) * rate : n * rate)}**`).join('\n')
+      : null;
+    card = pcard({
+      accent: color(cfg, down ? 'open' : 'brand', down ? 0x2ecc71 : 0x3498db),
+      thumb: sp?.thumbnail || icon,
+      header: `# ${down ? `🔥 Harga ${sp?.label || ''} Turun!` : `💱 Harga ${sp?.label || ''} Diperbarui`}\n-# ${name} • Price Update`,
+      blocks: [
+        down
+          ? `Kabar gembira! Harga **${sp?.label}** sekarang **lebih murah** 🎉\nWaktunya order sebelum kehabisan stock! 🛒`
+          : `Harga **${sp?.label}** telah diperbarui.\nHarga baru **langsung berlaku** untuk pesanan berikutnya ✨`,
+        `### 🏷️ Harga Baru\n${lines.join('\n') || '-'}`,
+        examples ? `### 🧮 Contoh Harga${sp.type === 'gamepass' ? ' (Robux diterima)' : ''}\n${examples}` : null,
+        [`**🏪 Status:** ${statusBadge(sp)}`, hasStock(sp) ? `**📦 Stock:** \`${num(stockOf(sp))} ${stockUnit(sp)}\`` : null].filter(Boolean).join('\n'),
+        '-# Pesanan yang sudah berjalan tetap memakai harga sebelumnya.',
+      ],
+      footer: `${name} • Diperbarui ${now}`,
+      rows: [sp && isProductOpen(sp) ? orderBtn(groupOf(sp)) : null],
+    });
   } else if (kind === 'returned') {
     const t = extra.ticket;
     const sp = (cfg.products || []).find((x) => x.id === t.productId) || robux;
