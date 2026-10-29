@@ -24,6 +24,7 @@ const { loadConfig, isId, rupiah, num, getProduct } = require('./config');
 const { state, save, productState, hasStock, stockOf, setStock, stockUnit, planStockOf, setPlanStock, isProductOpen } = require('./state');
 const V = require('./views');
 const W = require('./waroengkuy');
+const T = require('./control-tools');
 
 /**
  * 🎛️ Store Control Center — panel admin (tanpa command) untuk mengatur seluruh Noname Store:
@@ -133,7 +134,7 @@ function buildPanel(guild, cfg) {
   });
   const inst = list.find((p) => p.type === 'instant');
   const blocks = [
-    `## ${overall}`,
+    [`## ${overall}`, ...T.panelLines(cfg)].join('\n'),
     `### 🛍️ Produk\n${productLines.join('\n')}`,
     inst
       ? [
@@ -150,14 +151,12 @@ function buildPanel(guild, cfg) {
       `🎫 **Ticket Berjalan:** \`${num(tickets.filter((t) => t.status === 'open').length)}\` • 💳 **Menunggu Verifikasi:** \`${num(tickets.filter((t) => t.status === 'open' && t.payment?.status === 'pending').length)}\``,
     ].join('\n'),
     state.controlLog?.length ? `### 📜 Aktivitas Terakhir\n${state.controlLog.map((x) => `<t:${Math.floor(x.at / 1000)}:R> ┃ ${x.text}`).join('\n')}` : null,
-    '-# 🟢 Buka • 🟠 Buka tapi stock habis • 🔴 Tutup\n-# Klik tombol produk = **buka / tutup sekali klik** (otomatis diumumkan). Pilih produk di menu untuk atur **stock & harga**.',
+    `-# 🟢 Buka • 🟠 Buka tapi stock habis • 🔴 Tutup — klik tombol produk = **buka / tutup sekali klik** (otomatis diumumkan).\n-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
   ];
   for (const b of blocks.filter(Boolean)) {
     box.addSeparatorComponents(line());
     box.addTextDisplayComponents(text(b));
   }
-  box.addSeparatorComponents(line());
-  box.addTextDisplayComponents(text(`-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`));
 
   // Menu kelola produk
   box.addActionRowComponents(
@@ -178,12 +177,24 @@ function buildPanel(guild, cfg) {
   // Tombol buka / tutup sekali klik per produk (hijau = buka, merah = tutup)
   const toggles = list.slice(0, 10).map((p) => btn(`store:cptog:${p.id}`, p.label, p.emoji || '🛒', isProductOpen(p) ? ButtonStyle.Success : ButtonStyle.Danger));
   for (let i = 0; i < toggles.length; i += 5) box.addActionRowComponents(rowOf(...toggles.slice(i, i + 5)));
+  const mt = Boolean(state.maintenance?.on);
   box.addActionRowComponents(
     rowOf(
-      btn('store:cpall:open', 'Buka Semua', '🟢', ButtonStyle.Secondary, open === list.length),
+      btn('store:cpall:open', 'Buka Semua', '🟢', ButtonStyle.Secondary, open === list.length || mt),
       btn('store:cpall:close', 'Tutup Semua', '🔴', ButtonStyle.Secondary, open === 0),
       btn('store:cpall:reason', 'Tutup + Alasan', '📝'),
+      btn('store:cptmt', mt ? 'Akhiri Maintenance' : 'Maintenance', '🛠️', mt ? ButtonStyle.Success : ButtonStyle.Secondary),
       btn('store:cprefresh', 'Refresh', '🔄'),
+    ),
+  );
+  const qn = T.queueCount();
+  box.addActionRowComponents(
+    rowOf(
+      btn('store:cptq', qn ? `Antrean (${qn})` : 'Antrean', '📋', qn ? ButtonStyle.Primary : ButtonStyle.Secondary),
+      btn('store:cptsch', 'Jam Operasional', '⏰'),
+      btn('store:cptann', 'Pengumuman', '📢'),
+      btn('store:cptrep', 'Laporan', '📊'),
+      btn('store:cptalert', 'Peringatan', '⚠️'),
     ),
   );
   return { components: [box], flags: V2F, allowedMentions: { parse: [] } };
@@ -366,9 +377,14 @@ function reasonModal(id, open) {
 
 // ───────────────────────── Router ─────────────────────────
 async function handle(interaction, action, arg) {
-  if (!['cpsel', 'cptog', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
+  const tool = T.ACTIONS.includes(action);
+  if (!tool && !['cpsel', 'cptog', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
   if (!isAdmin(interaction.member)) {
     await interaction.reply({ content: '⛔ Panel ini khusus **Administrator**.', flags: EPH }).catch(() => {});
+    return true;
+  }
+  if (tool) {
+    await T.handle(interaction, action, arg);
     return true;
   }
   const cfg = loadConfig();
@@ -534,11 +550,25 @@ async function handle(interaction, action, arg) {
 
 function init(c) {
   ctx = c;
+  T.init({ ctx: c, setOpen, refresh, logAction, getWrk: () => wrk });
+}
+/** Guild tempat panel admin berada (untuk jadwal & peringatan). */
+async function panelGuild() {
+  const client = ctx?.getClient();
+  if (!client) return null;
+  const ch = await client.channels.fetch(channelOfCfg(loadConfig())).catch(() => null);
+  return ch?.guild || client.guilds.cache.first() || null;
 }
 /** Dipanggil saat bot siap: kirim / perbarui panel, lalu perbarui berkala (saldo, statistik harian). */
 function start() {
   setTimeout(refresh, 6000);
   setInterval(refresh, 5 * 60 * 1000);
+  // ⏰ Jam operasional (tiap 30 detik) & ⚠️ peringatan stock / saldo (tiap 2 menit).
+  setInterval(async () => T.scheduleTick(await panelGuild()).catch((e) => console.warn('[control] jadwal:', e.message)), 30 * 1000);
+  setInterval(async () => {
+    if (loadConfig()?.products?.some((p) => p.type === 'instant')) await refreshWrk();
+    await T.alertsTick(await panelGuild()).catch((e) => console.warn('[control] peringatan:', e.message));
+  }, 2 * 60 * 1000);
 }
 
 module.exports = { init, start, handle, refresh, buildPanel };
