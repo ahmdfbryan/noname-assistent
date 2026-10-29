@@ -473,6 +473,20 @@ async function onProduct(interaction, p) {
   return interaction.update(productView(interaction.guild, cfg, p, prod));
 }
 
+/** Tombol "Beli Sekarang" di post forum katalog → detail & varian produk (pesan pribadi). */
+async function onForumBuy(interaction, wrkProductId) {
+  const cfg = loadConfig();
+  const p = instantProduct(cfg);
+  if (!p) return interaction.reply({ content: '❌ Produk belum tersedia.', flags: EPH });
+  if (!isProductOpen(p)) return interaction.reply({ content: `🔴 **${p.label}** sedang **TUTUP**. Pantau channel stock untuk info berikutnya.`, flags: EPH });
+  await interaction.deferReply({ flags: EPH });
+  const { items } = await loadItems();
+  const prod = findProduct(p, items, wrkProductId);
+  if (!prod) return interaction.editReply('❌ Produk ini sudah tidak dijual. Cek produk lain di katalog ya.');
+  setSession(interaction.user.id, { wrkProductId: prod.id, pid: p.id, cat: prod.category, page: 0 });
+  return interaction.editReply(productView(interaction.guild, cfg, p, prod));
+}
+
 async function onCategoryBack(interaction, p) {
   const s = getSession(interaction.user.id);
   if (!s?.cat) return onBack(interaction, p);
@@ -1490,6 +1504,7 @@ async function handle(interaction, action, arg) {
     if (action === 'insretry') return run(() => onRetry(interaction, arg));
     if (action === 'inscopy') return run(() => onCopy(interaction, arg));
     if (action === 'insmine') return run(() => onMine(interaction));
+    if (action === 'insbuy') return run(() => onForumBuy(interaction, arg));
   } else if (interaction.isStringSelectMenu()) {
     if (action === 'inscat') return run(() => onCategory(interaction, p()));
     if (action === 'insprod') return run(() => onProduct(interaction, p()));
@@ -1555,4 +1570,14 @@ module.exports = {
   instantProduct,
   adminStatus,
   payMode,
+  // dipakai katalog forum (forum.js)
+  sellable,
+  groupCatalog,
+  productSummary,
+  inStock,
+  cleanDesc,
+  warrantyText,
+  helpChannelId,
+  minTotal,
+  PAY_LABEL,
 };
