@@ -55,7 +55,7 @@ const bullets = (list) => (list || []).map((x) => `▸ ${x}`).join('\n');
 /** Produk yang tampil di katalog sesuai grup (main = store utama, digital = produk digital). */
 function catalogProducts(cfg, group = 'main') {
   const list = productsOf(cfg, group);
-  // ⚡ Produk Instan punya panel sendiri, tapi kartunya tetap tampil di katalog Produk Digital (sebelum Coming Soon).
+  // 👑 Premium App punya panel sendiri, tapi kartunya tetap tampil di katalog Produk Digital (sebelum Coming Soon).
   if (group === 'digital') {
     const inst = productsOf(cfg, 'instant');
     const soon = list.findIndex((p) => p.type === 'soon');
