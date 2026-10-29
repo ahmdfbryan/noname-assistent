@@ -19,11 +19,11 @@ const {
   AttachmentBuilder,
 } = require('discord.js');
 const UI = require('./ui');
+const F = require('./tools-files');
 
 /**
  * ⚙️ Tools Noname — kumpulan alat kecil di Bot Command Center (hasil hanya terlihat oleh pemakai).
- * Tools: 🔳 Link → QR Code.
- * Tambah tool baru: tambahkan item di TOOLS + handler di handle().
+ * Tools: 📄 Dokumen & PDF, 🖼️ Gambar (tools-files.js) + 🔳 Link → QR Code.
  */
 const V2 = MessageFlags.IsComponentsV2;
 const EPH = MessageFlags.Ephemeral;
@@ -31,24 +31,34 @@ const BRAND = 0x3498db;
 const text = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000));
 const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
 
-const TOOLS = [
-  { id: 'qr', emoji: '🔳', title: 'Link → QR Code', desc: 'Ubah link / teks jadi gambar QR Code siap scan & download.', button: 'Buat QR' },
-];
+const row = (...b) => new ActionRowBuilder().addComponents(b);
+const toolBtn = (id, t) =>
+  new ButtonBuilder()
+    .setCustomId(`bp:t:${id}`)
+    .setLabel(F.ready(id) ? t.short : `${t.short} (segera)`)
+    .setEmoji(t.emoji)
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(!F.ready(id));
 
-/** Menu tools (pesan pribadi). */
-function buildMenu(guild) {
+/** Menu tools (pesan pribadi): daftar tool + tombol, dikelompokkan Dokumen / Gambar / Lainnya. */
+async function buildMenu(guild) {
+  await F.detect();
   const box = UI.accent(new ContainerBuilder(), BRAND);
-  box.addTextDisplayComponents(text(`# ⚙️ Tools Noname\n-# ${guild?.name || 'Noname'} • Alat bantu gratis untuk member`));
+  const list = (ids) => ids.map((id) => `${F.TOOLS[id].emoji} **${F.TOOLS[id].title}** — ${F.TOOLS[id].desc}${F.ready(id) ? '' : ' `segera`'}`).join('\n');
+  box.addTextDisplayComponents(text(`# ⚙️ Tools Noname\n-# ${guild?.name || 'Noname'} • Alat bantu gratis untuk member — hasil hanya terlihat olehmu 🔒`));
   box.addSeparatorComponents(line());
-  for (const t of TOOLS) {
-    box.addSectionComponents(
-      new SectionBuilder()
-        .addTextDisplayComponents(text(`### ${t.emoji} ${t.title}\n${t.desc}`))
-        .setButtonAccessory(new ButtonBuilder().setCustomId(`bp:t:${t.id}`).setLabel(t.button).setEmoji(t.emoji).setStyle(ButtonStyle.Primary)),
-    );
-  }
+  box.addTextDisplayComponents(text(`### 📄 Dokumen & PDF\n${list(F.DOC_TOOLS)}`));
+  box.addActionRowComponents(row(...F.DOC_TOOLS.slice(0, 3).map((id) => toolBtn(id, F.TOOLS[id]))), row(...F.DOC_TOOLS.slice(3, 6).map((id) => toolBtn(id, F.TOOLS[id]))));
   box.addSeparatorComponents(line());
-  box.addTextDisplayComponents(text('-# 🔒 Hasil tools hanya terlihat olehmu • Tools lain segera hadir ✨'));
+  box.addTextDisplayComponents(text(`### 🖼️ Gambar & Lainnya\n${list(F.IMG_TOOLS)}\n🔳 **Link → QR Code** — Ubah link / teks jadi QR Code siap scan`));
+  box.addActionRowComponents(
+    row(
+      ...F.IMG_TOOLS.map((id) => toolBtn(id, F.TOOLS[id])),
+      new ButtonBuilder().setCustomId('bp:t:qr').setLabel('Link → QR').setEmoji('🔳').setStyle(ButtonStyle.Secondary),
+    ),
+  );
+  box.addSeparatorComponents(line());
+  box.addTextDisplayComponents(text('-# 📎 Klik tool → upload file di form → hasil langsung dikirim. File dihapus dari server setelah selesai.'));
   return { components: [box], flags: V2 | EPH };
 }
 
@@ -140,7 +150,21 @@ async function onQrSubmit(i) {
 async function handle(i) {
   const id = i.customId;
   if (id === 'bp:tools') {
-    await i.reply(buildMenu(i.guild));
+    await i.reply(await buildMenu(i.guild));
+    return true;
+  }
+  // 📄 Tools file
+  const tm = id.match(/^bp:t:(\w+)$/);
+  if (tm && F.TOOLS[tm[1]] && i.isButton()) {
+    await F.detect();
+    if (!F.ready(tm[1])) await i.reply({ content: '🔧 Tool ini belum tersedia di server.', flags: EPH });
+    else await i.showModal(F.buildModal(tm[1]));
+    return true;
+  }
+  const fm = id.match(/^bp:m:f:(\w+)$/);
+  if (fm && i.isModalSubmit()) {
+    await F.detect();
+    await F.onSubmit(i, fm[1]);
     return true;
   }
   if (id === 'bp:t:qr' && i.isButton()) {
@@ -154,4 +178,4 @@ async function handle(i) {
   return false;
 }
 
-module.exports = { handle, buildMenu, normalize };
+module.exports = { handle, buildMenu, normalize, detect: F.detect };
