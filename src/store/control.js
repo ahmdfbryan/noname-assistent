@@ -121,11 +121,8 @@ function buildPanel(guild, cfg) {
   const tickets = Object.values(state.tickets || {});
   const from = wib();
   const today = tickets.filter((t) => t.status === 'completed' && t.closedAt >= from);
-  const box = UI.accent(new ContainerBuilder(), brand(cfg));
   const header = `# 🎛️ Store Control Center\n-# ${name} • Panel Admin — atur toko tanpa command`;
   const icon = guild.iconURL({ extension: 'png', size: 256 });
-  if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
-  else box.addTextDisplayComponents(text(header));
 
   const overall = open === list.length ? '🟢 **Semua produk BUKA**' : open === 0 ? '🔴 **Semua produk TUTUP**' : `🟡 **${open} dari ${list.length} produk buka**`;
   const productLines = list.map((p) => {
@@ -133,71 +130,92 @@ function buildPanel(guild, cfg) {
     return `${statusDot(p)} ${p.emoji || '🛒'} **${p.label}**\n┗ ${priceText(cfg, p)}${st ? ` • 📦 ${st}` : ''}`;
   });
   const inst = list.find((p) => p.type === 'instant');
-  const blocks = [
-    [`## ${overall}`, ...T.panelLines(cfg)].join('\n'),
-    `### 🛍️ Produk\n${productLines.join('\n')}`,
+  const pendingPay = tickets.filter((t) => t.status === 'open' && t.payment?.status === 'pending').length;
+  const summary = [
+    '### 📊 Ringkasan Hari Ini',
+    `🧾 **Order Selesai:** \`${num(today.length)}\` • 💰 **Omzet:** \`${rupiah(today.reduce((a, t) => a + (Number(t.price) || 0), 0))}\``,
+    `🎫 **Ticket Berjalan:** \`${num(tickets.filter((t) => t.status === 'open').length)}\` • 💳 **Menunggu Verifikasi:** \`${num(pendingPay)}\``,
     inst
-      ? [
-          '### 👑 Waroengkuy (Premium App)',
-          wrk.ok
-            ? `🟢 **API:** terhubung • 💰 **Saldo:** \`${rupiah(wrk.balance)}\``
-            : `🔴 **API:** ${{ no_api_key: 'API key belum diisi', unauthorized: 'API key ditolak', ip_not_allowed: 'IP VPS belum di-whitelist' }[wrk.code] || 'tidak bisa dihubungi'}`,
-          `🛠️ **Pesanan Butuh Bantuan:** \`${num(tickets.filter((t) => t.kind === 'instant' && t.status === 'open' && t.ins?.stage === 'need_help').length)}\``,
-        ].join('\n')
+      ? wrk.ok
+        ? `👑 **Waroengkuy:** \`🟢 Terhubung\` • 💰 **Saldo:** \`${rupiah(wrk.balance)}\` • 🛠️ **Butuh Bantuan:** \`${num(tickets.filter((t) => t.kind === 'instant' && t.status === 'open' && t.ins?.stage === 'need_help').length)}\``
+        : `👑 **Waroengkuy:** \`🔴 ${{ no_api_key: 'API key belum diisi', unauthorized: 'API key ditolak', ip_not_allowed: 'IP VPS belum di-whitelist' }[wrk.code] || 'Tidak bisa dihubungi'}\``
       : null,
-    [
-      '### 📊 Hari Ini',
-      `🧾 **Order Selesai:** \`${num(today.length)}\` • 💰 **Omzet:** \`${rupiah(today.reduce((a, t) => a + (Number(t.price) || 0), 0))}\``,
-      `🎫 **Ticket Berjalan:** \`${num(tickets.filter((t) => t.status === 'open').length)}\` • 💳 **Menunggu Verifikasi:** \`${num(tickets.filter((t) => t.status === 'open' && t.payment?.status === 'pending').length)}\``,
-    ].join('\n'),
-    state.controlLog?.length ? `### 📜 Aktivitas Terakhir\n${state.controlLog.map((x) => `<t:${Math.floor(x.at / 1000)}:R> ┃ ${x.text}`).join('\n')}` : null,
-    `-# 🟢 Buka • 🟠 Buka tapi stock habis • 🔴 Tutup — klik tombol produk = **buka / tutup sekali klik** (otomatis diumumkan).\n-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
-  ];
-  for (const b of blocks.filter(Boolean)) {
-    box.addSeparatorComponents(line());
-    box.addTextDisplayComponents(text(b));
-  }
-
-  // Menu kelola produk
-  box.addActionRowComponents(
-    rowOf(
-      new StringSelectMenuBuilder()
-        .setCustomId('store:cpsel')
-        .setPlaceholder('⚙️ Kelola produk: stock, harga, buka / tutup...')
-        .addOptions(
-          list.slice(0, 25).map((p) => ({
-            label: p.label.slice(0, 100),
-            value: p.id,
-            emoji: p.emoji || '🛒',
-            description: `${isProductOpen(p) ? 'BUKA' : 'TUTUP'}${hasStock(p) ? ` • Stock ${num(stockOf(p))} ${stockUnit(p)}` : ''}${p.type === 'instant' ? ' • hanya buka / tutup' : ''}`.slice(0, 100),
-          })),
-        ),
-    ),
-  );
-  // Tombol buka / tutup sekali klik per produk (hijau = buka, merah = tutup)
-  const toggles = list.slice(0, 10).map((p) => btn(`store:cptog:${p.id}`, p.label, p.emoji || '🛒', isProductOpen(p) ? ButtonStyle.Success : ButtonStyle.Danger));
-  for (let i = 0; i < toggles.length; i += 5) box.addActionRowComponents(rowOf(...toggles.slice(i, i + 5)));
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const activity = state.controlLog?.length ? `### 📜 Aktivitas Terakhir\n${state.controlLog.slice(0, 4).map((x) => `<t:${Math.floor(x.at / 1000)}:R> ┃ ${x.text}`).join('\n')}` : null;
   const mt = Boolean(state.maintenance?.on);
-  box.addActionRowComponents(
-    rowOf(
-      btn('store:cpall:open', 'Buka Semua', '🟢', ButtonStyle.Secondary, open === list.length || mt),
-      btn('store:cpall:close', 'Tutup Semua', '🔴', ButtonStyle.Secondary, open === 0),
-      btn('store:cpall:reason', 'Tutup + Alasan', '📝'),
-      btn('store:cptmt', mt ? 'Akhiri Maintenance' : 'Maintenance', '🛠️', mt ? ButtonStyle.Success : ButtonStyle.Secondary),
-      btn('store:cprefresh', 'Refresh', '🔄'),
-    ),
-  );
   const qn = T.queueCount();
-  box.addActionRowComponents(
-    rowOf(
-      btn('store:cptq', qn ? `Antrean (${qn})` : 'Antrean', '📋', qn ? ButtonStyle.Primary : ButtonStyle.Secondary),
-      btn('store:cptsch', 'Jam Operasional', '⏰'),
-      btn('store:cptann', 'Pengumuman', '📢'),
-      btn('store:cptrep', 'Laporan', '📊'),
-      btn('store:cptalert', 'Peringatan', '⚠️'),
-    ),
+
+  // ── Bagian informasi
+  const info = [[`## ${overall}`, ...T.panelLines(cfg)].join('\n'), `### 🛍️ Status Produk\n${productLines.join('\n')}`, summary, activity];
+
+  // ── Bagian tombol (tiap kelompok punya judul kecil supaya rapi)
+  const toggles = list.slice(0, 9).map((p) => btn(`store:cptog:${p.id}`, p.label, p.emoji || '🛒', isProductOpen(p) ? ButtonStyle.Success : ButtonStyle.Danger));
+  const toggleRows = [];
+  for (let i = 0; i < toggles.length; i += 3) toggleRows.push(rowOf(...toggles.slice(i, i + 3)));
+  const select = rowOf(
+    new StringSelectMenuBuilder()
+      .setCustomId('store:cpsel')
+      .setPlaceholder('⚙️ Pilih produk untuk atur stock, harga & status...')
+      .addOptions(
+        list.slice(0, 25).map((p) => ({
+          label: p.label.slice(0, 100),
+          value: p.id,
+          emoji: p.emoji || '🛒',
+          description: `${isProductOpen(p) ? '🟢 Buka' : '🔴 Tutup'}${hasStock(p) ? ` • Stock ${num(stockOf(p))} ${stockUnit(p)}` : ''}${p.type === 'instant' ? ' • hanya buka / tutup' : ''}`.slice(0, 100),
+        })),
+      ),
   );
-  return { components: [box], flags: V2F, allowedMentions: { parse: [] } };
+  const toolsRow = rowOf(
+    btn('store:cptq', qn ? `Antrean (${qn})` : 'Antrean', '📋', qn ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    btn('store:cptsch', 'Jam Operasional', '⏰'),
+    btn('store:cptann', 'Pengumuman', '📢'),
+    btn('store:cptrep', 'Laporan', '📊'),
+    btn('store:cptalert', 'Peringatan', '⚠️'),
+  );
+  const storeRow = rowOf(
+    btn('store:cpall:open', 'Buka Semua', '🟢', ButtonStyle.Secondary, open === list.length || mt),
+    btn('store:cpall:close', 'Tutup Semua', '🔴', ButtonStyle.Secondary, open === 0),
+    btn('store:cpall:reason', 'Tutup + Alasan', '📝'),
+    btn('store:cptmt', mt ? 'Akhiri Maintenance' : 'Maintenance', '🛠️', mt ? ButtonStyle.Success : ButtonStyle.Secondary),
+    btn('store:cprefresh', 'Refresh', '🔄'),
+  );
+  const footer = `-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`;
+
+  /** Susun isi kotak. Discord membatasi 40 komponen per pesan → aktivitas disembunyikan kalau tidak muat. */
+  const build = (withActivity) => {
+    const b = UI.accent(new ContainerBuilder(), brand(cfg));
+    if (icon) b.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
+    else b.addTextDisplayComponents(text(header));
+    for (const x of info.filter((v, i) => v && (withActivity || i !== 3))) {
+      b.addSeparatorComponents(line());
+      b.addTextDisplayComponents(text(x));
+    }
+    b.addSeparatorComponents(line());
+    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# Sekali klik — 🟩 hijau = sedang buka, 🟥 merah = sedang tutup. Otomatis diumumkan ke channel stock.'));
+    for (const r of toggleRows) b.addActionRowComponents(r);
+    b.addTextDisplayComponents(text('### ⚙️ Kelola Produk'));
+    b.addActionRowComponents(select);
+    b.addTextDisplayComponents(text('### 🧰 Alat Admin'));
+    b.addActionRowComponents(toolsRow, storeRow);
+    b.addSeparatorComponents(line());
+    b.addTextDisplayComponents(text(footer));
+    return b;
+  };
+  const count = (b) => {
+    let n = 0;
+    const walk = (c) => {
+      n += 1;
+      if (c.accessory) n += 1;
+      (c.components || []).forEach(walk);
+    };
+    walk(b.toJSON());
+    return n;
+  };
+  let built = build(true);
+  if (count(built) > 40) built = build(false);
+  return { components: [built], flags: V2F, allowedMentions: { parse: [] } };
 }
 
 // ───────────────────────── Detail satu produk (pesan pribadi admin) ─────────────────────────
