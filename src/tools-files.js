@@ -144,6 +144,31 @@ function pump() {
 const waitingAhead = () => queue.length + Math.max(0, running - MAX_JOBS + 1);
 
 // ───────────────────────── Daftar tool ─────────────────────────
+// ───────────────────────── remove.bg ─────────────────────────
+const removeBgKey = () => process.env.REMOVEBG_API_KEY || process.env.REMOVE_BG_API_KEY || '';
+/** Batas pemakaian per member per hari (kredit remove.bg terbatas). Admin tanpa batas. 0 = tanpa batas. */
+const REMOVEBG_DAILY = () => (process.env.REMOVEBG_DAILY_LIMIT === undefined ? 3 : Number(process.env.REMOVEBG_DAILY_LIMIT) || 0);
+const USAGE_FILE = path.join(ROOT, 'data', 'tools-usage.json');
+const todayKey = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10); // tanggal WIB
+function usage() {
+  let u;
+  try {
+    u = JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8'));
+  } catch {
+    u = {};
+  }
+  if (u.date !== todayKey()) u = { date: todayKey(), removebg: {} };
+  u.removebg = u.removebg || {};
+  return u;
+}
+function addUsage(userId) {
+  const u = usage();
+  u.removebg[userId] = (u.removebg[userId] || 0) + 1;
+  fs.mkdirSync(path.dirname(USAGE_FILE), { recursive: true });
+  fs.writeFileSync(USAGE_FILE, JSON.stringify(u));
+}
+const usedToday = (userId) => usage().removebg[userId] || 0;
+
 const DOC_EXT = ['doc', 'docx', 'odt', 'rtf', 'txt', 'xls', 'xlsx', 'ods', 'csv', 'ppt', 'pptx', 'odp'];
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'tif', 'heic', 'avif'];
 const TOOLS = {
@@ -156,9 +181,10 @@ const TOOLS = {
   imgpdf: { emoji: '📸', title: 'Gambar → PDF', short: 'Gambar → PDF', desc: 'Foto / screenshot (maks 10) jadi 1 PDF', needs: () => avail.pdflib && avail.sharp },
   imgcompress: { emoji: '🗜️', title: 'Kompres Gambar', short: 'Kompres Gambar', desc: 'Ukuran gambar turun jauh, kualitas tetap bagus', needs: () => avail.sharp },
   imgconvert: { emoji: '🔄', title: 'Ubah Format Gambar', short: 'JPG ↔ PNG ↔ WEBP', desc: 'Ubah format JPG / PNG / WEBP (maks 10 gambar)', needs: () => avail.sharp },
+  removebg: { emoji: '🪄', title: 'Hapus Background', short: 'Hapus Background', desc: 'Hapus latar foto otomatis (AI remove.bg)', needs: () => Boolean(removeBgKey()) },
 };
 const DOC_TOOLS = ['office', 'pdfword', 'merge', 'split', 'pdfcompress', 'pdfjpg'];
-const IMG_TOOLS = ['imgpdf', 'imgcompress', 'imgconvert'];
+const IMG_TOOLS = ['removebg', 'imgpdf', 'imgcompress', 'imgconvert'];
 const ready = (id) => Boolean(TOOLS[id]?.needs());
 
 // ───────────────────────── Form (modal) ─────────────────────────
@@ -236,6 +262,18 @@ function buildModal(id) {
         { label: 'Sedang — seimbang (disarankan)', value: 'medium', emoji: '⚖️' },
         { label: 'Ringan — kualitas tinggi', value: 'light', emoji: '🪶' },
         { label: 'Kuat — ukuran paling kecil', value: 'strong', emoji: '💪' },
+      ]),
+    );
+  }
+  if (id === 'removebg') {
+    m.addLabelComponents(
+      upload('Foto', 'JPG / PNG / WEBP • orang, produk, hewan, mobil, dll. Maks 1 foto.', { max: 1 }),
+      select('bg', 'Latar Hasil', [
+        { label: 'Transparan (PNG)', value: 'transparent', emoji: '🧩' },
+        { label: 'Putih', value: 'ffffff', emoji: '⬜' },
+        { label: 'Hitam', value: '000000', emoji: '⬛' },
+        { label: 'Biru (pas foto)', value: '1f4fbf', emoji: '🟦' },
+        { label: 'Merah (pas foto)', value: 'c8102e', emoji: '🟥' },
       ]),
     );
   }
@@ -428,6 +466,49 @@ async function process_(id, inputs, opts, dir) {
     return { outputs: [{ name: inputs.length === 1 ? `${base(first.name)}.pdf` : `gambar-${inputs.length}-halaman.pdf`, buf: Buffer.from(await d.save()) }], note: `${inputs.length} halaman` };
   }
 
+  if (id === 'removebg') {
+    if (!IMG_EXT.includes(extOf(first.name))) throw new Error('Upload file **gambar** (JPG / PNG / WEBP).');
+    // remove.bg menerima JPG / PNG / WEBP → format lain diubah dulu ke JPG.
+    let img = first.buf;
+    let imgName = first.name;
+    if (!['jpg', 'jpeg', 'png', 'webp'].includes(extOf(first.name)) && sharp) {
+      img = await sharp(first.buf, { failOn: 'none' }).rotate().jpeg({ quality: 92 }).toBuffer();
+      imgName = `${base(first.name)}.jpg`;
+    }
+    const transparent = opts.bg === 'transparent' || !/^[0-9a-f]{6}$/i.test(opts.bg || '');
+    const form = new FormData();
+    form.append('image_file', new Blob([img]), imgName);
+    form.append('size', process.env.REMOVEBG_SIZE || 'auto');
+    form.append('format', transparent ? 'png' : 'jpg');
+    if (!transparent) form.append('bg_color', opts.bg);
+    let res;
+    try {
+      res = await fetch('https://api.remove.bg/v1.0/removebg', { method: 'POST', headers: { 'X-Api-Key': removeBgKey() }, body: form, signal: AbortSignal.timeout(90000) });
+    } catch (e) {
+      throw new Error(`Server remove.bg tidak bisa dihubungi (${e?.cause?.code || e.message}). Coba lagi sebentar.`);
+    }
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const j = await res.json();
+        detail = j?.errors?.[0]?.title || '';
+      } catch {}
+      if (res.status === 402) throw new Error('Kuota **remove.bg** server sudah habis bulan ini. Hubungi admin ya 🙏');
+      if (res.status === 429) throw new Error('Terlalu banyak permintaan ke remove.bg — coba lagi 1 menit lagi.');
+      if (res.status === 403) throw new Error('API key remove.bg ditolak — admin perlu cek `REMOVEBG_API_KEY` di .env.');
+      if (/foreground/i.test(detail)) throw new Error('Objek utama di foto **tidak terdeteksi**. Coba foto yang objeknya lebih jelas.');
+      throw new Error(`remove.bg menolak gambar ini${detail ? `: ${detail}` : ` (HTTP ${res.status})`}.`);
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    const credits = res.headers.get('x-credits-charged');
+    console.log(`[tools] remove.bg dipakai (${credits || '?'} kredit).`);
+    return {
+      outputs: [{ name: `${base(first.name)}-nobg.${transparent ? 'png' : 'jpg'}`, buf }],
+      images: true,
+      note: `Latar ${transparent ? '**transparan** (PNG)' : `warna \`#${opts.bg.toUpperCase()}\``}`,
+    };
+  }
+
   if (id === 'imgcompress' || id === 'imgconvert') {
     const outputs = [];
     let before = 0;
@@ -490,7 +571,12 @@ async function onSubmit(i, id) {
       return d;
     }
   };
-  const opts = { pages: get('pages'), mode: pick('mode', 'one'), level: pick('level', 'medium'), dpi: pick('dpi', '150'), size: pick('size', 'a4'), format: pick('format', 'jpg') };
+  const opts = { pages: get('pages'), mode: pick('mode', 'one'), level: pick('level', 'medium'), dpi: pick('dpi', '150'), size: pick('size', 'a4'), format: pick('format', 'jpg'), bg: pick('bg', 'transparent') };
+  // Hapus background: batas harian per member (admin tanpa batas).
+  const admin = i.member?.permissions?.has?.('Administrator');
+  if (id === 'removebg' && !admin && REMOVEBG_DAILY() > 0 && usedToday(i.user.id) >= REMOVEBG_DAILY()) {
+    return i.reply({ content: `⏳ Jatah **Hapus Background** kamu hari ini sudah habis (**${REMOVEBG_DAILY()}x / hari**). Coba lagi besok ya!`, flags: EPH });
+  }
 
   await i.deferReply({ flags: EPH });
   cooldown.set(i.user.id, Date.now());
@@ -508,6 +594,10 @@ async function onSubmit(i, id) {
       for (const [n, f] of files.entries()) inputs.push(await download(f, dir, n));
       return { ...(await process_(id, inputs, opts, dir)), inputs };
     });
+    if (id === 'removebg') {
+      addUsage(i.user.id);
+      if (!admin && REMOVEBG_DAILY() > 0) result.note = `${result.note} • sisa jatah hari ini **${Math.max(0, REMOVEBG_DAILY() - usedToday(i.user.id))}x**`;
+    }
     const total = result.outputs.reduce((a, o) => a + o.buf.length, 0);
     const limit = uploadLimit(i.guild);
     if (total > limit) {
@@ -537,7 +627,7 @@ async function onSubmit(i, id) {
     return i.editReply({ components: [box], files: att, flags: V2 });
   } catch (err) {
     console.warn(`[tools] ${id} gagal:`, err.message);
-    const msg = /password|rusak|valid|Format|didukung|Upload|jangkauan|terkunci/i.test(err.message) ? err.message : `Proses gagal: ${String(err.message).split(' — ')[0].slice(0, 200)}`;
+    const msg = /password|rusak|valid|Format|didukung|Upload|jangkauan|terkunci|remove\.bg|Kuota|Objek|Terlalu banyak|API key/i.test(err.message) ? err.message : `Proses gagal: ${String(err.message).split(' — ')[0].slice(0, 200)}`;
     return i.editReply(statusBox(`### ❌ Gagal\n${msg}`)).catch(() => {});
   } finally {
     busyUsers.delete(i.user.id);
