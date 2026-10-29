@@ -19,7 +19,7 @@
     "Canva Pro (type canva): plans = paket (id, label, price, days). Stock = jumlah slot email, atur dengan /store stok-set produk:Canva Pro (habis → tutup otomatis, slot kembali → buka otomatis). remindDays = DM pengingat ke pembeli sebelum masa aktif habis; saat habis admin yang menutup ticket mendapat DM untuk mengeluarkan email dari team. ticket.idPrefix / categoryName = ID & kategori ticket Canva.",
     "Pembayaran: payment.methods = daftar rekening (bank, number, emoji, holder opsional = atas nama per rekening). payment.accountName = atas nama untuk semua rekening (opsional). Tampil di semua ticket + tombol 💳 Konfirmasi Pembayaran & 📋 Salin No. Rekening. Admin konfirmasi dengan tombol ✅ Dana Masuk di bukti pembayaran atau /danamasuk [nominal] [catatan] di channel ticket.",
     "Role Spender (spenderRoles): buyerRoleId = role order pertama. tiers = role berdasarkan total belanja (min dalam Rupiah, dari order Completed; rekber tidak dihitung). keepLowerTiers false = member hanya memegang 1 role tier tertinggi (role lama diganti, seperti role level); true = semua tier yang dicapai tetap terpasang. keepBuyerRole true = role Buyer tetap dipasang untuk semua yang pernah order (Buyer + 1 tier); false = Buyer diganti tier pertama begitu tercapai. announce = ucapan naik level di ticket + DM. Bot butuh izin Manage Roles & role bot harus di atas semua role ini. /store sinkron-role untuk memasang ulang ke semua pembeli.",
-    "⚡ Produk Instan (type instant) — produk otomatis dari API Waroengkuy (API key di .env: WRK_KEY=wrk_...). payment.mode: \"deposit\" (default) = pembeli bayar QRIS isi saldo Waroengkuy seharga harga jual, lalu bot membeli pakai saldo — selisih harga (untung) tetap jadi SALDO Waroengkuy, min. belanja Rp10.000, maks 3 pembayaran bersamaan; \"qris\" = QRIS order langsung dari Waroengkuy dengan harga reseller (tanpa untung); \"manual\" = transfer ke rekening toko (payment.methods) + admin klik Dana Masuk, lalu akun dikirim otomatis memakai saldo Waroengkuy (untung masuk rekening kamu, saldo harus selalu terisi). pricing: harga jual = harga reseller + percent% + flat, dibulatkan ke atas kelipatan roundTo, untung minimal minProfit, capAtNormalPrice true = tidak lebih mahal dari harga toko resmi Waroengkuy; overrides = harga tetap per variant_id, contoh {\"8\": 12000}. filter: categories (hanya kategori ini), hideCategories, hideProducts (product_id / nama produk), hideVariants (variant_id), hideNoWarranty, hideManual. maxQty = maks akun per order. alertChannelId = channel admin untuk laporan error / pesanan yang butuh bantuan (alertRoleId = role yang di-ping). ticket.keepMinutes = lama ticket dipertahankan setelah akun terkirim. Buka produk dengan /store buka, cek koneksi & saldo dengan /store instan. Panel Produk Instan ada di channel sendiri (channels.instantPanel) — kirim dengan /store panel jenis:Produk Instan. Teks panel bisa diatur di products[produk-instan].panel (title, subtitle, description, bannerImage, thumbnail, features, steps). Kartunya tetap tampil di katalog Produk Digital."
+    "👑 Premium App (type instant) — produk otomatis dari API Waroengkuy (API key di .env: WRK_KEY=wrk_...). payment.mode: \"deposit\" (default) = pembeli bayar QRIS isi saldo Waroengkuy seharga harga jual, lalu bot membeli pakai saldo — selisih harga (untung) tetap jadi SALDO Waroengkuy, min. belanja Rp10.000, maks 3 pembayaran bersamaan; \"qris\" = QRIS order langsung dari Waroengkuy dengan harga reseller (tanpa untung); \"manual\" = transfer ke rekening toko (payment.methods) + admin klik Dana Masuk, lalu akun dikirim otomatis memakai saldo Waroengkuy (untung masuk rekening kamu, saldo harus selalu terisi). pricing: harga jual = harga reseller + percent% + flat, dibulatkan ke atas kelipatan roundTo, untung minimal minProfit, capAtNormalPrice true = tidak lebih mahal dari harga toko resmi Waroengkuy; overrides = harga tetap per variant_id, contoh {\"8\": 12000}. filter: categories (hanya kategori ini), hideCategories, hideProducts (product_id / nama produk), hideVariants (variant_id), hideNoWarranty, hideManual. maxQty = maks akun per order. alertChannelId = channel admin untuk laporan error / pesanan yang butuh bantuan (alertRoleId = role yang di-ping). ticket.keepMinutes = lama ticket dipertahankan setelah akun terkirim. Buka produk dengan /store buka, cek koneksi & saldo dengan /store premium-app. Panel Premium App ada di channel sendiri (channels.instantPanel) — kirim dengan /store panel jenis:Premium App. Teks panel bisa diatur di products[produk-instan].panel (title, subtitle, description, bannerImage, thumbnail, features, steps). Kartunya tetap tampil di katalog Produk Digital."
   ],
   "storeName": "Noname Store",
   "channels": {
@@ -467,8 +467,8 @@
       "id": "produk-instan",
       "type": "instant",
       "group": "digital",
-      "label": "Produk Instan",
-      "emoji": "⚡",
+      "label": "Premium App",
+      "emoji": "👑",
       "description": "Akun premium **siap pakai** — Netflix, Spotify, YouTube, CapCut, Canva & banyak lagi! 💎\n\nPilih produk, bayar via **QRIS**, dan akun **langsung dikirim otomatis** ke ticket & DM kamu dalam hitungan detik. ⚡ Stok & harga selalu **real-time**.",
       "thumbnail": "",
       "payment": {
@@ -494,14 +494,14 @@
       "alertChannelId": "1565037054339850260",
       "alertRoleId": "",
       "ticket": {
-        "categoryName": "⚡ TICKET INSTAN",
-        "idPrefix": "INS",
+        "categoryName": "👑 TICKET PREMIUM APP",
+        "idPrefix": "PA",
         "keepMinutes": 30
       },
       "terms": {
         "button": "Syarat & Ketentuan",
-        "title": "📌 SYARAT & KETENTUAN PRODUK INSTAN",
-        "description": "Mohon dibaca **sebelum membeli Produk Instan**:\n\n✅ **Pengiriman Otomatis**\n┗ Akun dikirim **otomatis** ke ticket & DM setelah pembayaran QRIS terverifikasi.\n\n✅ **Bayar Tepat Sesuai Nominal**\n┗ Bayar **persis** sesuai nominal QRIS (sudah termasuk kode unik) sebelum batas waktu.\n\n✅ **Garansi Sesuai Varian**\n┗ Lama garansi tertera di tiap varian. Varian **Tanpa Garansi** tidak bisa diganti / di-refund.\n\n✅ **Aturan Pemakaian**\n┗ Jangan ganti password / data akun kecuali diizinkan & ikuti catatan penggunaan yang dikirim bersama akun.\n\n✅ **Simpan Data Akun**\n┗ Salin & simpan data akun segera — ticket ditutup otomatis setelah testimoni.\n\n⚠️ Dengan melanjutkan pembelian, kamu dianggap telah menyetujui seluruh ketentuan ini."
+        "title": "📌 SYARAT & KETENTUAN PREMIUM APP",
+        "description": "Mohon dibaca **sebelum membeli Premium App**:\n\n✅ **Pengiriman Otomatis**\n┗ Akun dikirim **otomatis** ke ticket & DM setelah pembayaran QRIS terverifikasi.\n\n✅ **Bayar Tepat Sesuai Nominal**\n┗ Bayar **persis** sesuai nominal QRIS (sudah termasuk kode unik) sebelum batas waktu.\n\n✅ **Garansi Sesuai Varian**\n┗ Lama garansi tertera di tiap varian. Varian **Tanpa Garansi** tidak bisa diganti / di-refund.\n\n✅ **Aturan Pemakaian**\n┗ Jangan ganti password / data akun kecuali diizinkan & ikuti catatan penggunaan yang dikirim bersama akun.\n\n✅ **Simpan Data Akun**\n┗ Salin & simpan data akun segera — ticket ditutup otomatis setelah testimoni.\n\n⚠️ Dengan melanjutkan pembelian, kamu dianggap telah menyetujui seluruh ketentuan ini."
       },
       "howTo": {
         "short": "Bayar QRIS • akun dikirim otomatis",
@@ -511,8 +511,8 @@
           "**DM terbuka** supaya salinan akun bisa dikirim ke DM"
         ],
         "steps": [
-          "Buka channel **Produk Digital**, klik **⚡ Produk Instan**",
-          "Pilih **kategori** ➜ **produk** ➜ **varian** (harga & stok real-time)",
+          "Buka channel **👑 Premium App**, lalu pilih **kategori** di menu panel",
+          "Pilih **produk** ➜ **varian** (harga & stok real-time)",
           "Pilih **jumlah**, cek ringkasan, lalu klik **💳 Bayar Sekarang**",
           "Scan **QRIS** di ticket & bayar **tepat** sesuai nominal",
           "Pembayaran terdeteksi **otomatis** — akun langsung dikirim ke ticket & DM ✨",
