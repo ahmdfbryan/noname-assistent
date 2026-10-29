@@ -28,6 +28,7 @@ const H = require('./howto');
 const C = require('./catalog');
 const I = require('./instant');
 const F = require('./forum');
+const CP = require('./control');
 
 const PROOF_DIR = path.join(__dirname, '..', '..', 'data', 'proofs');
 const SESSION_MS = 10 * 60 * 1000;
@@ -112,6 +113,7 @@ const refreshPanel = () => {
   debounce('panel', () => editTracked('panel', (g, c) => V.buildPanel(g, c, 'main')));
   debounce('digitalPanel', () => editTracked('digitalPanel', (g, c) => V.buildPanel(g, c, 'digital')), 2000);
   debounce('instantPanel', () => editTracked('instantPanel', I.buildPanel), 3000);
+  debounce('controlPanel', () => CP.refresh(), 2500); // 🎛️ Store Control Center (panel admin)
   debounce('howto', () => editTracked('howto', H.buildHowToPanel), 2500);
   debounce('catalog', () => refreshCatalog('main'), 3500);
   debounce('digitalCatalog', () => refreshCatalog('digital'), 4500);
@@ -2417,6 +2419,8 @@ async function handleInteraction(interaction) {
   const [, action, arg] = id.split(':');
 
   try {
+    // 🎛️ Store Control Center (panel admin): customId "store:cp..."
+    if (action?.startsWith('cp') && (await CP.handle(interaction, action, arg))) return true;
     // 👑 Premium App (Waroengkuy): semua customId "store:ins..."
     if (action?.startsWith('ins') && (await I.handle(interaction, action, arg))) return true;
     if (interaction.isButton()) {
@@ -2483,6 +2487,7 @@ function registerStore(c) {
     setInterval(housekeeping, 30 * 1000);
     I.start();
     F.start(); // 👑 katalog Premium App di forum
+    CP.start(); // 🎛️ panel admin dikirim / diperbarui otomatis
     refreshPanel();
     refreshLeaderboard();
   });
@@ -2490,6 +2495,7 @@ function registerStore(c) {
 
 // Premium App memakai fungsi bersama dari file ini.
 I.init({ getClient: () => client, logOrder, refreshPanel, refreshLeaderboard, getTicketCategory, editTicketMsg, testimonyTimeoutMs });
+CP.init({ getClient: () => client, setProductsOpen, announce, closeIfSoldOut, reopenIfAutoClosed, refreshPanel });
 
 module.exports = {
   handleInteraction,
