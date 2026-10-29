@@ -69,7 +69,8 @@ function buildPanel(guild, client) {
   );
   box.addSeparatorComponents(line());
 
-  const item = (title, desc, id, label, emoji, style = ButtonStyle.Primary) =>
+  // Tombol tanpa warna (abu-abu).
+  const item = (title, desc, id, label, emoji, style = ButtonStyle.Secondary) =>
     new SectionBuilder()
       .addTextDisplayComponents(text(`### ${title}\n${desc}`))
       .setButtonAccessory(new ButtonBuilder().setCustomId(id).setLabel(label).setEmoji(emoji).setStyle(style));
@@ -77,7 +78,7 @@ function buildPanel(guild, client) {
   box.addSectionComponents(item('👤 Info Akun Discord', 'Profil, badge, umur akun & role — via member, User ID, atau username.', 'bp:user', 'Cek Akun', '👤'));
   box.addSectionComponents(item('🎮 Info Akun Roblox', 'Avatar, status, teman, grup & username lama.', 'bp:roblox', 'Cek Roblox', '🎮'));
   box.addSectionComponents(item('🔍 Cek Server Discord', 'Member, online, boost, fitur & info invite server lain.', 'bp:server', 'Cek Server', '🔍'));
-  box.addSectionComponents(item('⚙️ Tools Noname', 'Kumpulan alat bantu: 🔳 ubah link jadi QR Code & tools lainnya.', 'bp:tools', 'Buka Tools', '⚙️'));
+  box.addSectionComponents(item('⚙️ Tools Noname', 'PDF ↔ Word, Office → PDF, gabung / pisah / kompres PDF, kompres & ubah format gambar, QR Code.', 'bp:tools', 'Buka Tools', '⚙️'));
 
   box.addSeparatorComponents(line());
   box.addTextDisplayComponents(text(`-# 📬 Hasil pengecekan dikirim ke <#${RESULT_CHANNEL}>`));
@@ -253,6 +254,7 @@ function registerBotPanel(c) {
     stickyTimer = setTimeout(() => repost(), 6000); // tunggu chat reda → panel pindah ke bawah
   });
   c.once(Events.ClientReady, async () => {
+    Tools.detect?.().catch?.(() => {}); // cek program tools file (LibreOffice, Ghostscript, dll)
     // Perbarui tampilan panel setelah restart (pesan dihapus manual → berhenti).
     if (!panel) return;
     const ch = await c.channels.fetch(panel.channelId).catch(() => null);
