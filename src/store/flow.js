@@ -2495,7 +2495,7 @@ function registerStore(c) {
 
 // Premium App memakai fungsi bersama dari file ini.
 I.init({ getClient: () => client, logOrder, refreshPanel, refreshLeaderboard, getTicketCategory, editTicketMsg, testimonyTimeoutMs });
-CP.init({ getClient: () => client, setProductsOpen, announce, closeIfSoldOut, reopenIfAutoClosed, refreshPanel });
+CP.init({ getClient: () => client, setProductsOpen, announce, closeIfSoldOut, reopenIfAutoClosed, refreshPanel, markPaid });
 
 module.exports = {
   handleInteraction,
