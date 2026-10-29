@@ -28,7 +28,7 @@ const V = require('./views');
 const SP = require('./spender');
 
 /**
- * ⚡ PRODUK INSTAN — produk digital otomatis dari API Reseller Waroengkuy.
+ * ⚡ PREMIUM APP — produk digital otomatis dari API Reseller Waroengkuy.
  * Produk, stock & harga diambil langsung dari API; pembayaran QRIS dicek otomatis;
  * akun dikirim otomatis ke ticket + DM pembeli. Masalah (stok habis, saldo kurang, API error)
  * dilaporkan ke channel alert admin.
@@ -194,7 +194,7 @@ function homeView(guild, cfg, p, items, notice) {
   const ps = productStatsOf(p.id);
   return card(cfg, {
     thumb: p.thumbnail || guild.iconURL({ extension: 'png', size: 256 }),
-    header: `## ${p.emoji || '⚡'} ${p.label}\n${fill(p.description || 'Akun premium **siap pakai**, dikirim **otomatis** setelah pembayaran terverifikasi.', name)}`,
+    header: `## ${p.emoji || '👑'} ${p.label}\n${fill(p.description || 'Akun premium **siap pakai**, dikirim **otomatis** setelah pembayaran terverifikasi.', name)}`,
     blocks: [
       notice || null,
       [
@@ -207,7 +207,7 @@ function homeView(guild, cfg, p, items, notice) {
         .filter(Boolean)
         .join('\n'),
       `✅ **Order Selesai:** \`${num(ps.orders)} order\``,
-      !open ? '🔴 Produk instan sedang **TUTUP**. Pantau channel stock untuk info berikutnya.' : !catOptions.length ? '📭 Belum ada produk yang bisa dijual saat ini.' : '👇 **Pilih kategori** untuk melihat produk.',
+      !open ? '🔴 Premium App sedang **TUTUP**. Pantau channel stock untuk info berikutnya.' : !catOptions.length ? '📭 Belum ada produk yang bisa dijual saat ini.' : '👇 **Pilih kategori** untuk melihat produk.',
     ],
     footer: footerOf(cfg, guild),
     rows,
@@ -306,12 +306,12 @@ async function onCategory(interaction, p) {
   interaction.message.edit(buildPanel(interaction.guild, cfg)).catch(() => {});
 }
 
-// ═════════════════════════════ Panel publik (channel Produk Instan) ═════════════════════════════
+// ═════════════════════════════ Panel publik (channel Premium App) ═════════════════════════════
 const KEYCAPS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'];
-/** Panel ⚡ Produk Instan di channel sendiri: dropdown kategori langsung di panel. Ter-update otomatis. */
+/** Panel 👑 Premium App di channel sendiri: dropdown kategori langsung di panel. Ter-update otomatis. */
 function buildPanel(guild, cfg) {
   const p = instantProduct(cfg);
-  if (!p) return card(cfg, { header: '❌ Produk Instan belum diatur di store.json.' });
+  if (!p) return card(cfg, { header: '❌ Premium App belum diatur di store.json.' });
   const pt = p.panel || {};
   const name = { name: V.storeName(cfg, guild) };
   const open = isProductOpen(p);
@@ -355,11 +355,11 @@ function buildPanel(guild, cfg) {
   }));
   const select = new StringSelectMenuBuilder().setCustomId(`store:inscat:${p.id}`);
   if (open && options.length) select.setPlaceholder('📂 Pilih kategori untuk mulai belanja...').addOptions(options);
-  else select.setPlaceholder(open ? '⏳ Produk sedang dimuat...' : '🔴 Produk Instan sedang tutup').addOptions({ label: '-', value: '-' }).setDisabled(true);
+  else select.setPlaceholder(open ? '⏳ Produk sedang dimuat...' : '🔴 Premium App sedang tutup').addOptions({ label: '-', value: '-' }).setDisabled(true);
 
   return card(cfg, {
     thumb: pt.thumbnail || p.thumbnail || guild.iconURL({ extension: 'png', size: 256 }),
-    header: `# ${fill(pt.title || '⚡ Produk Instan | {server}', name)}\n-# ${fill(pt.subtitle || 'Auto Delivery 24 Jam • {server}', name)}`,
+    header: `# ${fill(pt.title || '👑 Premium App | {server}', name)}\n-# ${fill(pt.subtitle || 'Auto Delivery 24 Jam • {server}', name)}`,
     image: pt.bannerImage || null,
     blocks: [
       fill(
@@ -399,9 +399,9 @@ async function onMine(interaction) {
     .filter((t) => kindOf(t) === 'instant' && t.userId === interaction.user.id && (t.status === 'open' || (t.status === 'completed' && !t.deleted)))
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 5);
-  if (!list.length) return interaction.reply({ content: '📭 Kamu belum punya pesanan instan yang aktif. Pilih kategori di panel untuk mulai belanja! ⚡', flags: EPH });
+  if (!list.length) return interaction.reply({ content: '📭 Kamu belum punya pesanan Premium App yang aktif. Pilih kategori di panel untuk mulai belanja! ⚡', flags: EPH });
   const lines = list.map((t) => `▸ \`${t.id}\` • **${clip(t.productLabel, 60)}** ×${num(t.qty)} • ${t.status === 'open' ? STAGE_TEXT[t.ins?.stage] || '⏳ Diproses' : '✅ Selesai'}${t.channelId ? ` • <#${t.channelId}>` : ''}`);
-  return interaction.reply({ content: `🎫 **Pesanan Instan Kamu**\n${lines.join('\n')}`, flags: EPH });
+  return interaction.reply({ content: `🎫 **Pesanan Premium App Kamu**\n${lines.join('\n')}`, flags: EPH });
 }
 
 async function onPage(interaction, dir) {
@@ -494,7 +494,7 @@ async function onVariant(interaction, p) {
   if (!it) return interaction.reply({ content: '❌ Varian tidak ditemukan. Klik **Muat Ulang** lalu coba lagi.', flags: EPH });
   if (!inStock(it)) return interaction.reply({ content: `⛔ **${it.product} — ${it.variant}** sedang **habis**. Pilih varian lain ya.`, flags: EPH });
   const active = activeTicketOf({ userId: interaction.user.id, kind: 'instant' });
-  if (active) return interaction.reply({ content: `⚠️ Kamu masih punya pesanan instan yang berjalan: <#${active.channelId}> (\`${active.id}\`). Selesaikan / batalkan dulu ya.`, flags: EPH });
+  if (active) return interaction.reply({ content: `⚠️ Kamu masih punya pesanan Premium App yang berjalan: <#${active.channelId}> (\`${active.id}\`). Selesaikan / batalkan dulu ya.`, flags: EPH });
 
   const unit = sellPrice(p, it);
   const maxQ = it.type === 'manual' ? 1 : Math.min(maxQty(p), it.stock == null ? maxQty(p) : Number(it.stock));
@@ -629,7 +629,7 @@ async function onConfirm(interaction, yes) {
   const p = instantProduct(cfg, sess?.pid);
   if (!sess?.draft || !p) return done('⌛ Sesi sudah berakhir. Silakan pilih produk lagi dari panel.');
   if (!isProductOpen(p)) return done(`🔴 Maaf, **${p.label}** baru saja **TUTUP**.`);
-  if (activeTicketOf({ userId: interaction.user.id, kind: 'instant' })) return done('⚠️ Kamu masih punya pesanan instan yang sedang berjalan.');
+  if (activeTicketOf({ userId: interaction.user.id, kind: 'instant' })) return done('⚠️ Kamu masih punya pesanan Premium App yang sedang berjalan.');
   await interaction.update(card(cfg, { header: '⏳ Mengecek stok & harga terbaru...' }));
   const guild = interaction.guild;
   const d = sess.draft;
@@ -659,7 +659,7 @@ async function onConfirm(interaction, yes) {
   sess.draft = null;
 
   const tc = p.ticket || {};
-  const id = nextTicketId(tc.idPrefix || 'INS', 'instantSeq');
+  const id = nextTicketId(tc.idPrefix || 'PA', 'instantSeq');
   const now = Date.now();
   const t = {
     id,
@@ -717,7 +717,7 @@ async function onConfirm(interaction, yes) {
   save();
 
   try {
-    const category = await ctx.getTicketCategory(guild, cfg, tc.categoryName || '⚡ TICKET INSTAN');
+    const category = await ctx.getTicketCategory(guild, cfg, tc.categoryName || '👑 TICKET PREMIUM APP');
     const perms = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks];
     const overwrites = [
       { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
@@ -728,7 +728,7 @@ async function onConfirm(interaction, yes) {
     if (staff) overwrites.push({ id: staff, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
     const slug = interaction.user.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
     const channel = await guild.channels.create({
-      name: `⚡・${id.toLowerCase()}-${slug}`,
+      name: `👑・${id.toLowerCase()}-${slug}`,
       type: ChannelType.GuildText,
       parent: category.id,
       topic: `${id} • ${t.productLabel} x${t.qty} • ${interaction.user.tag}`,
@@ -739,7 +739,7 @@ async function onConfirm(interaction, yes) {
     await msg.pin().catch(() => {});
     t.messageId = msg.id;
     save();
-    ctx.logOrder(guild, t, '🆕 Order instan masuk & menunggu pembayaran');
+    ctx.logOrder(guild, t, '🆕 Order Premium App masuk & menunggu pembayaran');
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
@@ -842,14 +842,14 @@ function steps(t) {
   return rows.map((r, i) => `${r[0] ? '✅' : t.status === 'open' && i === cur ? (st === 'need_help' ? '🛠️' : '⏳') : '▫️'} \`${i + 1}\` ${r[1]}`).join('\n');
 }
 
-/** Isi ticket instan (dipanggil V.buildTicketMessage untuk kind 'instant'). */
+/** Isi ticket Premium App (dipanggil V.buildTicketMessage untuk kind 'instant'). */
 function buildTicket(guild, cfg, t) {
   const name = V.storeName(cfg, guild);
   const i = t.ins;
   const pay = i.pay || {};
   const info = new EmbedBuilder()
-    .setAuthor({ name: `${name} • Produk Instan`, iconURL: guild.iconURL({ size: 128 }) || undefined })
-    .setTitle(`⚡ Detail Pesanan • ${t.id}`)
+    .setAuthor({ name: `${name} • Premium App`, iconURL: guild.iconURL({ size: 128 }) || undefined })
+    .setTitle(`👑 Detail Pesanan • ${t.id}`)
     .setDescription(`Halo <@${t.userId}>, terima kasih sudah berbelanja di **${name}**! 💜`)
     .addFields(
       { name: '👤 Pembeli', value: `<@${t.userId}>`, inline: true },
@@ -926,7 +926,7 @@ function helpChannelId() {
 }
 const helpText = (t) => {
   const ch = helpChannelId();
-  return `Buat **ticket bantuan** di ${ch ? `<#${ch}>` : 'NCS Ticket Center'} (pilih **⚡ Bantuan Produk Instan**) & sertakan ID \`${t.id}\``;
+  return `Buat **ticket bantuan** di ${ch ? `<#${ch}>` : 'NCS Ticket Center'} (pilih **👑 Bantuan Premium App**) & sertakan ID \`${t.id}\``;
 };
 
 /** Pesan pengiriman akun (di ticket & DM). */
@@ -1464,14 +1464,14 @@ function init(c) {
 function start() {
   const p = instantProduct(loadConfig());
   if (!p) return;
-  if (!W.hasKey()) console.warn('[instan] WRK_KEY belum diisi di .env — Produk Instan tidak bisa mengambil produk / memproses pesanan.');
+  if (!W.hasKey()) console.warn('[instan] WRK_KEY belum diisi di .env — Premium App tidak bisa mengambil produk / memproses pesanan.');
   refreshCatalogCache();
   setInterval(tick, POLL_MS);
   setInterval(refreshCatalogCache, 5 * 60 * 1000);
 }
 
 // ═════════════════════════════ Router (dipanggil flow.js) ═════════════════════════════
-/** Return true kalau interaksi milik Produk Instan. */
+/** Return true kalau interaksi milik Premium App. */
 async function handle(interaction, action, arg) {
   const cfg = loadConfig();
   const p = () => instantProduct(cfg, arg) || instantProduct(cfg);
@@ -1500,7 +1500,7 @@ async function handle(interaction, action, arg) {
   return false;
 }
 
-/** Status untuk /store instan. */
+/** Status untuk /store premium-app. */
 async function adminStatus(guild) {
   const cfg = loadConfig();
   const p = instantProduct(cfg);
@@ -1519,7 +1519,7 @@ async function adminStatus(guild) {
   const help = open.filter((t) => t.ins?.stage === 'need_help');
   const chId = alertChannelOf(cfg, p);
   return card(cfg, {
-    header: `## ⚡ Status Produk Instan\n-# Waroengkuy Reseller API`,
+    header: `## 👑 Status Premium App\n-# Waroengkuy Reseller API`,
     blocks: [
       err
         ? `🔴 **API:** gagal — \`${err.code}\` ${clip(err.message, 200)}${ERROR_HINT[err.code] ? `\n${ERROR_HINT[err.code]}` : ''}`
