@@ -467,7 +467,7 @@ const ORDER_STATUS = {
   refund: { label: '💸 Refund', key: 'refund' },
 };
 const PAY_STATUS = { paid: '✅ Lunas / Dana Masuk', pending: '⏳ Menunggu Konfirmasi', rejected: '⛔ Ditolak' };
-const KIND_LABEL = { robux: 'Robux Visend', gamepass: 'Robux Gamepass', canva: 'Canva Pro', boost: 'Server Boost', rekber: 'Rekber', instant: 'Produk Instan' };
+const KIND_LABEL = { robux: 'Robux Visend', gamepass: 'Robux Gamepass', canva: 'Canva Pro', boost: 'Server Boost', rekber: 'Rekber', instant: 'Premium App' };
 
 async function archiveStoreTicket(guild, t, source) {
   if (!guild || !t || t.archived) return null;
