@@ -301,6 +301,13 @@ async function changeStock(guild, p, planId, value, mode, by) {
   return `📦 **${label}**: ${num(before)} → **${num(after)} ${stockUnit(p)}**`;
 }
 
+/** Umumkan perubahan harga ke channel stock (store.json → pingEveryone.price untuk @everyone). */
+async function announcePrice(guild, cfg, p, changes) {
+  if (!changes.length || !isId(cfg?.channels?.stock)) return false;
+  await ctx.announce(guild, 'price', { product: p, changes }, Boolean(cfg.pingEveryone?.price));
+  return true;
+}
+
 /** Simpan harga paket ke store.json (format file tetap rapi). */
 function savePlanPrices(productId, prices) {
   const raw = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
@@ -486,7 +493,8 @@ async function handle(interaction, action, arg) {
     save();
     ctx.refreshPanel();
     logAction(`💱 <@${by}> rate **${p.label}**: ${rupiah(before)} → ${rupiah(v)}`);
-    await answer(`💱 Rate **${p.label}**: ${rupiah(before)} → **${rupiah(v)} / Robux**.\n-# Ticket yang sudah berjalan tetap memakai rate lama.`);
+    const announced = before !== v ? await announcePrice(guild, cfg, p, [{ label: 'Rate', before, after: v, suffix: ' / Robux' }]) : false;
+    await answer(`💱 Rate **${p.label}**: ${rupiah(before)} → **${rupiah(v)} / Robux**.${announced ? '\n📢 Perubahan harga sudah **diumumkan** di channel stock.' : ''}\n-# Ticket yang sudah berjalan tetap memakai rate lama.`);
     refresh();
     return true;
   }
@@ -512,6 +520,10 @@ async function handle(interaction, action, arg) {
       }
       logAction(`💱 <@${by}> harga paket **${p.label}** diubah`);
       ctx.refreshPanel();
+      const changes = plansOf(p)
+        .filter((x) => prices[x.id] != null)
+        .map((x) => ({ label: x.label, before: Number(x.price), after: prices[x.id], suffix: p.type === 'boost' ? ' / boost' : '' }));
+      if (await announcePrice(guild, loadConfig(), getProduct(loadConfig(), p.id), changes)) out.push('📢 Perubahan harga sudah **diumumkan** di channel stock.');
     }
     await answer(out.join('\n') || 'ℹ️ Tidak ada perubahan harga.');
     refresh();
