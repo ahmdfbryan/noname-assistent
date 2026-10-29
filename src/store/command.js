@@ -7,6 +7,7 @@ const SP = require('./spender');
 const H = require('./howto');
 const C = require('./catalog');
 const I = require('./instant');
+const F = require('./forum');
 const { setProductsOpen, reopenIfAutoClosed, closeIfSoldOut, announce, refreshPanel, onDanaMasukCommand, migrateToV2, postCatalog } = require('./flow');
 
 const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
@@ -144,6 +145,7 @@ const storeCommand = {
         }),
     )
     .addSubcommand((s) => s.setName('status').setDescription('Lihat ringkasan toko'))
+    .addSubcommand((s) => s.setName('premium-forum').setDescription('Buat / sinkronkan katalog Premium App di forum channel (1 post per produk)'))
     .addSubcommand((s) => s.setName('premium-app').setDescription('Status Premium App: koneksi API Waroengkuy, saldo, pesanan bermasalah'))
     .addSubcommand((s) => s.setName('sinkron-role').setDescription('Pasang ulang role Buyer & tier spender ke semua pembeli'))
     .addSubcommand((s) => s.setName('perbarui-tampilan').setDescription('Ubah history order & testimoni lama ke tampilan baru (Components V2)')),
@@ -290,6 +292,14 @@ const storeCommand = {
       );
     }
 
+    if (sub === 'premium-forum') {
+      await interaction.editReply('⏳ Menyinkronkan katalog forum Premium App... (produk banyak bisa butuh beberapa menit)');
+      const r = await F.sync({ force: true });
+      if (r.error) return interaction.editReply(`❌ ${r.error}`);
+      return interaction.editReply(
+        `✅ Katalog forum selesai disinkronkan: **${r.total}** produk • **${r.created}** post baru • **${r.updated}** diperbarui • **${r.removed}** dihapus.\nSelanjutnya ter-update otomatis tiap 10 menit.`,
+      );
+    }
     if (sub === 'premium-app') return interaction.editReply(await I.adminStatus(guild));
 
     if (sub === 'status') {
