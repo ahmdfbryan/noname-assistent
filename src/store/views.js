@@ -505,7 +505,43 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
  * open / close → extra.products • stock → extra.product + extra.text • sold → extra.product, amount, count • returned → extra.ticket.
  * ping = mention @everyone di atas kotak.
  */
+/**
+ * Gambar produk untuk pengumuman (sama seperti kartu katalog):
+ * products[].catalog.thumbnail / products[].thumbnail (link https atau path file) → assets/products/<id>.png → logo server.
+ */
+function productThumb(guild, p) {
+  const fs = require('fs');
+  const path = require('path');
+  const root = path.join(__dirname, '..', '..');
+  for (const set of [p?.catalog?.thumbnail, p?.thumbnail].map((x) => String(x || '').trim()).filter(Boolean)) {
+    if (/^https?:\/\//i.test(set)) return { url: set, files: [], real: true };
+    const file = path.join(root, set);
+    if (fs.existsSync(file)) {
+      const name = `product-${String(p.id).replace(/[^\w-]/g, '')}${path.extname(file) || '.png'}`;
+      return { url: `attachment://${name}`, files: [{ attachment: file, name }], real: true };
+    }
+  }
+  if (p?.id) {
+    const file = path.join(root, 'assets', 'products', `${p.id}.png`);
+    if (fs.existsSync(file)) {
+      const name = `product-${String(p.id).replace(/[^\w-]/g, '')}.png`;
+      return { url: `attachment://${name}`, files: [{ attachment: file, name }], real: true };
+    }
+  }
+  return { url: icon256(guild), files: [], real: false };
+}
+
 function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
+  // Gambar produk (bukan logo server) + file lampirannya.
+  const files = [];
+  const imgOf = (p) => {
+    const r = productThumb(guild, p);
+    for (const f of r.files) if (!files.some((x) => x.name === f.name)) files.push(f);
+    return r;
+  };
+  const thumbOf = (p) => (p ? imgOf(p).url : icon256(guild));
+  /** Banyak produk sekaligus → galeri gambar produk; 1 produk → gambar kecil produk. */
+  const multiImages = (list) => (list.length > 1 ? list.slice(0, 10).map((x) => imgOf(x)).filter((r) => r.real).map((r) => r.url) : []);
   const onlyDigital = (extra.products || []).length && (extra.products || []).every((x) => groupOf(x) === 'digital');
   const robux = (cfg.products || []).find((x) => x.type === 'robux');
   const name = storeName(cfg, guild);
@@ -534,9 +570,11 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     if (robuxIncluded) info.push(`**💎 Stock Robux:** \`${num(state.stock)} Robux\``, `**💱 Rate Visend:** \`${rupiah(robux ? rateOf(cfg, robux) : 0)} / Robux\``);
     for (const gp of gamepass) info.push(`**${gp.emoji || '🎟️'} Rate ${gp.label}:** \`${rupiah(rateOf(cfg, gp))} / Robux\``);
     for (const sp of slotProducts) info.push(`**${sp.emoji || '📦'} Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
+    const gallery = multiImages(products);
     card = pcard({
       accent: color(cfg, 'open', 0x2ecc71),
-      thumb: icon,
+      thumb: single ? thumbOf(single) : gallery.length ? null : icon,
+      images: gallery,
       header: `# 🟢 ${single ? single.label : name} Resmi Dibuka!\n-# ${name} • Store Update`,
       blocks: [
         single
@@ -552,9 +590,11 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     const left = [];
     if (robuxIncluded) left.push(`**💎 Sisa Stock Robux:** \`${num(state.stock)} Robux\``);
     for (const sp of slotProducts) left.push(`**${sp.emoji || '📦'} Sisa Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
+    const gallery = multiImages(products);
     card = pcard({
       accent: color(cfg, 'closed', 0xe74c3c),
-      thumb: icon,
+      thumb: single ? thumbOf(single) : gallery.length ? null : icon,
+      images: gallery,
       header: `# 🔴 ${single ? single.label : name} Sementara Ditutup\n-# ${name} • Store Update`,
       blocks: [
         extra.reason
@@ -579,6 +619,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
       accent: color(cfg, 'brand', 0x3498db),
       thumb: icon,
       header: `# 📦 Stock ${sp?.label || 'Robux'} Diperbarui!\n-# ${name} • Stock Update`,
+      thumbOverride: thumbOf(sp),
       blocks: [
         extra.text ? `${extra.text}\n${sp && isProductOpen(sp) ? 'Stock sudah siap — yuk langsung order! 🛒' : 'Order dibuka kembali segera, pantau terus ya! 🔔'}` : null,
         `### 📊 Detail Stock\n${lines.join('\n')}`,
@@ -597,6 +638,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
       accent: color(cfg, 'brand', 0x3498db),
       thumb: icon,
       header: `# 🛒 ${sp?.label || 'Robux'} Baru Saja Terjual!\n-# ${name} • Live Sales`,
+      thumbOverride: thumbOf(sp),
       blocks: [
         `🎉 ${extra.count > 1 ? `**${num(extra.count)} pesanan**` : '**Pesanan baru**'} masuk sebanyak **${num(sold)} ${unit}**!\nSisa stock tinggal **${num(left)} ${unit}** — amankan bagianmu sebelum kehabisan! 🔥`,
         [
@@ -628,7 +670,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
       : null;
     card = pcard({
       accent: color(cfg, down ? 'open' : 'brand', down ? 0x2ecc71 : 0x3498db),
-      thumb: sp?.thumbnail || icon,
+      thumb: thumbOf(sp),
       header: `# ${down ? `🔥 Harga ${sp?.label || ''} Turun!` : `💱 Harga ${sp?.label || ''} Diperbarui`}\n-# ${name} • Price Update`,
       blocks: [
         down
@@ -651,6 +693,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
       accent: color(cfg, 'refund', 0xe67e22),
       thumb: icon,
       header: `# ♻️ Stock ${sp?.label || t.productLabel} Kembali Tersedia!\n-# ${name} • Stock Update`,
+      thumbOverride: thumbOf(sp),
       blocks: [
         `Pesanan \`${t.id}\` ${t.status === 'refund' ? '**di-refund**' : '**dibatalkan**'} — stock dikembalikan ke toko${sp && isProductOpen(sp) ? ' dan **bisa dipesan lagi**! ✨' : '. 🔔'}`,
         [
@@ -665,6 +708,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     });
   }
   if (!card) return null;
+  if (files.length) card.files = files;
   if (ping) {
     card.components.unshift(v2Text('@everyone'));
     card.allowedMentions = { parse: ['everyone'] };
@@ -2282,11 +2326,13 @@ function buildBoostExpiry(guild, cfg, t, who) {
 }
 
 // ══════════════════════ Panel & info produk (Components V2) ══════════════════════
-function pcard({ accent, header, thumb, image, blocks = [], footer, rows = [] }) {
+function pcard({ accent, header, thumb, thumbOverride, image, images = [], blocks = [], footer, rows = [] }) {
+  if (thumbOverride) thumb = thumbOverride;
   const box = UI.accent(new ContainerBuilder(), accent);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(v2Text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(v2Text(header));
   if (image) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image)));
+  if (images.length) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(images.slice(0, 10).map((u) => new MediaGalleryItemBuilder().setURL(u))));
   for (const b of blocks.filter(Boolean)) {
     box.addSeparatorComponents(v2Line());
     box.addTextDisplayComponents(v2Text(b));
