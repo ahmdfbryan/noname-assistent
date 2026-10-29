@@ -73,14 +73,14 @@ function which(cmd) {
 }
 const pythonPath = () => process.env.TOOLS_PYTHON || ['.venv/bin/python', '.venv/bin/python3'].map((p) => path.join(ROOT, p)).find((p) => fs.existsSync(p)) || 'python3';
 
-const avail = { checked: false, soffice: null, gs: false, pdftoppm: false, pdf2docx: false, pymupdf: false, sharp: false, pdflib: false, jszip: false };
+const avail = { checked: false, soffice: null, gs: false, pdftoppm: false, pdf2docx: false, pymupdf: false, openpyxl: false, pptx: false, sharp: false, pdflib: false, jszip: false };
 let lastDetect = 0;
 /**
  * Cek program pendukung. Hasil disimpan; kalau masih ada yang belum tersedia, dicek ulang otomatis
  * (maks tiap 60 detik) → setelah memasang program di VPS tidak wajib restart bot.
  */
 async function detect(force = false) {
-  const missing = !avail.soffice || !avail.gs || !avail.pdftoppm || !avail.pdf2docx || !avail.sharp || !avail.pdflib || !avail.jszip;
+  const missing = !avail.soffice || !avail.gs || !avail.pdftoppm || !avail.pdf2docx || !avail.openpyxl || !avail.pptx || !avail.sharp || !avail.pdflib || !avail.jszip;
   if (avail.checked && !force && (!missing || Date.now() - lastDetect < 60000)) return avail;
   avail.checked = true;
   lastDetect = Date.now();
@@ -101,6 +101,8 @@ async function detect(force = false) {
   const py = pythonPath();
   avail.pdf2docx = await has(py, ['-c', 'import pdf2docx']);
   avail.pymupdf = await has(py, ['-c', 'import fitz']);
+  avail.openpyxl = avail.pymupdf && (await has(py, ['-c', 'import openpyxl']));
+  avail.pptx = avail.pymupdf && (await has(py, ['-c', 'import pptx']));
   const sig = JSON.stringify(avail);
   if (sig === detect.lastSig) return avail; // tidak berubah → tidak perlu log ulang
   detect.lastSig = sig;
@@ -108,11 +110,11 @@ async function detect(force = false) {
   if (!avail.soffice) hint.push('LibreOffice (sudo apt install -y libreoffice-writer libreoffice-calc libreoffice-impress)');
   if (!avail.gs && !avail.pymupdf) hint.push('Ghostscript (sudo apt install -y ghostscript)');
   if (!avail.pdftoppm) hint.push('poppler-utils (sudo apt install -y poppler-utils)');
-  if (!avail.pdf2docx) hint.push(`pdf2docx (python3 -m venv .venv && .venv/bin/pip install pdf2docx) — python: ${py}`);
+  if (!avail.pdf2docx || !avail.openpyxl || !avail.pptx) hint.push(`PDF → Office (python3 -m venv .venv && .venv/bin/pip install pdf2docx openpyxl python-pptx) — python: ${py}`);
   if (!avail.sharp || !avail.pdflib || !avail.jszip) hint.push('library npm (jalankan: npm install)');
   if (hint.length) console.warn(`[tools] belum terpasang → ${hint.join(' • ')}`);
   console.log(
-    `[tools] tersedia: office→pdf ${avail.soffice ? '✓' : '✗'} • pdf→word ${avail.pdf2docx ? '✓' : '✗'} • kompres pdf ${avail.gs ? '✓ gs' : avail.pymupdf ? '✓ pymupdf' : '✗'} • pdf→jpg ${avail.pdftoppm ? '✓' : '✗'} • sharp ${avail.sharp ? '✓' : '✗'} • pdf-lib ${avail.pdflib ? '✓' : '✗'}`,
+    `[tools] tersedia: office→pdf ${avail.soffice ? '✓' : '✗'} • pdf→word ${avail.pdf2docx ? '✓' : '✗'} • pdf→excel ${avail.openpyxl ? '✓' : '✗'} • pdf→ppt ${avail.pptx ? '✓' : '✗'} • kompres pdf ${avail.gs ? '✓ gs' : avail.pymupdf ? '✓ pymupdf' : '✗'} • pdf→jpg ${avail.pdftoppm ? '✓' : '✗'} • sharp ${avail.sharp ? '✓' : '✗'} • pdf-lib ${avail.pdflib ? '✓' : '✗'}`,
   );
   return avail;
 }
@@ -173,7 +175,7 @@ const DOC_EXT = ['doc', 'docx', 'odt', 'rtf', 'txt', 'xls', 'xlsx', 'ods', 'csv'
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'tif', 'heic', 'avif'];
 const TOOLS = {
   office: { emoji: '📄', title: 'Word / Excel / PPT → PDF', short: 'Office → PDF', desc: 'Dokumen Word, Excel, PowerPoint jadi PDF rapi', needs: () => avail.soffice },
-  pdfword: { emoji: '📝', title: 'PDF → Word', short: 'PDF → Word', desc: 'PDF jadi dokumen Word (.docx) yang bisa diedit', needs: () => avail.pdf2docx },
+  pdfword: { emoji: '📝', title: 'PDF → Word / Excel / PPT', short: 'PDF → Office', desc: 'PDF jadi Word (.docx), Excel (.xlsx), atau PowerPoint (.pptx)', needs: () => avail.pdf2docx || avail.openpyxl || avail.pptx },
   merge: { emoji: '📑', title: 'Gabung PDF', short: 'Gabung PDF', desc: '2–10 PDF digabung jadi 1 file', needs: () => avail.pdflib },
   split: { emoji: '✂️', title: 'Pisah / Ambil Halaman PDF', short: 'Pisah PDF', desc: 'Ambil halaman tertentu atau pecah per halaman', needs: () => avail.pdflib && avail.jszip },
   pdfcompress: { emoji: '🗜️', title: 'Kompres PDF', short: 'Kompres PDF', desc: 'Perkecil ukuran PDF untuk dikirim via WA / email', needs: () => avail.gs || avail.pymupdf },
@@ -213,7 +215,14 @@ function buildModal(id) {
   const t = TOOLS[id];
   const m = new ModalBuilder().setCustomId(`bp:m:f:${id}`).setTitle(`${t.emoji} ${t.title}`.slice(0, 45));
   if (id === 'office') m.addLabelComponents(upload('File Word / Excel / PowerPoint', `.docx .doc .xlsx .xls .pptx .ppt .odt .rtf .txt • maks ${MAX_INPUT_MB} MB`));
-  if (id === 'pdfword') m.addLabelComponents(upload('File PDF', `PDF berisi teks (bukan hasil scan) • maks ${MAX_INPUT_MB} MB`));
+  if (id === 'pdfword') {
+    const targets = [
+      avail.pdf2docx ? { label: 'Word (.docx) — teks bisa diedit', value: 'docx', emoji: '📝' } : null,
+      avail.openpyxl ? { label: 'Excel (.xlsx) — ambil tabel', value: 'xlsx', emoji: '📊' } : null,
+      avail.pptx ? { label: 'PowerPoint (.pptx) — 1 halaman = 1 slide', value: 'pptx', emoji: '📽️' } : null,
+    ].filter(Boolean);
+    m.addLabelComponents(upload('File PDF', `PDF berisi teks (bukan hasil scan) • maks ${MAX_INPUT_MB} MB`), select('target', 'Ubah ke', targets));
+  }
   if (id === 'merge') m.addLabelComponents(upload('File PDF (2–10 file)', 'Urutan gabung = urutan upload.', { min: 2, max: 10 }));
   if (id === 'split') {
     m.addLabelComponents(
@@ -336,6 +345,79 @@ async function zipFiles(files, name) {
 
 const IMG_LEVEL = { light: 85, medium: 72, strong: 55 };
 
+/** PDF → Excel: tabel tiap halaman jadi sheet (PyMuPDF find_tables). Tanpa tabel → teks per baris. */
+const PDF_XLSX = String.raw`
+import sys, re, fitz, openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+doc = fitz.open(sys.argv[1])
+wb = openpyxl.Workbook()
+wb.remove(wb.active)
+def val(c):
+    s = "" if c is None else str(c).strip()
+    if re.fullmatch(r"-?\d{1,15}", s): return int(s)
+    return s
+def autosize(ws):
+    for col in ws.columns:
+        w = max((len(str(c.value)) for c in col if c.value is not None), default=8)
+        ws.column_dimensions[col[0].column_letter].width = min(max(10, w + 2), 60)
+found = 0
+for pno, page in enumerate(doc):
+    try:
+        tabs = page.find_tables().tables
+    except Exception:
+        tabs = []
+    for ti, t in enumerate(tabs):
+        # Teks tiap sel diambil dari area selnya (spasi antar kata tetap terjaga).
+        try:
+            rows = [[(page.get_textbox(fitz.Rect(c)).strip().replace("\n", " ") if c else "") for c in r.cells] for r in t.rows]
+        except Exception:
+            rows = t.extract() or []
+        rows = [r for r in rows if any((c or "").strip() for c in r)]
+        if not rows: continue
+        found += 1
+        ws = wb.create_sheet(("Hal%d-Tabel%d" % (pno + 1, ti + 1))[:31])
+        for r in rows: ws.append([val(c) for c in r])
+        for c in ws[1]:
+            c.font = Font(bold=True)
+            c.fill = PatternFill("solid", fgColor="DDEBF7")
+            c.alignment = Alignment(wrap_text=True, vertical="center")
+        ws.freeze_panes = "A2"
+        autosize(ws)
+if found == 0:
+    ws = wb.create_sheet("Teks")
+    for pno, page in enumerate(doc):
+        ws.append(["Halaman %d" % (pno + 1)])
+        ws.cell(ws.max_row, 1).font = Font(bold=True)
+        for line in page.get_text("text").splitlines():
+            if line.strip(): ws.append([val(x) for x in re.split(r"\s{2,}|\t", line.strip())])
+        ws.append([])
+    autosize(ws)
+wb.save(sys.argv[2])
+print(found)
+`;
+
+/** PDF → PowerPoint: tiap halaman dirender jadi gambar slide (tampilan sama persis). */
+const PDF_PPTX = String.raw`
+import sys, os, fitz
+from pptx import Presentation
+from pptx.util import Emu
+doc = fitz.open(sys.argv[1])
+prs = Presentation()
+first = doc[0].rect
+prs.slide_width = Emu(12192000)
+prs.slide_height = Emu(int(12192000 * first.height / first.width))
+n = 0
+for pno, page in enumerate(doc):
+    if pno >= 100: break
+    img = os.path.join(sys.argv[3], "slide-%d.png" % pno)
+    page.get_pixmap(dpi=150).save(img)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.shapes.add_picture(img, 0, 0, width=prs.slide_width, height=prs.slide_height)
+    n += 1
+prs.save(sys.argv[2])
+print(n)
+`;
+
 /** Jalankan tool. Return { outputs: [{ name, buf }], note }. */
 async function process_(id, inputs, opts, dir) {
   const sharp = avail.sharp ? require('sharp') : null;
@@ -354,6 +436,25 @@ async function process_(id, inputs, opts, dir) {
     return { outputs: [{ name: `${base(first.name)}.pdf`, buf: fs.readFileSync(out) }] };
   }
 
+  if (id === 'pdfword' && opts.target === 'xlsx') {
+    if (extOf(first.name) !== 'pdf') throw new Error('Upload file **PDF**.');
+    const out = path.join(dir, 'out.xlsx');
+    const { stdout } = await run(pythonPath(), ['-c', PDF_XLSX, first.file, out], { timeout: 240000 });
+    if (!fs.existsSync(out)) throw new Error('Konversi gagal.');
+    const found = Number(String(stdout).trim().split('\n').pop()) || 0;
+    return {
+      outputs: [{ name: `${base(first.name)}.xlsx`, buf: fs.readFileSync(out) }],
+      note: found ? `**${found} tabel** ditemukan (1 tabel = 1 sheet)` : 'Tidak ada tabel terdeteksi — **teks dimasukkan per baris** ke sheet "Teks".',
+    };
+  }
+  if (id === 'pdfword' && opts.target === 'pptx') {
+    if (extOf(first.name) !== 'pdf') throw new Error('Upload file **PDF**.');
+    const out = path.join(dir, 'out.pptx');
+    const { stdout } = await run(pythonPath(), ['-c', PDF_PPTX, first.file, out, dir], { timeout: 240000 });
+    if (!fs.existsSync(out)) throw new Error('Konversi gagal.');
+    const n = Number(String(stdout).trim().split('\n').pop()) || 0;
+    return { outputs: [{ name: `${base(first.name)}.pptx`, buf: fs.readFileSync(out) }], note: `${n} slide • tampilan sama persis dengan PDF (tiap halaman jadi gambar slide)` };
+  }
   if (id === 'pdfword') {
     if (extOf(first.name) !== 'pdf') throw new Error('Upload file **PDF**.');
     const out = path.join(dir, 'out.docx');
@@ -571,7 +672,7 @@ async function onSubmit(i, id) {
       return d;
     }
   };
-  const opts = { pages: get('pages'), mode: pick('mode', 'one'), level: pick('level', 'medium'), dpi: pick('dpi', '150'), size: pick('size', 'a4'), format: pick('format', 'jpg'), bg: pick('bg', 'transparent') };
+  const opts = { pages: get('pages'), mode: pick('mode', 'one'), level: pick('level', 'medium'), dpi: pick('dpi', '150'), size: pick('size', 'a4'), format: pick('format', 'jpg'), bg: pick('bg', 'transparent'), target: pick('target', 'docx') };
   // Hapus background: batas harian per member (admin tanpa batas).
   const admin = i.member?.permissions?.has?.('Administrator');
   if (id === 'removebg' && !admin && REMOVEBG_DAILY() > 0 && usedToday(i.user.id) >= REMOVEBG_DAILY()) {
