@@ -161,7 +161,7 @@ function guessRewardType(prize) {
   return null;
 }
 
-// ───────────────────────── ⚡ Bantuan Produk Instan ─────────────────────────
+// ───────────────────────── 👑 Bantuan Premium App ─────────────────────────
 const INSTANT_HELP = 'instant-help';
 const DEFAULT_ISSUES = [
   { id: 'login', label: 'Akun tidak bisa login', emoji: '🔐' },
@@ -175,7 +175,7 @@ const instantIssues = () => {
   const list = loadConfig().instantIssues;
   return (Array.isArray(list) && list.length ? list : DEFAULT_ISSUES).slice(0, 25);
 };
-/** Pesanan Produk Instan milik member (terbaru dulu). */
+/** Pesanan Premium App milik member (terbaru dulu). */
 function instantOrdersOf(userId) {
   try {
     const { state } = require('./store/state');
@@ -186,7 +186,7 @@ function instantOrdersOf(userId) {
     return [];
   }
 }
-/** Status garansi pesanan instan. */
+/** Status garansi pesanan Premium App. */
 function warrantyOf(o) {
   const i = o?.ins || {};
   if (o.status !== 'completed') return { state: 'pending', text: '`⏳ Pesanan belum selesai`' };
@@ -207,7 +207,7 @@ function buildForm(type, userId) {
     const first = orders.length
       ? new LabelBuilder()
           .setLabel('Pesanan yang Bermasalah')
-          .setDescription('Pilih pesanan Produk Instan kamu.')
+          .setDescription('Pilih pesanan Premium App kamu.')
           .setStringSelectMenuComponent(
             new StringSelectMenuBuilder()
               .setCustomId('order')
@@ -228,8 +228,8 @@ function buildForm(type, userId) {
           )
       : new LabelBuilder()
           .setLabel('ID Pesanan')
-          .setDescription('Contoh: INS-0001 (ada di DM / ticket pesananmu).')
-          .setTextInputComponent(new TextInputBuilder().setCustomId('ordertext').setStyle(TextInputStyle.Short).setPlaceholder('INS-0001').setMaxLength(30).setRequired(true));
+          .setDescription('Contoh: PA-0001 (ada di DM / ticket pesananmu).')
+          .setTextInputComponent(new TextInputBuilder().setCustomId('ordertext').setStyle(TextInputStyle.Short).setPlaceholder('PA-0001').setMaxLength(30).setRequired(true));
     modal.addLabelComponents(
       first,
       new LabelBuilder()
@@ -485,7 +485,7 @@ function buildTicketMessage(guild, cfg, t) {
     color: accent,
     thumb: t.avatar || guild.iconURL({ extension: 'png', size: 256 }),
     header: `-# ${guild.name} • NCS Ticket Center\n## ${type.emoji || '🎫'} ${type.label} • ${t.id}\n${type.welcome || 'Tim kami akan segera membantumu.'}`,
-    blocks: [info, short.length || long.length ? [instantHelp ? '### ⚡ Detail Kendala Produk Instan' : detailTitle, ...short].join('\n') : null, ...long, verify, checklist || instantChecklist],
+    blocks: [info, short.length || long.length ? [instantHelp ? '### 👑 Detail Kendala Premium App' : detailTitle, ...short].join('\n') : null, ...long, verify, checklist || instantChecklist],
     footer: `NCS Ticket Center • ${t.id} • ${ts(t.createdAt, 'f')}`,
     rows,
   });
