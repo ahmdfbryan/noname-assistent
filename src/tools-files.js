@@ -56,13 +56,34 @@ function run(cmd, args, { timeout = 120000, cwd, env } = {}) {
     });
   });
 }
-const has = async (cmd, args = ['--version']) => run(cmd, args, { timeout: 15000 }).then(() => true).catch(() => false);
+const has = async (cmd, args = ['--version']) => run(cmd, args, { timeout: 30000 }).then(() => true).catch(() => false);
+/** Cari program di PATH (cepat, tanpa menjalankannya). Return path lengkap atau null. */
+function which(cmd) {
+  if (!cmd) return null;
+  if (cmd.includes('/')) return fs.existsSync(cmd) ? cmd : null;
+  const dirs = String(process.env.PATH || '').split(path.delimiter).concat(['/usr/bin', '/usr/local/bin', '/bin', '/snap/bin', '/usr/lib/libreoffice/program', '/opt/libreoffice/program']);
+  for (const d of dirs) {
+    const f = path.join(d, cmd);
+    try {
+      fs.accessSync(f, fs.constants.X_OK);
+      return f;
+    } catch {}
+  }
+  return null;
+}
 const pythonPath = () => process.env.TOOLS_PYTHON || ['.venv/bin/python', '.venv/bin/python3'].map((p) => path.join(ROOT, p)).find((p) => fs.existsSync(p)) || 'python3';
 
 const avail = { checked: false, soffice: null, gs: false, pdftoppm: false, pdf2docx: false, pymupdf: false, sharp: false, pdflib: false, jszip: false };
-async function detect() {
-  if (avail.checked) return avail;
+let lastDetect = 0;
+/**
+ * Cek program pendukung. Hasil disimpan; kalau masih ada yang belum tersedia, dicek ulang otomatis
+ * (maks tiap 60 detik) → setelah memasang program di VPS tidak wajib restart bot.
+ */
+async function detect(force = false) {
+  const missing = !avail.soffice || !avail.gs || !avail.pdftoppm || !avail.pdf2docx || !avail.sharp || !avail.pdflib || !avail.jszip;
+  if (avail.checked && !force && (!missing || Date.now() - lastDetect < 60000)) return avail;
   avail.checked = true;
+  lastDetect = Date.now();
   const tryReq = (m) => {
     try {
       require(m);
@@ -74,17 +95,22 @@ async function detect() {
   avail.sharp = tryReq('sharp');
   avail.pdflib = tryReq('pdf-lib');
   avail.jszip = tryReq('jszip');
-  for (const c of [process.env.TOOLS_SOFFICE, 'soffice', 'libreoffice'].filter(Boolean)) {
-    if (await has(c)) {
-      avail.soffice = c;
-      break;
-    }
-  }
-  avail.gs = await has('gs');
-  avail.pdftoppm = await has('pdftoppm', ['-v']);
+  avail.soffice = [process.env.TOOLS_SOFFICE, 'soffice', 'libreoffice'].map(which).find(Boolean) || null;
+  avail.gs = Boolean(which('gs'));
+  avail.pdftoppm = Boolean(which('pdftoppm'));
   const py = pythonPath();
   avail.pdf2docx = await has(py, ['-c', 'import pdf2docx']);
   avail.pymupdf = await has(py, ['-c', 'import fitz']);
+  const sig = JSON.stringify(avail);
+  if (sig === detect.lastSig) return avail; // tidak berubah → tidak perlu log ulang
+  detect.lastSig = sig;
+  const hint = [];
+  if (!avail.soffice) hint.push('LibreOffice (sudo apt install -y libreoffice-writer libreoffice-calc libreoffice-impress)');
+  if (!avail.gs && !avail.pymupdf) hint.push('Ghostscript (sudo apt install -y ghostscript)');
+  if (!avail.pdftoppm) hint.push('poppler-utils (sudo apt install -y poppler-utils)');
+  if (!avail.pdf2docx) hint.push(`pdf2docx (python3 -m venv .venv && .venv/bin/pip install pdf2docx) — python: ${py}`);
+  if (!avail.sharp || !avail.pdflib || !avail.jszip) hint.push('library npm (jalankan: npm install)');
+  if (hint.length) console.warn(`[tools] belum terpasang → ${hint.join(' • ')}`);
   console.log(
     `[tools] tersedia: office→pdf ${avail.soffice ? '✓' : '✗'} • pdf→word ${avail.pdf2docx ? '✓' : '✗'} • kompres pdf ${avail.gs ? '✓ gs' : avail.pymupdf ? '✓ pymupdf' : '✗'} • pdf→jpg ${avail.pdftoppm ? '✓' : '✗'} • sharp ${avail.sharp ? '✓' : '✗'} • pdf-lib ${avail.pdflib ? '✓' : '✗'}`,
   );
