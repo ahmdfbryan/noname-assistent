@@ -167,20 +167,20 @@ function buildPanel(guild, cfg) {
         })),
       ),
   );
-  const toolsRow = rowOf(
-    btn('store:cptq', qn ? `Antrean (${qn})` : 'Antrean', '📋', qn ? ButtonStyle.Primary : ButtonStyle.Secondary),
-    btn('store:cptsch', 'Jam Operasional', '⏰'),
-    btn('store:cptann', 'Pengumuman', '📢'),
-    btn('store:cptrep', 'Laporan', '📊'),
-    btn('store:cptalert', 'Peringatan', '⚠️'),
-  );
-  const storeRow = rowOf(
-    btn('store:cpall:open', 'Buka Semua', '🟢', ButtonStyle.Secondary, open === list.length || mt),
-    btn('store:cpall:close', 'Tutup Semua', '🔴', ButtonStyle.Secondary, open === 0),
-    btn('store:cpall:reason', 'Tutup + Alasan', '📝'),
-    btn('store:cptmt', mt ? 'Akhiri Maintenance' : 'Maintenance', '🛠️', mt ? ButtonStyle.Success : ButtonStyle.Secondary),
-    btn('store:cprefresh', 'Refresh', '🔄'),
-  );
+  // Semua alat admin dalam 1 baris (dropdown).
+  const toolOptions = [
+    { value: 'q', emoji: '📋', label: qn ? `Antrean Pesanan (${qn} menunggu)` : 'Antrean Pesanan', description: 'Verifikasi pembayaran & pesanan bermasalah' },
+    { value: 'sch', emoji: '⏰', label: 'Jam Operasional', description: 'Jadwal buka / tutup otomatis, On 24 Jam, Libur' },
+    { value: 'ann', emoji: '📢', label: 'Pengumuman', description: 'Restock, flash sale, info libur, info umum' },
+    { value: 'rep', emoji: '📊', label: 'Laporan Penjualan', description: 'Omzet, order, untung Premium App + CSV' },
+    { value: 'alert', emoji: '⚠️', label: 'Peringatan Stock & Saldo', description: 'Batas stock / saldo menipis' },
+    mt || open === list.length ? null : { value: 'openall', emoji: '🟢', label: 'Buka Semua Produk', description: 'Langsung dibuka & diumumkan' },
+    open === 0 ? null : { value: 'closeall', emoji: '🔴', label: 'Tutup Semua Produk', description: 'Langsung ditutup & diumumkan' },
+    { value: 'reason', emoji: '📝', label: 'Tutup Semua + Alasan', description: 'Alasan ikut tampil di pengumuman' },
+    { value: 'mt', emoji: '🛠️', label: mt ? 'Akhiri Maintenance' : 'Mode Maintenance', description: mt ? 'Buka kembali produk seperti sebelum maintenance' : 'Tutup semua sementara, nanti dibuka kembali otomatis' },
+    { value: 'refresh', emoji: '🔄', label: 'Refresh Panel', description: 'Perbarui data panel sekarang' },
+  ].filter(Boolean);
+  const toolsRow = rowOf(new StringSelectMenuBuilder().setCustomId('store:cptool').setPlaceholder(qn ? `🧰 Pilih alat admin... • 📋 ${qn} pesanan menunggu` : '🧰 Pilih alat admin...').addOptions(toolOptions));
   const footer = `-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`;
 
   /** Susun isi kotak. Discord membatasi 40 komponen per pesan → aktivitas disembunyikan kalau tidak muat. */
@@ -198,7 +198,7 @@ function buildPanel(guild, cfg) {
     b.addTextDisplayComponents(text('### ⚙️ Kelola Produk'));
     b.addActionRowComponents(select);
     b.addTextDisplayComponents(text('### 🧰 Alat Admin'));
-    b.addActionRowComponents(toolsRow, storeRow);
+    b.addActionRowComponents(toolsRow);
     b.addSeparatorComponents(line());
     b.addTextDisplayComponents(text(footer));
     return b;
@@ -394,7 +394,33 @@ function reasonModal(id, open) {
 }
 
 // ───────────────────────── Router ─────────────────────────
+/** Menu "Alat Admin" (1 dropdown) → aksi yang sama seperti tombol sebelumnya. */
+const TOOL_MENU = {
+  q: ['cptq'],
+  sch: ['cptsch'],
+  ann: ['cptann'],
+  rep: ['cptrep'],
+  alert: ['cptalert'],
+  openall: ['cpall', 'open'],
+  closeall: ['cpall', 'close'],
+  reason: ['cpall', 'reason'],
+  mt: ['cptmt'],
+  refresh: ['cprefresh'],
+};
+
 async function handle(interaction, action, arg) {
+  if (action === 'cptool') {
+    if (!isAdmin(interaction.member)) {
+      await interaction.reply({ content: '⛔ Panel ini khusus **Administrator**.', flags: EPH }).catch(() => {});
+      return true;
+    }
+    const [a, b] = TOOL_MENU[interaction.values?.[0]] || [];
+    if (!a) return true;
+    await handle(interaction, a, b);
+    // Kosongkan pilihan menu supaya menu yang sama bisa dipilih lagi.
+    if (a !== 'cprefresh') interaction.message?.edit(buildPanel(interaction.guild, loadConfig())).catch(() => {});
+    return true;
+  }
   const tool = T.ACTIONS.includes(action);
   if (!tool && !['cpsel', 'cptog', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
   if (!isAdmin(interaction.member)) {
