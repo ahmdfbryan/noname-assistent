@@ -13,6 +13,9 @@
   "dependencies": {
     "discord.js": "^14.25.1",
     "dotenv": "^16.4.5",
-    "qrcode": "^1.5.4"
+    "jszip": "^3.10.1",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.33.5"
   }
 }
