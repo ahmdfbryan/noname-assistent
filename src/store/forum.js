@@ -47,7 +47,9 @@ const clip = (s, n) => {
   return c.length > n ? `${c.slice(0, n - 1)}…` : c;
 };
 const brand = (cfg) => parseInt(String(cfg?.colors?.brand || '#3498DB').replace('#', ''), 16);
-const settings = (p) => ({ lockPosts: true, enabled: true, ...(p?.forum || {}) });
+// lockPosts default false: post yang di-LOCK membuat tombol tidak bisa diklik member biasa.
+// Supaya member tidak bisa membalas, atur izin forum: @everyone → Send Messages in Posts ❌ (lihat petunjuk).
+const settings = (p) => ({ lockPosts: false, enabled: true, ...(p?.forum || {}) });
 const forumId = (cfg, p) => [settings(p).channelId, cfg?.channels?.premiumForum].find(isId) || null;
 const panelUrl = (guildId) => (state.instantPanel ? `https://discord.com/channels/${guildId}/${state.instantPanel.channelId}/${state.instantPanel.messageId}` : null);
 const helpUrl = (guildId) => {
@@ -296,11 +298,21 @@ async function createPost(forum, name, payload, fallback, tags, lock) {
   return thread;
 }
 
+/**
+ * Pastikan post tetap aktif: tidak terarsip & tidak terkunci (kecuali lockPosts true).
+ * Post terarsip / terkunci membuat tombol Beli Sekarang tidak bisa diklik pembeli.
+ */
+async function keepOpen(thread, lock) {
+  if (!thread) return;
+  if (thread.archived) await thread.setArchived(false, 'Katalog: post tetap aktif').catch(() => {});
+  if (!lock && thread.locked) await thread.setLocked(false, 'Katalog: tombol harus bisa diklik').catch(() => {});
+}
+
 /** Edit post. Return false kalau post sudah tidak ada (dihapus manual). */
-async function editPost(threadId, payload, fallback, tags) {
+async function editPost(threadId, payload, fallback, tags, lock = false) {
   const thread = await client.channels.fetch(threadId).catch(() => null);
   if (!thread) return false;
-  if (thread.archived) await thread.setArchived(false, 'Update katalog').catch(() => {});
+  await keepOpen(thread, lock);
   try {
     await thread.messages.edit(thread.id, payload);
   } catch (err) {
@@ -364,8 +376,11 @@ async function sync({ force = false } = {}) {
       const cur = fs.posts[prod.id];
       try {
         if (cur) {
-          if (!force && cur.hash === hash) continue;
-          const ok = await editPost(cur.threadId, buildPost(guild, cfg, p, prod), buildPostEmbed(guild, cfg, p, prod), tags);
+          if (!force && cur.hash === hash) {
+            await keepOpen(await client.channels.fetch(cur.threadId).catch(() => null), lock);
+            continue;
+          }
+          const ok = await editPost(cur.threadId, buildPost(guild, cfg, p, prod), buildPostEmbed(guild, cfg, p, prod), tags, lock);
           if (ok) {
             cur.hash = hash;
             res.updated += 1;
@@ -396,9 +411,10 @@ async function sync({ force = false } = {}) {
 
     // Post panduan (dibuat terakhir supaya paling atas, lalu di-pin).
     const gHash = guideHash(p, products);
+    if (fs.guide && !force && fs.guide.hash === gHash) await keepOpen(await client.channels.fetch(fs.guide.threadId).catch(() => null), lock);
     if (!fs.guide || force || fs.guide.hash !== gHash) {
       const payload = buildGuide(guild, cfg, p, products);
-      const ok = fs.guide ? await editPost(fs.guide.threadId, payload, null, null).catch(() => false) : false;
+      const ok = fs.guide ? await editPost(fs.guide.threadId, payload, null, null, lock).catch(() => false) : false;
       if (ok) fs.guide.hash = gHash;
       else {
         const thread = await createPost(forum, settings(p).guideTitle || '📌 Mulai di Sini — Cara Belanja Premium App', payload, null, [], lock).catch((e) => {
