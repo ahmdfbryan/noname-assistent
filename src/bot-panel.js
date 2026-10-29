@@ -24,10 +24,11 @@ const {
 const UI = require('./ui');
 const { userInfoCommand, robloxCommand } = require('./profile-info');
 const { serverCheckCommand } = require('./server-check');
+const Tools = require('./tools-noname');
 
 /**
  * Bot Command Center — panel sticky (Components V2) di channel bot command.
- * Tombol: 👤 Info Akun Discord • 🎮 Info Akun Roblox • 🔍 Cek Server.
+ * Tombol: 👤 Info Akun Discord • 🎮 Info Akun Roblox • 🔍 Cek Server • ⚙️ Tools Noname (QR Code, dst).
  * Tombol membuka form kecil → hasil (tampilan /userinfo, /roblox, /cekserver) dikirim PUBLIK ke channel hasil (RESULT_CHANNEL);
  * pemakai mendapat info + tombol menuju hasilnya. Pesan gagal (tidak ditemukan, dll) hanya terlihat oleh pemakai.
  * Panel selalu dipindah ke paling bawah saat ada pesan baru di channel.
@@ -76,6 +77,7 @@ function buildPanel(guild, client) {
   box.addSectionComponents(item('👤 Info Akun Discord', 'Profil, badge, umur akun & role — via member, User ID, atau username.', 'bp:user', 'Cek Akun', '👤'));
   box.addSectionComponents(item('🎮 Info Akun Roblox', 'Avatar, status, teman, grup & username lama.', 'bp:roblox', 'Cek Roblox', '🎮'));
   box.addSectionComponents(item('🔍 Cek Server Discord', 'Member, online, boost, fitur & info invite server lain.', 'bp:server', 'Cek Server', '🔍'));
+  box.addSectionComponents(item('⚙️ Tools Noname', 'Kumpulan alat bantu: 🔳 ubah link jadi QR Code & tools lainnya.', 'bp:tools', 'Buka Tools', '⚙️'));
 
   box.addSeparatorComponents(line());
   box.addTextDisplayComponents(text(`-# 📬 Hasil pengecekan dikirim ke <#${RESULT_CHANNEL}>`));
@@ -188,6 +190,8 @@ async function handleInteraction(i) {
   const id = i.customId;
   if (typeof id !== 'string' || !id.startsWith('bp:')) return false;
   try {
+    // ⚙️ Tools Noname (bp:tools, bp:t:*, bp:m:qr, ...)
+    if (await Tools.handle(i)) return true;
     if (i.isButton()) {
       if (id === 'bp:user') await i.showModal(userModal());
       else if (id === 'bp:roblox') await i.showModal(robloxModal());
