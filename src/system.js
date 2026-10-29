@@ -103,7 +103,7 @@ async function checkRoblox() {
   return roblox;
 }
 
-// Waroengkuy (API Produk Instan) — dicek maks tiap 5 menit. Saldo TIDAK ditampilkan (dashboard publik).
+// Waroengkuy (API Premium App) — dicek maks tiap 5 menit. Saldo TIDAK ditampilkan (dashboard publik).
 let wrk = { ok: null, ms: 0, at: 0, code: null };
 async function checkWaroengkuy() {
   if (Date.now() - wrk.at < 5 * 60 * 1000 && wrk.ok !== null) return wrk;
@@ -150,7 +150,7 @@ async function services(guild) {
     add('store', '🛒 Noname Store', 'down', 'Gagal dimuat');
   }
 
-  // ⚡ Produk Instan (Waroengkuy)
+  // 👑 Premium App (Waroengkuy)
   try {
     const { state, isProductOpen } = require('./store/state');
     const { loadConfig: storeCfg } = require('./store/config');
@@ -163,17 +163,17 @@ async function services(guild) {
       const help = list.filter((t) => t.ins?.stage === 'need_help').length;
       const proc = list.filter((t) => t.ins?.stage !== 'waiting_payment').length;
       const sum = I.summaryOf(p);
-      if (!isProductOpen(p)) add('instant', '⚡ Produk Instan', 'off', 'Sedang tutup');
+      if (!isProductOpen(p)) add('instant', '👑 Premium App', 'off', 'Sedang tutup');
       else
         add(
           'instant',
-          '⚡ Produk Instan',
+          '👑 Premium App',
           !w.ok ? 'down' : help ? 'warn' : 'ok',
           `${num(sum.products)} produk tersedia • ${num(list.length - proc)} menunggu bayar • ${num(proc)} diproses${help ? ` • ${num(help)} dibantu admin` : ''}`,
         );
     }
   } catch (e) {
-    add('instant', '⚡ Produk Instan', 'down', 'Gagal dimuat');
+    add('instant', '👑 Premium App', 'down', 'Gagal dimuat');
   }
 
   // NCS Ticket Center
@@ -254,7 +254,7 @@ function trackHistory(list) {
 const text = (c) => new TextDisplayBuilder().setContent(String(c).slice(0, 4000));
 const line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
 
-/** Aktivitas store hari ini (WIB): semua order + Produk Instan. */
+/** Aktivitas store hari ini (WIB): semua order + Premium App. */
 function storeActivity() {
   try {
     const { state } = require('./store/state');
@@ -270,8 +270,8 @@ function storeActivity() {
     const avg = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null;
     return [
       '### 🛒 Aktivitas Store Hari Ini',
-      `**🧾 Order Selesai:** \`${num(done.length)}\` • **⚡ Instan:** \`${num(inst.length)}\` • **🎫 Ticket Aktif:** \`${num(all.filter((t) => t.status === 'open').length)}\``,
-      avg != null ? `**🚀 Rata-rata Kirim Instan:** \`${avg < 60000 ? `${Math.max(1, Math.round(avg / 1000))} detik` : `${Math.round(avg / 60000)} menit`}\` setelah bayar` : null,
+      `**🧾 Order Selesai:** \`${num(done.length)}\` • **👑 Premium App:** \`${num(inst.length)}\` • **🎫 Ticket Aktif:** \`${num(all.filter((t) => t.status === 'open').length)}\``,
+      avg != null ? `**🚀 Rata-rata Kirim Premium App:** \`${avg < 60000 ? `${Math.max(1, Math.round(avg / 1000))} detik` : `${Math.round(avg / 60000)} menit`}\` setelah bayar` : null,
     ]
       .filter(Boolean)
       .join('\n');
