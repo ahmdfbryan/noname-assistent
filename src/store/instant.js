@@ -757,7 +757,7 @@ async function onConfirm(interaction, yes) {
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
-      .send(V.buildDmCreated(guild, cfg, t, url))
+      .send(V.dm(V.buildDmCreated(guild, cfg, t, url)))
       .then(() => true)
       .catch(() => false);
     if (!dmOk) channel.send('ℹ️ Bot tidak bisa mengirim DM ke kamu (DM tertutup). **Data akun hanya dikirim di ticket ini** — salin & simpan sebelum ticket ditutup.').catch(() => {});
@@ -1250,7 +1250,7 @@ async function complete(guild, channel, t) {
     const tier = SP.buildTierUp(guild, cfg, t.userId, { prevTier: before.tier, tier: levelUp ? tierNow : null, firstOrder: before.firstOrder });
     await channel?.send(V.toV2(tier)).catch(() => {});
     const u = await ctx.getClient().users.fetch(t.userId).catch(() => null);
-    await u?.send({ embeds: tier.embeds }).catch(() => {});
+    await u?.send(V.dm(tier)).catch(() => {});
   }
   if (channel) {
     await ctx.editTicketMsg(channel, guild, cfg, t).catch(() => {});
