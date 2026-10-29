@@ -27,6 +27,7 @@ const SP = require('./spender');
 const H = require('./howto');
 const C = require('./catalog');
 const I = require('./instant');
+const F = require('./forum');
 
 const PROOF_DIR = path.join(__dirname, '..', '..', 'data', 'proofs');
 const SESSION_MS = 10 * 60 * 1000;
@@ -2475,11 +2476,13 @@ async function handleInteraction(interaction) {
 
 function registerStore(c) {
   client = c;
+  F.register(c);
   c.on('channelDelete', (ch) => onChannelDelete(ch).catch((e) => console.error('[store] channelDelete:', e.message)));
   c.once(Events.ClientReady, () => {
     housekeeping();
     setInterval(housekeeping, 30 * 1000);
     I.start();
+    F.start(); // 👑 katalog Premium App di forum
     refreshPanel();
     refreshLeaderboard();
   });
