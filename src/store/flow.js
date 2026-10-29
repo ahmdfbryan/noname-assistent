@@ -577,7 +577,7 @@ async function createOrder(interaction, productId, amount) {
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
-      .send(V.buildDmCreated(guild, cfg, ticket, url))
+      .send(V.dm(V.buildDmCreated(guild, cfg, ticket, url)))
       .then(() => true)
       .catch(() => false);
     if (!dmOk) {
@@ -838,7 +838,7 @@ async function onRekberConfirm(interaction, yes) {
     const url = channelUrl(guild.id, channel.id);
     for (const uid of pings) {
       const user = await client.users.fetch(uid).catch(() => null);
-      await user?.send(V.buildRekberDmCreated(guild, cfg, ticket, url, uid)).catch(() => {});
+      await user?.send(V.dm(V.buildRekberDmCreated(guild, cfg, ticket, url, uid))).catch(() => {});
     }
     await interaction.editReply({
       content: `✅ **Ticket rekber berhasil dibuat!** Lanjutkan transaksi di ${channel}.`,
@@ -1199,7 +1199,7 @@ async function onGamepassConfirm(interaction, yes) {
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
-      .send(V.buildDmCreated(guild, cfg, ticket, url))
+      .send(V.dm(V.buildDmCreated(guild, cfg, ticket, url)))
       .then(() => true)
       .catch(() => false);
     if (!dmOk) channel.send('ℹ️ Bot tidak bisa mengirim DM ke kamu (DM tertutup). Semua info pesanan ada di ticket ini.').catch(() => {});
@@ -1399,7 +1399,7 @@ async function onCanvaConfirm(interaction, yes) {
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
-      .send(V.buildDmCreated(guild, cfg, ticket, url))
+      .send(V.dm(V.buildDmCreated(guild, cfg, ticket, url)))
       .then(() => true)
       .catch(() => false);
     if (!dmOk) channel.send('ℹ️ Bot tidak bisa mengirim DM ke kamu (DM tertutup). Semua info pesanan ada di ticket ini.').catch(() => {});
@@ -1645,7 +1645,7 @@ async function onBoostConfirm(interaction, yes) {
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
-      .send(V.buildDmCreated(guild, cfg, ticket, url))
+      .send(V.dm(V.buildDmCreated(guild, cfg, ticket, url)))
       .then(() => true)
       .catch(() => false);
     if (!dmOk) channel.send('ℹ️ Bot tidak bisa mengirim DM ke kamu (DM tertutup). Semua info pesanan ada di ticket ini.').catch(() => {});
@@ -1839,14 +1839,16 @@ async function markPaid(guild, channel, t, { by, amount, note }) {
   const buyer = await client.users.fetch(buyerOf(t)).catch(() => null);
   const dm = V.buildDanaMasuk(guild, cfg, t, { amount: nominal, note, by });
   await buyer
-    ?.send({
-      embeds: dm.embeds,
-      components: [
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Buka Ticket').setEmoji('🎫').setURL(channelUrl(guild.id, t.channelId)),
-        ),
-      ],
-    })
+    ?.send(
+      V.dm({
+        embeds: dm.embeds,
+        components: [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Buka Ticket').setEmoji('🎫').setURL(channelUrl(guild.id, t.channelId)),
+          ),
+        ],
+      }),
+    )
     .catch(() => {});
   return null;
 }
@@ -2075,7 +2077,7 @@ async function onCloseModal(interaction, ticketId) {
       const card = SP.buildTierUp(guild, cfg, t.userId, { prevTier: spenderBefore.tier, tier: levelUp ? tierNow : null, firstOrder: spenderBefore.firstOrder });
       await channel.send(v2(card)).catch(() => {});
       const u = await client.users.fetch(t.userId).catch(() => null);
-      await u?.send({ embeds: card.embeds }).catch(() => {});
+      await u?.send(V.dm(card)).catch(() => {});
     }
   }
 
@@ -2113,7 +2115,7 @@ async function onCloseModal(interaction, ticketId) {
     const dmProof = proofAttachment(t);
     if (status === 'completed' && dmProof.url) dm.embeds[0].setImage(dmProof.url);
     else dm.embeds[0].setImage(null);
-    await user.send({ ...dm, files: status === 'completed' ? dmProof.files : [] }).catch(() => {});
+    await user.send(V.dm({ ...dm, files: status === 'completed' ? dmProof.files : [] })).catch(() => {});
   }
 
   logOrder(guild, t, CLOSE_LOG[kindOf(t)][status]);
@@ -2254,13 +2256,13 @@ async function housekeeping() {
           t.remindedBuyer = true;
           save();
           const u = await client.users.fetch(t.userId).catch(() => null);
-          await u?.send(expiry(guild, cfg, t, 'buyer')).catch(() => {});
+          await u?.send(V.dm(expiry(guild, cfg, t, 'buyer'))).catch(() => {});
         }
         if (!t.remindedAdmin && t.expiresAt <= now && guild) {
           t.remindedAdmin = true;
           save();
           const admin = t.closedBy ? await client.users.fetch(t.closedBy).catch(() => null) : null;
-          await admin?.send(expiry(guild, cfg, t, 'admin')).catch(() => {});
+          await admin?.send(V.dm(expiry(guild, cfg, t, 'admin'))).catch(() => {});
         }
       }
       // Hapus channel ticket yang sudah selesai.
