@@ -12,6 +12,7 @@ const {
   SeparatorSpacingSize,
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
+  FileBuilder,
   MessageFlags,
 } = require('discord.js');
 const UI = require('../ui');
@@ -2617,8 +2618,7 @@ function toV2(payload) {
 
   // 3) Bangun kotak V2.
   const boxes = parts.map(({ e, head, blocks, foot }) => {
-    const box = new ContainerBuilder();
-    if (e.color != null) box.setAccentColor(e.color);
+    const box = UI.accent(new ContainerBuilder(), e.color ?? null); // garis warna mengikuti ui.json
     if (e.thumbnail?.url) {
       box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(v2Text(head)).setThumbnailAccessory(new ThumbnailBuilder().setURL(e.thumbnail.url)));
     } else box.addTextDisplayComponents(v2Text(head));
@@ -2635,16 +2635,32 @@ function toV2(payload) {
   });
   const out = [];
   if (!boxes.length) {
-    const box = new ContainerBuilder().setAccentColor(color(loadConfig() || {}, 'brand', 0x3498db));
+    const box = UI.accent(new ContainerBuilder(), color(loadConfig() || {}, 'brand', 0x3498db));
     box.addTextDisplayComponents(v2Text(content || '​'));
     boxes.push(box);
   } else if (content) out.push(v2Text(content));
   for (const r of components || []) boxes.at(-1).addActionRowComponents(r);
+  // Lampiran yang tidak tampil sebagai gambar (misal transcript .txt) → komponen File supaya tetap terlihat.
+  const used = JSON.stringify(boxes.map((b) => b.toJSON()));
+  for (const f of rest.files || []) {
+    const name = f?.name || f?.attachment?.name;
+    if (name && !used.includes(`attachment://${name}`)) boxes.at(-1).addFileComponents(new FileBuilder().setURL(`attachment://${name}`));
+  }
   return { ...rest, components: [...out, ...boxes], flags: (payload.flags || 0) | MessageFlags.IsComponentsV2 };
+}
+
+/** Pesan DM (pembeli / owner) → Components V2 premium. Mention di atas kotak dibuang (tidak perlu di DM). */
+function dm(payload) {
+  if (!payload) return payload;
+  const { content, ...rest } = payload;
+  void content;
+  const out = toV2({ ...rest, allowedMentions: { parse: [] } });
+  return { ...out, allowedMentions: { parse: [] } };
 }
 
 module.exports = {
   toV2,
+  dm,
   boostPrice,
   boostTable,
   boostStockLines,
