@@ -1827,7 +1827,7 @@ async function markPaid(guild, channel, t, { by, amount, note }) {
     logOrder(guild, t, '💰 Dana masuk — pesanan diproses');
     await channel.send(v2(V.buildDanaMasuk(guild, cfg, t, { amount: nominal, note, by }))).catch(() => {});
   }
-  // Produk Instan: dana masuk (mode manual) → akun dikirim otomatis pakai saldo Waroengkuy.
+  // Premium App: dana masuk (mode manual) → akun dikirim otomatis pakai saldo Waroengkuy.
   if (kindOf(t) === 'instant') {
     I.onPaid(t).catch((e) => console.error(`[instan] onPaid ${t.id}:`, e.message));
     return null;
@@ -2416,7 +2416,7 @@ async function handleInteraction(interaction) {
   const [, action, arg] = id.split(':');
 
   try {
-    // ⚡ Produk Instan (Waroengkuy): semua customId "store:ins..."
+    // 👑 Premium App (Waroengkuy): semua customId "store:ins..."
     if (action?.startsWith('ins') && (await I.handle(interaction, action, arg))) return true;
     if (interaction.isButton()) {
       if (action === 'buy') await onProductInfo(interaction, arg);
@@ -2485,7 +2485,7 @@ function registerStore(c) {
   });
 }
 
-// Produk Instan memakai fungsi bersama dari file ini.
+// Premium App memakai fungsi bersama dari file ini.
 I.init({ getClient: () => client, logOrder, refreshPanel, refreshLeaderboard, getTicketCategory, editTicketMsg, testimonyTimeoutMs });
 
 module.exports = {
