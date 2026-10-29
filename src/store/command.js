@@ -75,8 +75,8 @@ const storeCommand = {
         .addStringOption((o) =>
           o
             .setName('jenis')
-            .setDescription('Store utama (default), Produk Digital, atau Produk Instan')
-            .addChoices({ name: 'Store Utama', value: 'main' }, { name: 'Produk Digital', value: 'digital' }, { name: 'Produk Instan', value: 'instant' }),
+            .setDescription('Store utama (default), Produk Digital, atau Premium App')
+            .addChoices({ name: 'Store Utama', value: 'main' }, { name: 'Produk Digital', value: 'digital' }, { name: 'Premium App', value: 'instant' }),
         )
         .addChannelOption((o) => o.setName('channel').setDescription('Default: channel panel di store.json').addChannelTypes(...TEXT)),
     )
@@ -144,7 +144,7 @@ const storeCommand = {
         }),
     )
     .addSubcommand((s) => s.setName('status').setDescription('Lihat ringkasan toko'))
-    .addSubcommand((s) => s.setName('instan').setDescription('Status Produk Instan: koneksi API Waroengkuy, saldo, pesanan bermasalah'))
+    .addSubcommand((s) => s.setName('premium-app').setDescription('Status Premium App: koneksi API Waroengkuy, saldo, pesanan bermasalah'))
     .addSubcommand((s) => s.setName('sinkron-role').setDescription('Pasang ulang role Buyer & tier spender ke semua pembeli'))
     .addSubcommand((s) => s.setName('perbarui-tampilan').setDescription('Ubah history order & testimoni lama ke tampilan baru (Components V2)')),
 
@@ -163,7 +163,7 @@ const storeCommand = {
       if (!channel?.isTextBased()) return interaction.editReply('❌ Channel tidak ditemukan.');
       if (group === 'instant' && !I.instantProduct(cfg)) return interaction.editReply('❌ Belum ada produk `"type": "instant"` di store.json.');
       await placeTracked(interaction, key, channel, group === 'instant' ? I.buildPanel : (g, c) => V.buildPanel(g, c, group));
-      const names = { main: '**Store Utama**', digital: '**Produk Digital**', instant: '**⚡ Produk Instan**' };
+      const names = { main: '**Store Utama**', digital: '**Produk Digital**', instant: '**👑 Premium App**' };
       return interaction.editReply(`✅ Panel ${names[group]} dikirim ke ${channel} dan akan ter-update otomatis.`);
     }
     if (sub === 'leaderboard') {
@@ -290,7 +290,7 @@ const storeCommand = {
       );
     }
 
-    if (sub === 'instan') return interaction.editReply(await I.adminStatus(guild));
+    if (sub === 'premium-app') return interaction.editReply(await I.adminStatus(guild));
 
     if (sub === 'status') {
       const active = Object.values(state.tickets).filter((t) => t.status === 'open');
