@@ -255,9 +255,13 @@ const storeCommand = {
       const target = pick ? (cfg.products || []).find((p) => p.id === pick) : product;
       if (!target) return interaction.editReply('❌ Produk tidak ada di store.json.');
       const rate = interaction.options.getInteger('rate');
+      const before = V.rateOf(cfg, target);
       state.rates[target.id] = rate;
       save();
       refreshPanel();
+      if (before !== rate && isId(cfg.channels?.stock)) {
+        await announce(guild, 'price', { product: target, changes: [{ label: 'Rate', before, after: rate, suffix: ' / Robux' }] }, Boolean(cfg.pingEveryone?.price));
+      }
       const example =
         target.type === 'gamepass'
           ? `1.000 Robux diterima = gamepass ${num(V.gpBeforeTax(target, 1000))} Robux = ${rupiah(V.gpBeforeTax(target, 1000) * rate)}`
