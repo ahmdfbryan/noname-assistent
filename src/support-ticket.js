@@ -739,8 +739,9 @@ async function closeTicket(interaction, t, reason) {
   // DM pembuka ticket
   const user = await client.users.fetch(t.userId).catch(() => null);
   const type = typeOf(cfg, t.type) || { label: t.type, emoji: '🎫' };
+  // DM Components V2 (transcript tampil sebagai file di dalam kotak).
   await user
-    ?.send({
+    ?.send(require('./store/views').dm({
       embeds: [
         new EmbedBuilder()
           .setColor(brand(cfg))
@@ -757,7 +758,7 @@ async function closeTicket(interaction, t, reason) {
           .setTimestamp(new Date()),
       ],
       files: transcript ? [transcript] : [],
-    })
+    }))
     .catch(() => {});
 
   refreshPanel().catch(() => {});
