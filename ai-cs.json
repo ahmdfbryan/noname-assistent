@@ -5,6 +5,7 @@
     "channelId = channel CS: semua pertanyaan member dijawab (kecuali staff/admin, balasan antar member, prefix command, dan ucapan terima kasih → cukup diberi reaksi 💙). answerMentionsAnywhere true = mention bot di channel lain juga dijawab.",
     "cooldownSeconds / dailyLimitPerUser / dailyLimitTotal = penghemat kuota (admin tidak kena batas per user). historyMessages & historyMinutes = bot ingat beberapa tanya-jawab terakhir per member.",
     "Info tambahan / koreksi jawaban → tulis di ai-knowledge.md (dibaca ulang otomatis, tanpa restart). Jawaban yang dinilai 👎 dikirim ke channel alert Premium App.",
+    "geminiModel = daftar model Gemini berurutan (yang pertama dipakai, sisanya cadangan). Model yang sudah dihapus Google otomatis dilewati, lalu Groq dipakai kalau semua gagal.",
     "File ini dibaca ulang otomatis tiap 10 detik — enabled false = matikan AI tanpa restart."
   ],
   "enabled": true,
@@ -20,6 +21,6 @@
   "maxAnswerTokens": 600,
   "temperature": 0.2,
   "providers": ["gemini", "groq"],
-  "geminiModel": "gemini-2.5-flash",
+  "geminiModel": ["gemini-3.8-flash", "gemini-flash-latest"],
   "groqModel": "llama-3.3-70b-versatile"
 }
