@@ -27,7 +27,7 @@
     "title": "🚀 Mulai dari Sini",
     "items": [
       "✅ **Verifikasi akun** di {channel:1552529630127456326} untuk membuka semua channel",
-      "📜 **Baca rules** di {channel:1552532239902838894} supaya nyaman bersama",
+      "📜 **Baca rules** di {channel:1565339364509229217} supaya nyaman bersama",
       "📢 **Pantau info terbaru** di {channel:1553660580282368070}",
       "🛒 **Cek store** di {channel:1553667092711088160} — Robux, Gamepass, Canva Pro & lainnya"
     ]
@@ -48,7 +48,7 @@
 
   "buttons": [
     { "label": "Verifikasi", "emoji": "✅", "channelId": "1552529630127456326" },
-    { "label": "Baca Rules", "emoji": "📜", "channelId": "1552532239902838894" },
+    { "label": "Baca Rules", "emoji": "📜", "channelId": "1565339364509229217" },
     { "label": "Store", "emoji": "🛒", "channelId": "1553667092711088160" }
   ]
 }
