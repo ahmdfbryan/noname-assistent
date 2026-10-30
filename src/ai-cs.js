@@ -51,7 +51,9 @@ const DEFAULTS = {
   historyMinutes: 10,
   maxAnswerTokens: 600,
   temperature: 0.2,
-  providers: ['gemini', 'groq'],
+  providers: ['gemini'],
+  requestTimeoutSeconds: 45,
+  geminiThinking: 'low',
   geminiModel: ['gemini-3.8-flash', 'gemini-flash-latest'],
   groqModel: 'llama-3.3-70b-versatile',
 };
@@ -269,31 +271,47 @@ async function askGemini(cfg, system, history, question) {
   const contents = [...history.flatMap((h) => [{ role: 'user', parts: [{ text: h.q }] }, { role: 'model', parts: [{ text: h.a }] }]), { role: 'user', parts: [{ text: question }] }];
   // geminiModel boleh 1 nama atau daftar cadangan. Model yang sudah dihapus Google (404) dilewati otomatis.
   const models = [].concat(cfg.geminiModel || [], 'gemini-flash-latest').filter((m, i, a) => m && a.indexOf(m) === i && !deadModels.has(m));
+  const timeoutMs = Math.max(10, Number(cfg.requestTimeoutSeconds) || 45) * 1000;
   let last = null;
   for (const model of models) {
-    // 2.5: thinking dimatikan (hemat & cepat). Model lain: ruang token lebih besar agar "thinking" tidak memotong jawaban.
-    const old = /2\.5/.test(model);
+    // Thinking dibuat seminimal mungkin (lebih cepat & hemat): 2.5 → thinkingBudget 0, 3.x → thinkingLevel "low".
+    const v25 = /2\.5/.test(model);
+    const thinking = v25 ? { thinkingBudget: 0 } : noThinkLevel.has(model) ? null : { thinkingLevel: cfg.geminiThinking || 'low' };
     const body = {
       systemInstruction: { parts: [{ text: system }] },
       contents,
-      generationConfig: { temperature: cfg.temperature, maxOutputTokens: old ? cfg.maxAnswerTokens : Math.max(cfg.maxAnswerTokens, 2048), ...(old ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+      generationConfig: { temperature: cfg.temperature, maxOutputTokens: v25 ? cfg.maxAnswerTokens : Math.max(cfg.maxAnswerTokens, 2048), ...(thinking ? { thinkingConfig: thinking } : {}) },
     };
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30000),
-    }).catch((e) => {
-      throw new AiError(`Gemini tidak bisa dihubungi: ${e.message}`, true);
-    });
+    let res;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      // Timeout / jaringan → coba model berikutnya (biasanya lebih ringan).
+      last = new AiError(`Gemini ${model} tidak merespons (${/abort|timeout/i.test(e.message) ? `timeout ${timeoutMs / 1000} detik` : e.message})`, true);
+      console.warn(`[ai-cs] ${last.message}`);
+      continue;
+    }
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      last = new AiError(`Gemini ${model} HTTP ${res.status}: ${j?.error?.message || ''}`.slice(0, 220), true);
+      const msg = j?.error?.message || '';
+      last = new AiError(`Gemini ${model} HTTP ${res.status}: ${msg}`.slice(0, 220), true);
+      // Model tidak mengenal thinkingLevel → ulangi model yang sama tanpa pengaturan thinking.
+      if (res.status === 400 && thinking && !v25 && /thinking/i.test(msg) && !noThinkLevel.has(model)) {
+        noThinkLevel.add(model);
+        models.splice(models.indexOf(model) + 1, 0, model);
+        continue;
+      }
       if (res.status === 404) {
         deadModels.add(model);
         console.warn(`[ai-cs] model ${model} tidak tersedia — ganti "geminiModel" di ai-cs.json. Mencoba model cadangan…`);
         continue;
       }
+      if (res.status === 429 || res.status >= 500) continue; // limit / server sibuk → model cadangan
       throw last;
     }
     const out = (j.candidates?.[0]?.content?.parts || [])
@@ -301,7 +319,10 @@ async function askGemini(cfg, system, history, question) {
       .map((p) => p.text || '')
       .join('')
       .trim();
-    if (!out) throw new AiError(`Gemini tidak memberi jawaban (${j.candidates?.[0]?.finishReason || j.promptFeedback?.blockReason || 'kosong'})`, true);
+    if (!out) {
+      last = new AiError(`Gemini ${model} tidak memberi jawaban (${j.candidates?.[0]?.finishReason || j.promptFeedback?.blockReason || 'kosong'})`, true);
+      continue;
+    }
     if (model !== models[0] && !warnedModel.has(model)) {
       warnedModel.add(model);
       console.log(`[ai-cs] memakai model cadangan Gemini: ${model}`);
@@ -311,6 +332,7 @@ async function askGemini(cfg, system, history, question) {
   throw last || new AiError('Tidak ada model Gemini yang tersedia', true);
 }
 const deadModels = new Set();
+const noThinkLevel = new Set();
 const warnedModel = new Set();
 
 async function askGroq(cfg, system, history, question) {
@@ -428,6 +450,7 @@ async function onMessage(msg, client) {
   lastAsk.set(msg.author.id, Date.now());
   running += 1;
   msg.channel.sendTyping().catch(() => {});
+  const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   const key = `${msg.channelId}:${msg.author.id}`;
   const hist = (history.get(key) || []).filter((h) => Date.now() - h.at < cfg.historyMinutes * 60000).slice(-cfg.historyMessages);
   try {
@@ -449,6 +472,7 @@ async function onMessage(msg, client) {
       .reply({ content: `🙏 Maaf, ${cfg.botName} sedang tidak bisa menjawab. Silakan buat **ticket bantuan** agar dibantu admin ya.`, allowedMentions: { repliedUser: true, parse: [] } })
       .catch(() => {});
   } finally {
+    clearInterval(typing);
     running -= 1;
   }
 }
@@ -492,7 +516,7 @@ function registerAiCs(client) {
   client.on(Events.MessageCreate, (msg) => onMessage(msg, client).catch((e) => console.error('[ai-cs]', e.message)));
   client.once(Events.ClientReady, () => {
     const cfg = loadCfg();
-    const keys = [process.env.GEMINI_API_KEY ? 'Gemini ✓' : 'Gemini ✗', process.env.GROQ_API_KEY ? 'Groq ✓' : 'Groq ✗'].join(' • ');
+    const keys = (cfg.providers || []).map((p) => `${p === 'gemini' ? 'Gemini' : 'Groq'} ${process.env[p === 'gemini' ? 'GEMINI_API_KEY' : 'GROQ_API_KEY'] ? '✓' : '✗ (key kosong)'}`).join(' • ');
     console.log(`[ai-cs] ${cfg.enabled ? 'aktif' : 'nonaktif'} di <#${cfg.channelId}> • ${keys}`);
   });
 }
