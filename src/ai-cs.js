@@ -52,7 +52,7 @@ const DEFAULTS = {
   maxAnswerTokens: 600,
   temperature: 0.2,
   providers: ['gemini', 'groq'],
-  geminiModel: 'gemini-2.5-flash',
+  geminiModel: ['gemini-3.8-flash', 'gemini-flash-latest'],
   groqModel: 'llama-3.3-70b-versatile',
 };
 let cfgCache = { at: 0, v: DEFAULTS };
@@ -267,25 +267,51 @@ async function askGemini(cfg, system, history, question) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new AiError('GEMINI_API_KEY kosong', true);
   const contents = [...history.flatMap((h) => [{ role: 'user', parts: [{ text: h.q }] }, { role: 'model', parts: [{ text: h.a }] }]), { role: 'user', parts: [{ text: question }] }];
-  const body = {
-    systemInstruction: { parts: [{ text: system }] },
-    contents,
-    generationConfig: { temperature: cfg.temperature, maxOutputTokens: cfg.maxAnswerTokens, ...(/2\.5/.test(cfg.geminiModel) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
-  };
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.geminiModel)}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
-  }).catch((e) => {
-    throw new AiError(`Gemini tidak bisa dihubungi: ${e.message}`, true);
-  });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new AiError(`Gemini HTTP ${res.status}: ${j?.error?.message || ''}`.slice(0, 200), res.status === 429 || res.status >= 500 || res.status === 403);
-  const out = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
-  if (!out) throw new AiError(`Gemini tidak memberi jawaban (${j.candidates?.[0]?.finishReason || j.promptFeedback?.blockReason || 'kosong'})`, true);
-  return out;
+  // geminiModel boleh 1 nama atau daftar cadangan. Model yang sudah dihapus Google (404) dilewati otomatis.
+  const models = [].concat(cfg.geminiModel || [], 'gemini-flash-latest').filter((m, i, a) => m && a.indexOf(m) === i && !deadModels.has(m));
+  let last = null;
+  for (const model of models) {
+    // 2.5: thinking dimatikan (hemat & cepat). Model lain: ruang token lebih besar agar "thinking" tidak memotong jawaban.
+    const old = /2\.5/.test(model);
+    const body = {
+      systemInstruction: { parts: [{ text: system }] },
+      contents,
+      generationConfig: { temperature: cfg.temperature, maxOutputTokens: old ? cfg.maxAnswerTokens : Math.max(cfg.maxAnswerTokens, 2048), ...(old ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+    };
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    }).catch((e) => {
+      throw new AiError(`Gemini tidak bisa dihubungi: ${e.message}`, true);
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      last = new AiError(`Gemini ${model} HTTP ${res.status}: ${j?.error?.message || ''}`.slice(0, 220), true);
+      if (res.status === 404) {
+        deadModels.add(model);
+        console.warn(`[ai-cs] model ${model} tidak tersedia — ganti "geminiModel" di ai-cs.json. Mencoba model cadangan…`);
+        continue;
+      }
+      throw last;
+    }
+    const out = (j.candidates?.[0]?.content?.parts || [])
+      .filter((p) => !p.thought)
+      .map((p) => p.text || '')
+      .join('')
+      .trim();
+    if (!out) throw new AiError(`Gemini tidak memberi jawaban (${j.candidates?.[0]?.finishReason || j.promptFeedback?.blockReason || 'kosong'})`, true);
+    if (model !== models[0] && !warnedModel.has(model)) {
+      warnedModel.add(model);
+      console.log(`[ai-cs] memakai model cadangan Gemini: ${model}`);
+    }
+    return out;
+  }
+  throw last || new AiError('Tidak ada model Gemini yang tersedia', true);
 }
+const deadModels = new Set();
+const warnedModel = new Set();
 
 async function askGroq(cfg, system, history, question) {
   const key = process.env.GROQ_API_KEY;
