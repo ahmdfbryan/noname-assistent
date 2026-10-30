@@ -21,6 +21,7 @@ const leveling = require('./leveling');
 const botPanel = require('./bot-panel');
 const canvaManager = require('./canva-manager');
 const { registerPrefix } = require('./prefix');
+const aiCs = require('./ai-cs');
 
 const byName = new Map(commands.map((c) => [c.data.name, c]));
 // GuildMembers wajib untuk fitur welcome → aktifkan "Server Members Intent" di Discord Developer Portal.
@@ -52,6 +53,7 @@ leveling.registerLeveling(client);
 botPanel.registerBotPanel(client);
 canvaManager.registerCanvaManager(client);
 registerPrefix(client);
+aiCs.registerAiCs(client);
 
 const wib = () => new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'medium' });
 client.once(Events.ClientReady, (c) => {
@@ -60,6 +62,8 @@ client.once(Events.ClientReady, (c) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  // 🤖 Noname Assistent (AI CS): tombol 👍 / 👎 ("ai:fb:...")
+  if (await aiCs.handleInteraction(interaction)) return;
   // Store: semua tombol / dropdown / form dengan customId "store:..."
   if (await store.handleInteraction(interaction)) return;
   // Giveaway: tombol ikut / keluar / daftar peserta ("ga:...")
