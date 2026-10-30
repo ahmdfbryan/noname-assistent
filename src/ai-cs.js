@@ -44,9 +44,9 @@ const DEFAULTS = {
   channelId: '1553664134758015058',
   answerMentionsAnywhere: true,
   ignoreStaffInChannel: true,
-  cooldownSeconds: 8,
-  dailyLimitPerUser: 25,
-  dailyLimitTotal: 1200,
+  cooldownSeconds: 3,
+  dailyLimitPerUser: 0,
+  dailyLimitTotal: 0,
   historyMessages: 4,
   historyMinutes: 10,
   maxAnswerTokens: 600,
@@ -439,23 +439,25 @@ async function onMessage(msg, client) {
   }
   question = clip(question, 800);
 
-  // Batas pemakaian (hemat kuota & resource).
+  // Batas pemakaian — 0 = tanpa batas. Default: tanpa batas harian, hanya jeda anti-spam singkat.
   ensureDay();
   const staff = isStaff(msg.member);
-  const wait = cfg.cooldownSeconds * 1000 - (Date.now() - (lastAsk.get(msg.author.id) || 0));
+  const wait = (Number(cfg.cooldownSeconds) || 0) * 1000 - (Date.now() - (lastAsk.get(msg.author.id) || 0));
   if (!staff && wait > 0) {
     await msg.react('⏳').catch(() => {});
     return;
   }
-  if (!staff && (data.users[msg.author.id] || 0) >= cfg.dailyLimitPerUser) {
+  if (!staff && Number(cfg.dailyLimitPerUser) > 0 && (data.users[msg.author.id] || 0) >= cfg.dailyLimitPerUser) {
     return msg.reply({ content: `🙏 Batas tanya ke ${cfg.botName} hari ini sudah tercapai. Untuk bantuan lanjutan, silakan buat **ticket bantuan** ya!`, allowedMentions: { repliedUser: true, parse: [] } }).catch(() => {});
   }
-  if (data.total >= cfg.dailyLimitTotal || running >= MAX_PARALLEL) {
-    return msg.reply({ content: `🙏 ${cfg.botName} sedang sibuk melayani banyak pertanyaan. Coba lagi sebentar, atau buat **ticket bantuan** untuk dibantu admin.`, allowedMentions: { repliedUser: true, parse: [] } }).catch(() => {});
+  if (Number(cfg.dailyLimitTotal) > 0 && data.total >= cfg.dailyLimitTotal) {
+    return msg.reply({ content: `🙏 ${cfg.botName} sedang sibuk melayani banyak pertanyaan. Coba lagi nanti, atau buat **ticket bantuan** untuk dibantu admin.`, allowedMentions: { repliedUser: true, parse: [] } }).catch(() => {});
   }
   lastAsk.set(msg.author.id, Date.now());
-  running += 1;
+  // Ramai? Pertanyaan tidak ditolak — antre sebentar sampai ada slot (maks. 3 diproses bersamaan supaya VPS tetap ringan).
   msg.channel.sendTyping().catch(() => {});
+  for (let n = 0; running >= MAX_PARALLEL && n < 240; n += 1) await new Promise((r) => setTimeout(r, 500));
+  running += 1;
   const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   const key = `${msg.channelId}:${msg.author.id}`;
   const hist = (history.get(key) || []).filter((h) => Date.now() - h.at < cfg.historyMinutes * 60000).slice(-cfg.historyMessages);
