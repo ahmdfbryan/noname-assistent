@@ -43,6 +43,7 @@ const DEFAULTS = {
   enabled: true,
   botName: 'Noname Assistent',
   channelId: '1553664134758015058',
+  rulesChannelId: '1565339364509229217',
   answerMentionsAnywhere: true,
   ignoreStaffInChannel: true,
   cooldownSeconds: 3,
@@ -156,6 +157,7 @@ function buildKnowledge(guild, includePremium) {
     lines.push(
       '## CHANNEL PENTING (sebut dengan format <#id>)',
       ...[
+        ref(loadCfg().rulesChannelId, 'Rules / aturan server'),
         ref(ch.panel, 'Panel Store utama (Robux Visend, Robux Gamepass, Rekber)'),
         ref(require('./store/config').channelOf(cfg, 'digitalPanel'), 'Panel Produk Digital (Canva Pro, Server Boost)'),
         ref(ch.instantPanel, 'Panel Premium App (otomatis)'),
