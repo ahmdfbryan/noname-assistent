@@ -52,9 +52,9 @@ const DEFAULTS = {
   maxAnswerTokens: 600,
   temperature: 0.2,
   providers: ['gemini'],
-  requestTimeoutSeconds: 45,
+  requestTimeoutSeconds: 20,
   geminiThinking: 'low',
-  geminiModel: ['gemini-3.8-flash', 'gemini-flash-latest'],
+  geminiModel: ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'],
   groqModel: 'llama-3.3-70b-versatile',
 };
 let cfgCache = { at: 0, v: DEFAULTS };
@@ -270,7 +270,10 @@ async function askGemini(cfg, system, history, question) {
   if (!key) throw new AiError('GEMINI_API_KEY kosong', true);
   const contents = [...history.flatMap((h) => [{ role: 'user', parts: [{ text: h.q }] }, { role: 'model', parts: [{ text: h.a }] }]), { role: 'user', parts: [{ text: question }] }];
   // geminiModel boleh 1 nama atau daftar cadangan. Model yang sudah dihapus Google (404) dilewati otomatis.
-  const models = [].concat(cfg.geminiModel || [], 'gemini-flash-latest').filter((m, i, a) => m && a.indexOf(m) === i && !deadModels.has(m));
+  const all = [].concat(cfg.geminiModel || [], 'gemini-flash-latest').filter((m, i, a) => m && a.indexOf(m) === i && !deadModels.has(m));
+  // Model yang barusan timeout diistirahatkan 15 menit supaya member tidak ikut menunggu lama.
+  const fresh = all.filter((m) => (slowUntil.get(m) || 0) < Date.now());
+  const models = fresh.length ? fresh : all;
   const timeoutMs = Math.max(10, Number(cfg.requestTimeoutSeconds) || 45) * 1000;
   let last = null;
   for (const model of models) {
@@ -293,7 +296,8 @@ async function askGemini(cfg, system, history, question) {
     } catch (e) {
       // Timeout / jaringan → coba model berikutnya (biasanya lebih ringan).
       last = new AiError(`Gemini ${model} tidak merespons (${/abort|timeout/i.test(e.message) ? `timeout ${timeoutMs / 1000} detik` : e.message})`, true);
-      console.warn(`[ai-cs] ${last.message}`);
+      console.warn(`[ai-cs] ${last.message} — dilewati 15 menit, pakai model berikutnya`);
+      slowUntil.set(model, Date.now() + 15 * 60000);
       continue;
     }
     const j = await res.json().catch(() => ({}));
@@ -332,6 +336,7 @@ async function askGemini(cfg, system, history, question) {
   throw last || new AiError('Tidak ada model Gemini yang tersedia', true);
 }
 const deadModels = new Set();
+const slowUntil = new Map();
 const noThinkLevel = new Set();
 const warnedModel = new Set();
 
