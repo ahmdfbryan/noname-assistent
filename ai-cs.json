@@ -1,0 +1,25 @@
+{
+  "_petunjuk": [
+    "🤖 Noname Assistent — customer service AI. Hanya memakai DATA PUBLIK (harga, status, stok, S&K, cara order, FAQ, aturan). Data internal (ticket, pembeli, saldo, modal, rekening, API key) tidak pernah dikirim ke AI.",
+    "API key di .env: GEMINI_API_KEY (Google AI Studio, gratis) — utama; GROQ_API_KEY (console.groq.com, gratis) — cadangan otomatis kalau Gemini limit/error. Minimal isi salah satu.",
+    "channelId = channel CS: semua pertanyaan member dijawab (kecuali staff/admin, balasan antar member, prefix command, dan ucapan terima kasih → cukup diberi reaksi 💙). answerMentionsAnywhere true = mention bot di channel lain juga dijawab.",
+    "cooldownSeconds / dailyLimitPerUser / dailyLimitTotal = penghemat kuota (admin tidak kena batas per user). historyMessages & historyMinutes = bot ingat beberapa tanya-jawab terakhir per member.",
+    "Info tambahan / koreksi jawaban → tulis di ai-knowledge.md (dibaca ulang otomatis, tanpa restart). Jawaban yang dinilai 👎 dikirim ke channel alert Premium App.",
+    "File ini dibaca ulang otomatis tiap 10 detik — enabled false = matikan AI tanpa restart."
+  ],
+  "enabled": true,
+  "botName": "Noname Assistent",
+  "channelId": "1553664134758015058",
+  "answerMentionsAnywhere": true,
+  "ignoreStaffInChannel": true,
+  "cooldownSeconds": 8,
+  "dailyLimitPerUser": 25,
+  "dailyLimitTotal": 1200,
+  "historyMessages": 4,
+  "historyMinutes": 10,
+  "maxAnswerTokens": 600,
+  "temperature": 0.2,
+  "providers": ["gemini", "groq"],
+  "geminiModel": "gemini-2.5-flash",
+  "groqModel": "llama-3.3-70b-versatile"
+}
