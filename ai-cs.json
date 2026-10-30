@@ -1,11 +1,11 @@
 {
   "_petunjuk": [
     "🤖 Noname Assistent — customer service AI. Hanya memakai DATA PUBLIK (harga, status, stok, S&K, cara order, FAQ, aturan). Data internal (ticket, pembeli, saldo, modal, rekening, API key) tidak pernah dikirim ke AI.",
-    "API key di .env: GEMINI_API_KEY (Google AI Studio, gratis) — utama; GROQ_API_KEY (console.groq.com, gratis) — cadangan otomatis kalau Gemini limit/error. Minimal isi salah satu.",
+    "API key di .env: GEMINI_API_KEY (Google AI Studio, gratis). providers [\"gemini\"] = hanya Gemini. Ingin cadangan Groq? isi GROQ_API_KEY lalu ubah jadi [\"gemini\", \"groq\"].",
     "channelId = channel CS: semua pertanyaan member dijawab (kecuali staff/admin, balasan antar member, prefix command, dan ucapan terima kasih → cukup diberi reaksi 💙). answerMentionsAnywhere true = mention bot di channel lain juga dijawab.",
     "cooldownSeconds / dailyLimitPerUser / dailyLimitTotal = penghemat kuota (admin tidak kena batas per user). historyMessages & historyMinutes = bot ingat beberapa tanya-jawab terakhir per member.",
     "Info tambahan / koreksi jawaban → tulis di ai-knowledge.md (dibaca ulang otomatis, tanpa restart). Jawaban yang dinilai 👎 dikirim ke channel alert Premium App.",
-    "geminiModel = daftar model Gemini berurutan (yang pertama dipakai, sisanya cadangan). Model yang sudah dihapus Google otomatis dilewati, lalu Groq dipakai kalau semua gagal.",
+    "geminiModel = daftar model Gemini berurutan (yang pertama dipakai, sisanya cadangan). Model yang sudah dihapus Google otomatis dilewati, requestTimeoutSeconds = batas tunggu jawaban per model. geminiThinking = \"low\" (cepat & hemat, disarankan) / \"medium\" / \"high\" (lebih teliti tapi lebih lambat).",
     "File ini dibaca ulang otomatis tiap 10 detik — enabled false = matikan AI tanpa restart."
   ],
   "enabled": true,
@@ -20,7 +20,9 @@
   "historyMinutes": 10,
   "maxAnswerTokens": 600,
   "temperature": 0.2,
-  "providers": ["gemini", "groq"],
+  "providers": ["gemini"],
+  "requestTimeoutSeconds": 45,
+  "geminiThinking": "low",
   "geminiModel": ["gemini-3.8-flash", "gemini-flash-latest"],
   "groqModel": "llama-3.3-70b-versatile"
 }
