@@ -252,6 +252,7 @@ function systemPrompt(cfg, guild, knowledge) {
     '7. Jangan menjanjikan diskon, refund, kompensasi, atau pengecualian — itu wewenang admin. Arahkan ke ticket bantuan.',
     '8. Pertanyaan di luar topik toko & server: tolak singkat dengan sopan lalu tawarkan bantuan seputar Noname Store.',
     '9. Jawaban ringkas & rapi untuk Discord (maks ±120 kata, boleh **tebal** dan daftar poin). Sebut channel dengan format <#id> dari DATA TOKO. Jangan menulis @everyone/@here.',
+    '10. Jika pesan member BUKAN pertanyaan/permintaan bantuan (sapaan, basa-basi, ucapan terima kasih, pujian, candaan, obrolan biasa), awali jawabanmu dengan tag [OBROLAN] lalu balas singkat & ramah (1–2 kalimat), boleh tawarkan bantuan. Untuk pertanyaan/permintaan bantuan, JANGAN pakai tag itu.',
     '',
     knowledge,
   ].join('\n');
@@ -462,7 +463,9 @@ async function onMessage(msg, client) {
     const premium = PREMIUM_HINT.test(question) || hist.some((h) => PREMIUM_HINT.test(h.q));
     const system = systemPrompt(cfg, msg.guild, buildKnowledge(msg.guild, premium));
     const res = await ask(cfg, system, hist, `[Penanya: ${msg.member?.displayName || msg.author.username}]\n${question}`);
-    const answer = sanitize(res.text, msg.guild);
+    // [OBROLAN] = bukan pertanyaan → balasan polos tanpa footer & tombol.
+    const casual = /^\s*\[OBROLAN\]/i.test(res.text);
+    const answer = sanitize(String(res.text).replace(/\[OBROLAN\]\s*/gi, ''), msg.guild);
     history.set(key, [...hist, { q: question, a: answer, at: Date.now() }].slice(-cfg.historyMessages));
     data.users[msg.author.id] = (data.users[msg.author.id] || 0) + 1;
     data.total += 1;
@@ -470,7 +473,8 @@ async function onMessage(msg, client) {
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     answers.set(id, { q: question, a: answer, userId: msg.author.id, channelId: msg.channelId, at: Date.now() });
     if (answers.size > 500) answers.delete(answers.keys().next().value);
-    await msg.reply(answerCard(cfg, msg.guild, answer, id)).catch((e) => console.warn('[ai-cs] kirim jawaban:', e.message));
+    const payload = casual ? { content: answer, allowedMentions: { parse: [], repliedUser: true } } : answerCard(cfg, msg.guild, answer, id);
+    await msg.reply(payload).catch((e) => console.warn('[ai-cs] kirim jawaban:', e.message));
   } catch (e) {
     console.warn('[ai-cs] gagal:', e.message);
     await msg
