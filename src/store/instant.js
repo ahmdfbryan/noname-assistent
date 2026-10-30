@@ -28,7 +28,7 @@ const V = require('./views');
 const SP = require('./spender');
 
 /**
- * ⚡ PREMIUM APP — produk digital otomatis dari API Reseller Waroengkuy.
+ * ⚡ PREMIUM APP — produk digital otomatis dari API Reseller Waroeng.
  * Produk, stock & harga diambil langsung dari API; pembayaran QRIS dicek otomatis;
  * akun dikirim otomatis ke ticket + DM pembeli. Masalah (stok habis, saldo kurang, API error)
  * dilaporkan ke channel alert admin.
@@ -57,7 +57,7 @@ const brand = (cfg) => parseInt(String(cfg?.colors?.brand || '#3498DB').replace(
 // ═════════════════════════════ Pengaturan produk ═════════════════════════════
 const instantProduct = (cfg, id) => (cfg?.products || []).find((p) => p.type === 'instant' && (!id || p.id === id)) || null;
 /** deposit (default) = pembeli bayar QRIS isi saldo seharga harga jual → bot beli pakai saldo (margin masuk saldo).
- *  qris = QRIS order langsung dari Waroengkuy (harga = harga reseller, tanpa margin).
+ *  qris = QRIS order langsung dari Waroeng (harga = harga reseller, tanpa margin).
  *  manual = transfer ke rekening toko + admin klik Dana Masuk → akun dikirim otomatis pakai saldo. */
 const payMode = (p) => (['deposit', 'qris', 'manual'].includes(p?.payment?.mode) ? p.payment.mode : 'deposit');
 const minTotal = (p) => (payMode(p) === 'deposit' ? 10000 : payMode(p) === 'qris' ? 1000 : Number(p?.payment?.minTotal) || 0);
@@ -74,7 +74,7 @@ function sellPrice(p, item) {
   const step = Math.max(1, Number(pr.roundTo ?? 500));
   const minProfit = Math.max(0, Number(pr.minProfit ?? 500));
   let price = Math.ceil((cost * (1 + (Number(pr.percent ?? 10) || 0) / 100) + (Number(pr.flat) || 0)) / step) * step;
-  // Tidak lebih mahal dari harga toko resmi Waroengkuy (selama masih untung minimal minProfit).
+  // Tidak lebih mahal dari harga toko resmi Waroeng (selama masih untung minimal minProfit).
   if (pr.capAtNormalPrice !== false && Number(item.normal_price) > cost) price = Math.min(price, Math.max(Number(item.normal_price), cost + minProfit));
   return Math.max(price, cost + minProfit);
 }
@@ -359,7 +359,7 @@ function buildPanel(guild, cfg) {
 
   return card(cfg, {
     thumb: pt.thumbnail || p.thumbnail || guild.iconURL({ extension: 'png', size: 256 }),
-    header: `# ${fill(pt.title || '👑 Premium App | {server}', name)}\n-# ${fill(pt.subtitle || 'Auto Delivery 24 Jam • {server}', name)}`,
+    header: `# ${fill(pt.title || '👑 Premium App', name)}\n-# ${fill(pt.subtitle || 'Auto Delivery 24 Jam • {server}', name)}`,
     image: pt.bannerImage || null,
     blocks: [
       fill(
@@ -1024,7 +1024,7 @@ async function checkTicket(t, { manual = false } = {}) {
         pay.paidAt = Date.parse(dep.paid_at) || Date.now();
         save();
         if (t.status !== 'open') {
-          await alert(await guildOf(t), t, { title: 'Dana Masuk Setelah Pesanan Dibatalkan', text: `Pembeli membayar **${rupiah(pay.amount)}** setelah pesanan dibatalkan / kedaluwarsa. Saldo Waroengkuy sudah bertambah — **kembalikan dana ke pembeli secara manual** atau kirim pesanan manual.` });
+          await alert(await guildOf(t), t, { title: 'Dana Masuk Setelah Pesanan Dibatalkan', text: `Pembeli membayar **${rupiah(pay.amount)}** setelah pesanan dibatalkan / kedaluwarsa. Saldo Waroeng sudah bertambah — **kembalikan dana ke pembeli secara manual** atau kirim pesanan manual.` });
           return '⚠️ Pesanan sudah dibatalkan.';
         }
         await onPaid(t);
@@ -1062,7 +1062,7 @@ async function checkTicket(t, { manual = false } = {}) {
       markPaymentPaid(t);
       save();
       if (t.status !== 'open') {
-        await alert(await guildOf(t), t, { title: 'Dibayar Setelah Dibatalkan', text: `Order QRIS \`${o.ref || o.id}\` dibayar setelah ticket ditutup. Akun ada di riwayat Waroengkuy — kirim manual ke <@${t.userId}>.` });
+        await alert(await guildOf(t), t, { title: 'Dibayar Setelah Dibatalkan', text: `Order QRIS \`${o.ref || o.id}\` dibayar setelah ticket ditutup. Akun ada di riwayat Waroeng — kirim manual ke <@${t.userId}>.` });
         return '⚠️ Pesanan sudah ditutup.';
       }
       ctx.logOrder(await guildOf(t), t, '💰 Pembayaran QRIS diterima otomatis');
@@ -1083,7 +1083,7 @@ async function checkTicket(t, { manual = false } = {}) {
     return null;
   } catch (err) {
     if (err.code === 'unauthorized' || err.code === 'no_api_key' || err.code === 'ip_not_allowed') {
-      await alertOnce(t, `auth:${err.code}`, { title: 'API Waroengkuy Ditolak', err });
+      await alertOnce(t, `auth:${err.code}`, { title: 'API Waroeng Ditolak', err });
     } else if (!W.isTemporary(err)) {
       console.warn(`[instan] cek ${t.id}:`, err.code, err.message);
     }
@@ -1115,7 +1115,7 @@ async function onPaid(t) {
   }
 }
 
-/** Beli ke Waroengkuy pakai saldo (ref_id tetap sama → aman diulang, saldo tidak terpotong dua kali). */
+/** Beli ke Waroeng pakai saldo (ref_id tetap sama → aman diulang, saldo tidak terpotong dua kali). */
 async function fulfill(t) {
   const i = t.ins;
   if (t.status !== 'open' || i.stage === 'delivered') return;
@@ -1152,7 +1152,7 @@ async function fulfill(t) {
   await handleOrderState(t, r.order);
 }
 
-/** Tindak lanjut status order dari Waroengkuy. */
+/** Tindak lanjut status order dari Waroeng. */
 async function handleOrderState(t, o) {
   if (!o) return;
   const i = t.ins;
@@ -1175,7 +1175,7 @@ async function handleOrderState(t, o) {
       i.stage = 'need_help';
       save();
       await refreshTicket(t);
-      return alert(guild, t, { title: 'Pesanan Manual Butuh Data', text: `Pesanan pusat menunggu data undangan (claim code \`${o.claim_code || '-'}\`). Minta data ke pembeli lalu kirim lewat panel Waroengkuy.` });
+      return alert(guild, t, { title: 'Pesanan Manual Butuh Data', text: `Pesanan pusat menunggu data undangan (claim code \`${o.claim_code || '-'}\`). Minta data ke pembeli lalu kirim lewat panel Waroeng.` });
     }
   }
   if (o.status === 'refunded') {
@@ -1183,7 +1183,7 @@ async function handleOrderState(t, o) {
     save();
     await refreshTicket(t);
     ctx.logOrder(guild, t, '🛠️ Pesanan ditolak pusat — dibantu admin');
-    return alert(guild, t, { title: 'Pesanan Ditolak Pusat (Dana Kembali ke Saldo)', text: `Alasan pusat: ${clip(o.note || '-', 300)}\nModal sudah kembali ke saldo Waroengkuy. **Kembalikan dana pembeli** (${rupiah(t.payment?.amount || t.price)}) lalu tutup ticket sebagai Refund.` });
+    return alert(guild, t, { title: 'Pesanan Ditolak Pusat (Dana Kembali ke Saldo)', text: `Alasan pusat: ${clip(o.note || '-', 300)}\nModal sudah kembali ke saldo Waroeng. **Kembalikan dana pembeli** (${rupiah(t.payment?.amount || t.price)}) lalu tutup ticket sebagai Refund.` });
   }
   if (['processing', 'need_data'].includes(o.status) || o.status === 'pending') {
     if (i.stage !== 'processing') {
@@ -1292,12 +1292,12 @@ async function cancelTicket(t, note, logText) {
 
 // ═════════════════════════════ Channel alert admin (system error) ═════════════════════════════
 const ERROR_HINT = {
-  insufficient_balance: '💸 **Saldo Waroengkuy kurang.** Isi saldo lalu klik **🔁 Kirim Ulang Otomatis**.',
+  insufficient_balance: '💸 **Saldo Waroeng kurang.** Isi saldo lalu klik **🔁 Kirim Ulang Otomatis**.',
   out_of_stock: '📦 **Stok di pusat habis** saat pesanan dibuat. Tunggu restock lalu kirim ulang, atau refund pembeli.',
   price_changed: '💱 **Harga pusat naik** di atas harga jual. Naikkan harga / kirim ulang setelah harga turun, atau refund pembeli.',
   unauthorized: '🔑 **API key ditolak.** Cek `WRK_KEY` di `.env` (key dibuat ulang = key lama mati), lalu restart bot.',
   no_api_key: '🔑 **API key belum diisi** di `.env` (`WRK_KEY=wrk_...`).',
-  ip_not_allowed: '🌐 **IP VPS tidak ada di whitelist** panel reseller Waroengkuy.',
+  ip_not_allowed: '🌐 **IP VPS tidak ada di whitelist** panel reseller Waroeng.',
   no_warranty_ack_required: '⚠️ Varian tanpa garansi butuh persetujuan.',
   too_many_pending: '⏳ QRIS menunggu bayar sudah penuh.',
   rate_limited: '⏳ Terlalu banyak permintaan ke API — otomatis dicoba lagi.',
@@ -1534,7 +1534,7 @@ async function adminStatus(guild) {
   const help = open.filter((t) => t.ins?.stage === 'need_help');
   const chId = alertChannelOf(cfg, p);
   return card(cfg, {
-    header: `## 👑 Status Premium App\n-# Waroengkuy Reseller API`,
+    header: `## 👑 Status Premium App\n-# Waroeng API`,
     blocks: [
       err
         ? `🔴 **API:** gagal — \`${err.code}\` ${clip(err.message, 200)}${ERROR_HINT[err.code] ? `\n${ERROR_HINT[err.code]}` : ''}`
