@@ -11,6 +11,7 @@
   "enabled": true,
   "botName": "Noname Assistent",
   "channelId": "1553664134758015058",
+  "rulesChannelId": "1565339364509229217",
   "answerMentionsAnywhere": true,
   "ignoreStaffInChannel": true,
   "cooldownSeconds": 3,
