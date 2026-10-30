@@ -1994,7 +1994,7 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
       row('Pembeli', `<@${t.userId}>`),
       row('Produk', `\`${t.productLabel}\``),
       row(k === 'gamepass' ? 'Robux Diterima' : 'Jumlah', `\`${num(t.amount)} Robux\``),
-      row('Akun Roblox', `\`@${t.roblox?.name}\``),
+      row('Akun Roblox', `\`@${maskName(t.roblox?.name)}\``), // disensor: Bu******an
       row('Harga', `\`${rupiah(t.price)}\``),
     ];
   }
@@ -2011,7 +2011,7 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
     color: color(cfg, 'brand', 0x3498db),
     header: `## 🧾 Testimoni #${String(no).padStart(4, '0')}`,
     lines,
-    thumb: buyer?.displayAvatarURL({ extension: 'png', size: 256 }) || t.roblox?.avatar || guild.iconURL({ extension: 'png', size: 256 }) || null,
+    thumb: buyer?.displayAvatarURL({ extension: 'png', size: 256 }) || guild.iconURL({ extension: 'png', size: 256 }) || null,
     after,
     image: t.proofUrl || null,
     footer: `🛒 ${storeName(cfg, guild)} • ${ts(at, 'f')}`,
