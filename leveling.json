@@ -5,7 +5,8 @@
     "xp.messageMin / messageMax = XP acak per pesan, cooldownSeconds = jeda dapat XP chat (anti spam).",
     "xp.voicePerMinute = XP per menit di voice (tidak deafen, bukan channel AFK; voiceMinMembers = minimal jumlah orang bukan bot di voice supaya dapat XP, 1 = sendirian pun dapat). Waktu voice tetap tercatat walau tidak dapat XP. voiceEnabled false = matikan XP voice.",
     "ignoredChannels = ID channel / kategori yang tidak memberi XP. ignoredRoles = role yang tidak mendapat XP.",
-    "titles = role reward per level (level, name = nama gelar di /rank & kartu level up, roleId = role yang diberikan otomatis). keepPreviousRoles false = member hanya memegang role level tertinggi (role lama dilepas), true = semua role yang sudah dicapai tetap dipasang. Bot butuh izin Manage Roles & role bot harus DI ATAS semua role level. Setelah mengubah titles, jalankan /level sinkron-role.",
+    "titles = role reward per level (level, name = nama gelar di /rank & kartu level up — emoji tidak tampil di gambar kartu, hanya di teks, roleId = role yang diberikan otomatis). keepPreviousRoles false = member hanya memegang role level tertinggi (role lama dilepas), true = semua role yang sudah dicapai tetap dipasang. Bot butuh izin Manage Roles & role bot harus DI ATAS semua role level. Setelah mengubah titles, jalankan /level sinkron-role.",
+    "levelUp.title / message: teks di atas gambar Level Up — {user} = mention, {name} = nama member, {level} = level baru, {server} = nama server. Gambar Level Up & Rank Card dibuat otomatis (font di assets/fonts).",
     "Rumus: XP ke level berikutnya = 5 × level² + 50 × level + 100 (Lv1 = 100 XP, Lv5 = 1.150 XP total, Lv10 = 4.675 XP total)."
   ],
   "channelId": "1529215816539701308",
@@ -36,8 +37,8 @@
     { "level": 100, "name": "🏆 Hall of Fame", "roleId": "1561435942714343424" }
   ],
   "levelUp": {
-    "title": "🎉 Level Up!",
-    "message": "Selamat {user}! Kamu naik ke **Level {level}** 🚀\nTerus aktif ngobrol & nongkrong di voice untuk naik level berikutnya!"
+    "title": "🎉 Level Up — Level {level}!",
+    "message": "Selamat {user}! Kamu resmi naik ke **Level {level}** ✨\nKonsistensimu di **{server}** terbayar — terus aktif ngobrol & nongkrong di voice untuk membuka gelar berikutnya! 🚀"
   },
   "leaderboard": {
     "title": "🏆 Top 10 Level | {server}",
