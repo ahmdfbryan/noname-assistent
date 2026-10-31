@@ -3,14 +3,70 @@ const path = require('path');
 
 const FILE = path.join(__dirname, '..', '..', 'store.json');
 
+/**
+ * Harga paket yang diubah lewat Store Control Center disimpan di data/price-overrides.json (tidak ikut GitHub),
+ * BUKAN di store.json → store.json tidak pernah diubah bot, jadi `git pull` di VPS tidak bentrok.
+ * Format: { "<productId>": { "<planId>": harga } }. Harga asli store.json tetap tersimpan di plan.basePrice.
+ */
+const OVERRIDE_FILE = path.join(__dirname, '..', '..', 'data', 'price-overrides.json');
+function readOverrides() {
+  try {
+    return JSON.parse(fs.readFileSync(OVERRIDE_FILE, 'utf8')) || {};
+  } catch {
+    return {};
+  }
+}
+function writeOverrides(data) {
+  fs.mkdirSync(path.dirname(OVERRIDE_FILE), { recursive: true });
+  fs.writeFileSync(`${OVERRIDE_FILE}.tmp`, `${JSON.stringify(data, null, 2)}\n`);
+  fs.renameSync(`${OVERRIDE_FILE}.tmp`, OVERRIDE_FILE);
+}
+/** Simpan harga paket dari Control Center. prices = { planId: harga }. Harga sama dengan store.json → override dihapus. */
+function setPlanPrices(productId, prices) {
+  const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+  const prod = (raw.products || []).find((x) => x.id === productId);
+  if (!prod) throw new Error('Produk tidak ditemukan di store.json');
+  const all = readOverrides();
+  const cur = { ...(all[productId] || {}) };
+  for (const pl of prod.plans || []) {
+    if (prices[pl.id] == null) continue;
+    if (Number(prices[pl.id]) === Number(pl.price)) delete cur[pl.id];
+    else cur[pl.id] = Number(prices[pl.id]);
+  }
+  if (Object.keys(cur).length) all[productId] = cur;
+  else delete all[productId];
+  writeOverrides(all);
+}
+/** Hapus semua harga paket dari Control Center untuk produk ini (kembali ke harga store.json). */
+function clearPlanPrices(productId) {
+  const all = readOverrides();
+  if (!all[productId]) return false;
+  delete all[productId];
+  writeOverrides(all);
+  return true;
+}
+const hasPlanOverride = (productId) => Boolean(Object.keys(readOverrides()[productId] || {}).length);
+
 /** Dibaca ulang tiap dipakai → edit store.json tidak perlu restart bot. */
 function loadConfig() {
+  let cfg;
   try {
-    return JSON.parse(fs.readFileSync(FILE, 'utf8'));
+    cfg = JSON.parse(fs.readFileSync(FILE, 'utf8'));
   } catch (err) {
     console.error('[store] store.json tidak bisa dibaca:', err.message);
     return null;
   }
+  const ov = readOverrides();
+  for (const prod of cfg.products || []) {
+    const o = ov[prod.id];
+    if (!o || !Array.isArray(prod.plans)) continue;
+    for (const pl of prod.plans) {
+      if (o[pl.id] == null || !Number.isFinite(Number(o[pl.id]))) continue;
+      pl.basePrice = pl.price;
+      pl.price = Number(o[pl.id]);
+    }
+  }
+  return cfg;
 }
 
 function color(cfg, key, fallback) {
@@ -74,4 +130,4 @@ function groupText(cfg, group, kind) {
   return cfg?.[kind] || {};
 }
 
-module.exports = { loadConfig, color, isId, rupiah, num, fill, ts, getProduct, GROUPS, groupOf, productsOf, channelOf, groupText };
+module.exports = { loadConfig, setPlanPrices, clearPlanPrices, hasPlanOverride, color, isId, rupiah, num, fill, ts, getProduct, GROUPS, groupOf, productsOf, channelOf, groupText };
