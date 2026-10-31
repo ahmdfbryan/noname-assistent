@@ -94,7 +94,9 @@ async function editTracked(key, build) {
   if (!cfg) return;
   const payload = build(channel.guild, cfg);
   try {
-    await channel.messages.edit(loc.messageId, payload);
+    // Panel dengan lampiran (banner Premium App) → pakai ulang lampiran yang sudah ada, tidak upload ulang.
+    if (payload.files?.length) await I.editPanelMessage(await channel.messages.fetch(loc.messageId), payload);
+    else await channel.messages.edit(loc.messageId, payload);
   } catch (err) {
     if (err.code === RESTJSONErrorCodes.UnknownMessage) {
       state[key] = null; // pesan dihapus manual → berhenti di-update
