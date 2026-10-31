@@ -303,7 +303,47 @@ async function onCategory(interaction, p) {
   setSession(interaction.user.id, { cat, page: view.page, pid: p.id });
   if (!fromPanel) return interaction.update(view.payload);
   await interaction.editReply(view.payload);
-  interaction.message.edit(buildPanel(interaction.guild, cfg)).catch(() => {});
+  editPanelMessage(interaction.message, buildPanel(interaction.guild, cfg)).catch(() => {});
+}
+
+// ═════════════════════════════ Banner panel ═════════════════════════════
+/**
+ * products[produk-instan].panel.bannerImage: link https ATAU path file di folder bot (contoh "assets/premium-app-banner.gif").
+ * File lokal dikirim sebagai lampiran sekali saja — saat panel di-update, lampiran lama dipakai ulang (tidak upload ulang).
+ */
+function bannerOf(src) {
+  const v = String(src || '').trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v)) return { url: v, files: [] };
+  const fs = require('fs');
+  const path = require('path');
+  const file = path.join(__dirname, '..', '..', v);
+  if (!fs.existsSync(file)) {
+    console.warn(`[instant] banner ${v} tidak ditemukan — panel tanpa banner.`);
+    return null;
+  }
+  const name = `premium-app-banner${path.extname(file).toLowerCase() || '.gif'}`;
+  return { url: `attachment://${name}`, files: [{ attachment: file, name }] };
+}
+
+/** Edit panel: kalau banner yang sama sudah terlampir di pesan → tidak upload ulang. Gagal → upload ulang penuh. */
+async function editPanelMessage(message, payload) {
+  const f = payload.files?.[0];
+  if (!f) return message.edit(payload);
+  let size = -1;
+  try {
+    size = require('fs').statSync(f.attachment).size;
+  } catch {}
+  const same = message.attachments?.find?.((a) => a.name === f.name && a.size === size);
+  if (same) {
+    const { files, ...rest } = payload;
+    try {
+      return await message.edit(rest);
+    } catch {
+      /* lanjut upload ulang */
+    }
+  }
+  return message.edit({ ...payload, attachments: [] });
 }
 
 // ═════════════════════════════ Panel publik (channel Premium App) ═════════════════════════════
@@ -357,10 +397,11 @@ function buildPanel(guild, cfg) {
   if (open && options.length) select.setPlaceholder('📂 Pilih kategori untuk mulai belanja...').addOptions(options);
   else select.setPlaceholder(open ? '⏳ Produk sedang dimuat...' : '🔴 Premium App sedang tutup').addOptions({ label: '-', value: '-' }).setDisabled(true);
 
-  return card(cfg, {
+  const banner = bannerOf(pt.bannerImage);
+  const payload = card(cfg, {
     thumb: pt.thumbnail || p.thumbnail || guild.iconURL({ extension: 'png', size: 256 }),
     header: `# ${fill(pt.title || '👑 Premium App', name)}\n-# ${fill(pt.subtitle || 'Auto Delivery 24 Jam • {server}', name)}`,
-    image: pt.bannerImage || null,
+    image: banner?.url || null,
     blocks: [
       fill(
         pt.description ||
@@ -391,6 +432,8 @@ function buildPanel(guild, cfg) {
       ),
     ],
   });
+  if (banner?.files.length) payload.files = banner.files;
+  return payload;
 }
 
 /** Tombol "Pesanan Saya" di panel. */
@@ -1559,6 +1602,7 @@ async function adminStatus(guild) {
 
 module.exports = {
   init,
+  editPanelMessage,
   start,
   handle,
   buildPanel,
