@@ -25,10 +25,10 @@
   "storeName": "Noname Store",
   "channels": {
     "panel": "1553667092711088160",
-    "testimoni": "1553667870221934654",
+    "testimoni": "",
     "leaderboard": "1559751984012329080",
-    "stock": "1553666054499344434",
-    "log": "1553667797383520347",
+    "stock": "100000000000001001",
+    "log": "100000000000001003",
     "howToOrder": "1553666097620848700",
     "catalog": "1553666501662351391",
     "instantPanel": "1565040089573101588",
@@ -129,7 +129,7 @@
       "id": "robux-visend",
       "type": "robux",
       "label": "Robux Visend",
-      "emoji": "💎",
+      "emoji": "<:robux:1566126953147273488>",
       "description": "Top up Robux via **Visend** — Robux dikirim langsung ke akun Roblox kamu melalui proses yang aman.\n\nKlik **Beli Sekarang** untuk memasukkan username Roblox dan memilih jumlah Robux. Bot akan membuatkan **ticket pribadi** untuk proses pembayaran.",
       "terms": {
         "button": "Syarat Pembelian",
@@ -160,7 +160,7 @@
           "**Username** Roblox (bukan display name)"
         ],
         "steps": [
-          "Buka channel **Store**, klik tombol **💎 Robux Visend**",
+          "Buka channel **Store**, klik tombol **<:robux:1566126953147273488> Robux Visend**",
           "Baca info & **📌 Syarat Pembelian**, lalu klik **🛒 Beli Sekarang**",
           "Masukkan **username Roblox**, lalu konfirmasi akunmu",
           "Pilih **jumlah Robux** (atau ✏️ Jumlah Lain)",
@@ -493,7 +493,7 @@
         "hideManual": false
       },
       "maxQty": 5,
-      "alertChannelId": "1565037054339850260",
+      "alertChannelId": "100000000000001000",
       "alertRoleId": "",
       "ticket": {
         "categoryName": "👑 TICKET PREMIUM APP",
