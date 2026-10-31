@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { ROBUX: RBX } = require('./emojis');
 const {
   MessageFlags,
   ContainerBuilder,
@@ -502,11 +503,11 @@ async function archiveStoreTicket(guild, t, source) {
 
   // ── Detail pesanan
   const det = ['### 🛒 Detail Pesanan', `**📦 Produk:** \`${product}\``];
-  if (kind === 'robux') det.push(`**💎 Jumlah:** \`${num(t.amount)} Robux\``, t.rate ? `**💱 Rate:** \`${rupiah(t.rate)} / Robux\`` : null);
+  if (kind === 'robux') det.push(`**${RBX} Jumlah:** \`${num(t.amount)} Robux\``, t.rate ? `**💱 Rate:** \`${rupiah(t.rate)} / Robux\`` : null);
   if (kind === 'gamepass') {
     det.push(
       `**🎟️ Gamepass:** [${t.gamepass?.name || t.gamepass?.id}](https://www.roblox.com/game-pass/${t.gamepass?.id}) • \`${t.gamepass?.id}\``,
-      `**💎 Harga Gamepass:** \`${num(t.before)} Robux\` • **Diterima:** \`${num(t.amount)} Robux\``,
+      `**${RBX} Harga Gamepass:** \`${num(t.before)} Robux\` • **Diterima:** \`${num(t.amount)} Robux\``,
       t.rate ? `**💱 Rate:** \`${rupiah(t.rate)} / Robux\`` : null,
     );
   }
@@ -523,7 +524,7 @@ async function archiveStoreTicket(guild, t, source) {
     det.push(
       `**🏷️ Varian:** \`${t.ins.variant || '-'}\` • **🔢 Jumlah:** \`${num(t.ins.qty)} akun\``,
       `**💱 Harga Jual:** \`${rupiah(t.ins.unitPrice)}\` • **🏭 Modal:** \`${rupiah(t.ins.unitCost)}\` / akun`,
-      `**⚡ Waroengkuy:** ref_id \`${t.ins.refId}\`${t.ins.order?.ref ? ` • No. \`${t.ins.order.ref}\`` : ''} • mode \`${t.ins.mode}\``,
+      `**⚡ Waroeng:** ref_id \`${t.ins.refId}\`${t.ins.order?.ref ? ` • No. \`${t.ins.order.ref}\`` : ''} • mode \`${t.ins.mode}\``,
       t.ins.deliveredAt ? `**📬 Akun Terkirim:** ${ts(t.ins.deliveredAt, 'f')}${t.ins.dmSent === false ? ' (DM gagal)' : ''}` : null,
     );
   }
@@ -609,7 +610,7 @@ async function archiveStoreTicket(guild, t, source) {
             ...(t.plan ? [['Paket', t.plan.label]] : []),
             ...(kind === 'canva' ? [['Email', t.email || '-']] : []),
             ...(kind === 'boost' ? [['Jumlah Boost', `${num(t.qty)} boost`], ['Server', t.server?.name || '-'], ['Invite', t.invite || '-']] : []),
-            ...(kind === 'instant' && t.ins ? [['Varian', t.ins.variant || '-'], ['Jumlah', `${num(t.ins.qty)} akun`], ['Modal', rupiah((t.ins.unitCost || 0) * (t.ins.qty || 1))], ['Waroengkuy', t.ins.order?.ref || t.ins.refId]] : []),
+            ...(kind === 'instant' && t.ins ? [['Varian', t.ins.variant || '-'], ['Jumlah', `${num(t.ins.qty)} akun`], ['Modal', rupiah((t.ins.unitCost || 0) * (t.ins.qty || 1))], ['Waroeng', t.ins.order?.ref || t.ins.refId]] : []),
             ...(kind === 'rekber'
               ? [['Objek', t.item || '-'], ['Nominal', rupiah(t.nominal)], ['Fee', rupiah(t.fee)], ['Diterima Penjual', rupiah(t.sellerGets)]]
               : []),
