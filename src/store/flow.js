@@ -18,6 +18,7 @@ const {
   Events,
 } = require('discord.js');
 const { loadConfig, isId, rupiah, num, getProduct, GROUPS, productsOf } = require('./config');
+const { CANVA } = require('../emojis');
 const { archiveStoreTicket } = require('../ticket-archive');
 const REP = require('./reputation');
 const { state, save, productState, productStatsOf, hasStock, stockOf, setStock, stockUnit, isProductOpen, kindOf, activeTicketOf, nextTicketId, planStockOf, setPlanStock } = require('./state');
@@ -1420,7 +1421,7 @@ async function onCanvaConfirm(interaction, yes) {
     return;
   }
   refreshPanel();
-  await closeIfSoldOut(guild, `🎨 **Slot ${product.label} sudah HABIS!** ${product.label} otomatis ditutup.`, product);
+  await closeIfSoldOut(guild, `${product.emoji || CANVA} **Slot ${product.label} sudah HABIS!** ${product.label} otomatis ditutup.`, product);
 }
 
 function canvaTicketFor(interaction, ticketId) {
