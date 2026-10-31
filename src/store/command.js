@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder } = require('discord.js');
 const { loadConfig, isId, rupiah, num, color, channelOf, GROUPS } = require('./config');
 const REP = require('./reputation');
-const { plain } = require('../emojis');
+const { plain, CANVA } = require('../emojis');
 const { state, save, productState, isProductOpen, hasStock, stockOf, setStock, stockUnit, planStockOf, setPlanStock } = require('./state');
 const V = require('./views');
 const SP = require('./spender');
@@ -16,22 +16,22 @@ const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 /** Pilihan produk untuk /store buka & tutup (dibaca dari store.json saat npm run deploy). */
 function productChoices() {
   const products = (loadConfig()?.products || []).filter((p) => p.type !== 'soon').slice(0, 24);
-  return [{ name: '🏪 Semua Produk', value: 'all' }, ...products.map((p) => ({ name: `${plain(p.emoji, '💎') || '•'} ${p.label}`.slice(0, 100), value: p.id }))];
+  return [{ name: '🏪 Semua Produk', value: 'all' }, ...products.map((p) => ({ name: `${plain(p.emoji) || '•'} ${p.label}`.slice(0, 100), value: p.id }))];
 }
 /** Pilihan produk yang punya harga per Robux (Robux Visend, Robux Gamepass, ...). */
 function rateChoices() {
   return (loadConfig()?.products || [])
     .filter((p) => p.type === 'robux' || p.type === 'gamepass')
     .slice(0, 25)
-    .map((p) => ({ name: `${plain(p.emoji, '💎') || '•'} ${p.label}`.slice(0, 100), value: p.id }));
+    .map((p) => ({ name: `${plain(p.emoji) || '•'} ${p.label}`.slice(0, 100), value: p.id }));
 }
 /** Pilihan produk yang memakai stock (Robux Visend, Canva Pro, ...). */
 function stockChoices() {
   const out = [];
   for (const p of (loadConfig()?.products || []).filter(hasStock)) {
     // Server Boost: stock diatur per paket (1 Bulan / 3 Bulan).
-    if (p.type === 'boost') for (const x of p.plans || []) out.push({ name: `${plain(p.emoji, '💎') || '•'} ${p.label} • ${x.label}`.slice(0, 100), value: `${p.id}:${x.id}` });
-    else out.push({ name: `${plain(p.emoji, '💎') || '•'} ${p.label}`.slice(0, 100), value: p.id });
+    if (p.type === 'boost') for (const x of p.plans || []) out.push({ name: `${plain(p.emoji) || '•'} ${p.label} • ${x.label}`.slice(0, 100), value: `${p.id}:${x.id}` });
+    else out.push({ name: `${plain(p.emoji) || '•'} ${p.label}`.slice(0, 100), value: p.id });
   }
   return out.slice(0, 25);
 }
@@ -344,7 +344,7 @@ const storeCommand = {
               t.kind === 'instant'
                 ? `\`${t.id}\` <#${t.channelId}> • ⚡ ${t.productLabel} ×${num(t.qty)} • <@${t.userId}>`
                 : t.kind === 'canva'
-                ? `\`${t.id}\` <#${t.channelId}> • 🎨 ${t.plan.label} • <@${t.userId}>`
+                ? `\`${t.id}\` <#${t.channelId}> • ${CANVA} ${t.plan.label} • <@${t.userId}>`
                 : t.kind === 'boost'
                 ? `\`${t.id}\` <#${t.channelId}> • 🚀 ${num(t.qty)} boost ${t.plan.label} • <@${t.userId}>`
                 : t.kind === 'gamepass'
