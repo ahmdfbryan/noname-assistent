@@ -25,6 +25,7 @@ const {
   MediaGalleryItemBuilder,
 } = require('discord.js');
 const UI = require('./ui');
+const { ROBUX } = require('./emojis');
 const giveaway = require('./giveaway');
 const { archiveNcsTicket } = require('./ticket-archive');
 
@@ -141,7 +142,7 @@ async function refreshPanel() {
 
 // ───────────────────────── Jenis hadiah (claim giveaway) ─────────────────────────
 const DEFAULT_REWARDS = [
-  { id: 'robux', label: 'Robux', emoji: '💎', description: 'Robux Roblox — dikirim ke akun Roblox', keywords: ['robux', 'rbx', 'gamepass', 'roblox'] },
+  { id: 'robux', label: 'Robux', emoji: ROBUX, description: 'Robux Roblox — dikirim ke akun Roblox', keywords: ['robux', 'rbx', 'gamepass', 'roblox'] },
   { id: 'ewallet', label: 'E-Wallet', emoji: '📱', description: 'DANA, OVO, GoPay, ShopeePay, dll.', keywords: ['dana', 'ovo', 'gopay', 'shopee', 'e-wallet', 'ewallet', 'linkaja', 'saldo'] },
   { id: 'cash', label: 'Uang Tunai (Transfer Bank)', emoji: '💵', description: 'Transfer ke rekening bank', keywords: ['rp', 'uang', 'cash', 'tunai', 'transfer', 'bank', 'rupiah'] },
   { id: 'pulsa', label: 'Pulsa / Kuota', emoji: '📶', description: 'Pulsa atau paket data ke nomor HP', keywords: ['pulsa', 'kuota', 'paket data'] },
@@ -443,7 +444,7 @@ function buildTicketMessage(guild, cfg, t) {
           '### 🛡️ Checklist Staff',
           `${t.warranty === 'active' ? '✅' : '▫️'} Cek status garansi (${{ active: 'aktif', expired: 'habis', none: 'tanpa garansi', pending: 'pesanan belum selesai', unknown: 'sesuai S&K' }[t.warranty] || 'cek manual'})`,
           `${t.claimedBy ? '✅' : '▫️'} Minta screenshot kendala & cek akun`,
-          '▫️ Klaim ke pusat (Waroengkuy) / kirim akun pengganti',
+          '▫️ Klaim ke pusat (Waroeng) / kirim akun pengganti',
           '▫️ Pastikan akun sudah normal, lalu tutup ticket',
         ].join('\n')
       : null;
