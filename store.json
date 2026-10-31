@@ -536,7 +536,8 @@
         "image": ""
       },
       "panel": {
-        "title": "👑 Premium App"
+        "title": "👑 Premium App",
+        "bannerImage": "assets/premium-app-banner.gif"
       },
       "forum": {
         "channelId": "1565222699830218863",
