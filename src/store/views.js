@@ -19,6 +19,7 @@ const UI = require('../ui');
 const { ROBUX: RBX, CANVA } = require('../emojis');
 const { color, rupiah, num, fill, ts, loadConfig, GROUPS, groupOf, productsOf, groupText } = require('./config');
 const SP = require('./spender');
+const { bannerOf } = require('./banner');
 const { state, productState, productStatsOf, hasStock, stockOf, stockUnit, isProductOpen, kindOf, planStockOf } = require('./state');
 
 const STATUS_LABEL = {
@@ -2328,7 +2329,7 @@ function buildBoostExpiry(guild, cfg, t, who) {
 }
 
 // ══════════════════════ Panel & info produk (Components V2) ══════════════════════
-function pcard({ accent, header, thumb, thumbOverride, image, images = [], blocks = [], footer, rows = [] }) {
+function pcard({ accent, header, thumb, thumbOverride, image, images = [], blocks = [], bottomImage, footer, rows = [] }) {
   if (thumbOverride) thumb = thumbOverride;
   const box = UI.accent(new ContainerBuilder(), accent);
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(v2Text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
@@ -2339,6 +2340,8 @@ function pcard({ accent, header, thumb, thumbOverride, image, images = [], block
     box.addSeparatorComponents(v2Line());
     box.addTextDisplayComponents(v2Text(b));
   }
+  // Gambar di bawah isi (banner panel store, tepat di atas footer).
+  if (bottomImage) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(bottomImage)));
   if (footer) {
     box.addSeparatorComponents(v2Line());
     box.addTextDisplayComponents(v2Text(`-# ${footer}`));
@@ -2388,15 +2391,20 @@ function buildPanelV2(guild, cfg, group = 'main') {
   const stats = digital
     ? [`🧾 **Total Transaksi:** \`${num(orders)} transaksi\``, ratingLine()] // total order semua produk di panel Produk Digital
     : [`🧾 **Total Transaksi:** \`${num((s.transactions || 0) + (s.rekber || 0))} transaksi\``, ratingLine()];
-  return pcard({
+  // Banner bawah: store.json → panel.bottomBanner (Produk Digital: digitalPanel.bottomBanner, kosong = ikut panel utama).
+  const bottom = bannerOf(p.bottomBanner || (digital ? cfg.panel?.bottomBanner : null), digital ? 'digital-banner' : 'store-banner');
+  const payload = pcard({
     accent: color(cfg, 'brand', 0x3498db),
     thumb: icon256(guild),
     header: `# ${fill(p.title || '🛒 {server}', name)}\n-# ${fill(p.subtitle || 'Official Store • {server}', name)}`,
     image: p.bannerImage || null,
     blocks: [fill(p.description, name) || null, stats.join('\n')],
+    bottomImage: bottom?.url || null,
     footer: `${name.name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
     rows: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [],
   });
+  if (bottom?.files.length) payload.files = bottom.files;
+  return payload;
 }
 
 /** Info Robux Visend (V2, hanya terlihat pembeli). */
