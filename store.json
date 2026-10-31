@@ -66,7 +66,8 @@
   "panel": {
     "title": "🛒 Noname Store",
     "description": "Ingin melakukan pembelian produk dari **{server}**?\n\nPilih tombol di bawah sesuai kebutuhanmu untuk membuka tiket pemesanan. Tim admin akan membantu proses selanjutnya. Pastikan kamu memilih kategori yang tepat agar pesanan dapat ditangani dengan lancar!",
-    "bannerImage": ""
+    "bannerImage": "",
+    "bottomBanner": "assets/store-banner.gif"
   },
   "howToOrder": {
     "title": "📖 How to Order | {server}",
