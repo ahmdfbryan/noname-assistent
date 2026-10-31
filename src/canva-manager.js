@@ -23,6 +23,7 @@ const {
   AttachmentBuilder,
 } = require('discord.js');
 const UI = require('./ui');
+const { CANVA } = require('./emojis');
 
 /**
  * Canva Manager — daftar pelanggan Canva Pro (dari WhatsApp / luar Discord + order ticket Discord)
@@ -216,7 +217,7 @@ function buildDashboard(guild) {
   const slice = list.slice(view.page * PER_PAGE, view.page * PER_PAGE + PER_PAGE);
 
   const box = UI.accent(new ContainerBuilder(), 0x3498db);
-  const header = `# 🎨 Canva Manager\n-# Noname Store • Pelanggan Canva Pro\nSemua pelanggan Canva Pro — dari **WhatsApp / luar Discord** & **order Discord** — di satu tempat.`;
+  const header = `# ${CANVA} Canva Manager\n-# Noname Store • Pelanggan Canva Pro\nSemua pelanggan Canva Pro — dari **WhatsApp / luar Discord** & **order Discord** — di satu tempat.`;
   const icon = guild?.iconURL?.({ extension: 'png', size: 256 });
   if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
   else box.addTextDisplayComponents(text(header));
