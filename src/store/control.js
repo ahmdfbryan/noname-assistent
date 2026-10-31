@@ -29,7 +29,7 @@ const T = require('./control-tools');
 /**
  * 🎛️ Store Control Center — panel admin (tanpa command) untuk mengatur seluruh Noname Store:
  * buka / tutup produk sekali klik (otomatis diumumkan ke channel stock), atur stock, harga / rate,
- * harga paket (Canva Pro, Server Boost). Premium App hanya buka / tutup (harga & stock dari Waroengkuy).
+ * harga paket (Canva Pro, Server Boost). Premium App hanya buka / tutup (harga & stock dari Waroeng).
  * Channel: store.json → channels.controlPanel. Panel dikirim otomatis saat bot menyala & ter-update otomatis.
  */
 
@@ -68,7 +68,7 @@ function priceText(cfg, p) {
   }
   if (p.type === 'instant') {
     const s = require('./instant').summaryOf(p);
-    return s.min ? `Mulai \`${rupiah(s.min)}\` • diatur Waroengkuy` : '`Diatur Waroengkuy`';
+    return s.min ? `Mulai \`${rupiah(s.min)}\` • diatur Waroeng` : '`Diatur Waroeng`';
   }
   return '`-`';
 }
@@ -94,7 +94,7 @@ const statusWord = (p) => {
   return ps.autoClosed ? '`🔴 TUTUP (stock habis)`' : '`🔴 TUTUP`';
 };
 
-// Saldo & status API Waroengkuy (panel ini private admin) — cache 2 menit.
+// Saldo & status API Waroeng (panel ini private admin) — cache 2 menit.
 let wrk = { at: 0, ok: null, balance: null, code: null };
 async function refreshWrk() {
   if (!W.hasKey()) return (wrk = { at: Date.now(), ok: false, balance: null, code: 'no_api_key' });
@@ -137,8 +137,8 @@ function buildPanel(guild, cfg) {
     `🎫 **Ticket Berjalan:** \`${num(tickets.filter((t) => t.status === 'open').length)}\` • 💳 **Menunggu Verifikasi:** \`${num(pendingPay)}\``,
     inst
       ? wrk.ok
-        ? `👑 **Waroengkuy:** \`🟢 Terhubung\` • 💰 **Saldo:** \`${rupiah(wrk.balance)}\` • 🛠️ **Butuh Bantuan:** \`${num(tickets.filter((t) => t.kind === 'instant' && t.status === 'open' && t.ins?.stage === 'need_help').length)}\``
-        : `👑 **Waroengkuy:** \`🔴 ${{ no_api_key: 'API key belum diisi', unauthorized: 'API key ditolak', ip_not_allowed: 'IP VPS belum di-whitelist' }[wrk.code] || 'Tidak bisa dihubungi'}\``
+        ? `👑 **Waroeng:** \`🟢 Terhubung\` • 💰 **Saldo:** \`${rupiah(wrk.balance)}\` • 🛠️ **Butuh Bantuan:** \`${num(tickets.filter((t) => t.kind === 'instant' && t.status === 'open' && t.ins?.stage === 'need_help').length)}\``
+        : `👑 **Waroeng:** \`🔴 ${{ no_api_key: 'API key belum diisi', unauthorized: 'API key ditolak', ip_not_allowed: 'IP VPS belum di-whitelist' }[wrk.code] || 'Tidak bisa dihubungi'}\``
       : null,
   ]
     .filter(Boolean)
@@ -149,11 +149,23 @@ function buildPanel(guild, cfg) {
 
   // ── Bagian informasi
   const info = [[`## ${overall}`, ...T.panelLines(cfg)].join('\n'), `### 🛍️ Status Produk\n${productLines.join('\n')}`, summary, activity];
+  // Gabungan (hemat komponen, batas Discord 40 per pesan) — dipakai kalau versi lengkap tidak muat.
+  const compact = [`${info[0]}\n\n${info[1]}`, summary, activity];
 
   // ── Bagian tombol (tiap kelompok punya judul kecil supaya rapi)
-  const toggles = list.slice(0, 9).map((p) => btn(`store:cptog:${p.id}`, p.label, p.emoji || '🛒', isProductOpen(p) ? ButtonStyle.Success : ButtonStyle.Danger));
+  // Tiap produk punya 2 tombol: 🟢 Buka & 🔴 Tutup. Tombol yang sesuai status sekarang berwarna.
+  // Klik Buka saat produk sudah buka (atau Tutup saat sudah tutup) = kirim ulang pengumumannya.
+  const pair = (p) => {
+    const on = isProductOpen(p);
+    return [
+      btn(`store:cpopen:${p.id}`, `Buka ${p.label}`, '🟢', on ? ButtonStyle.Success : ButtonStyle.Secondary),
+      btn(`store:cpclose:${p.id}`, `Tutup ${p.label}`, '🔴', on ? ButtonStyle.Secondary : ButtonStyle.Danger),
+    ];
+  };
   const toggleRows = [];
-  for (let i = 0; i < toggles.length; i += 3) toggleRows.push(rowOf(...toggles.slice(i, i + 3)));
+  const shown = list.slice(0, 10);
+  const perRow = shown.length <= 6 ? 1 : 2; // 1 produk per baris (rapi); banyak produk → 2 per baris supaya muat
+  for (let i = 0; i < shown.length; i += perRow) toggleRows.push(rowOf(...shown.slice(i, i + perRow).flatMap(pair)));
   const select = rowOf(
     new StringSelectMenuBuilder()
       .setCustomId('store:cpsel')
@@ -184,16 +196,17 @@ function buildPanel(guild, cfg) {
   const footer = `-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`;
 
   /** Susun isi kotak. Discord membatasi 40 komponen per pesan → aktivitas disembunyikan kalau tidak muat. */
-  const build = (withActivity) => {
+  const build = (withActivity, small = false) => {
     const b = UI.accent(new ContainerBuilder(), brand(cfg));
     if (icon) b.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
     else b.addTextDisplayComponents(text(header));
-    for (const x of info.filter((v, i) => v && (withActivity || i !== 3))) {
+    const blocks = small ? compact.filter((v, i) => v && (withActivity || i !== 2)) : info.filter((v, i) => v && (withActivity || i !== 3));
+    for (const x of blocks) {
       b.addSeparatorComponents(line());
       b.addTextDisplayComponents(text(x));
     }
     b.addSeparatorComponents(line());
-    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# Sekali klik — 🟩 hijau = sedang buka, 🟥 merah = sedang tutup. Otomatis diumumkan ke channel stock.'));
+    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# Tombol berwarna = status sekarang. Klik 🟢 Buka / 🔴 Tutup → langsung diumumkan ke channel stock (klik lagi = kirim ulang pengumuman).'));
     for (const r of toggleRows) b.addActionRowComponents(r);
     b.addTextDisplayComponents(text('### ⚙️ Kelola Produk'));
     b.addActionRowComponents(select);
@@ -214,7 +227,8 @@ function buildPanel(guild, cfg) {
     return n;
   };
   let built = build(true);
-  if (count(built) > 40) built = build(false);
+  if (count(built) > 40) built = build(true, true);
+  if (count(built) > 40) built = build(false, true);
   return { components: [built], flags: V2F, allowedMentions: { parse: [] } };
 }
 
@@ -226,7 +240,7 @@ function productView(guild, cfg, p, notice) {
   const info = [`🏪 **Status:** ${statusWord(p)}`, `💱 **Harga:** ${priceText(cfg, p)}`];
   const st = stockText(p);
   if (st) info.push(`📦 **Stock:** ${st}`);
-  if (p.type === 'instant') info.push('ℹ️ Harga & stock **Premium App** diatur otomatis dari Waroengkuy — di sini hanya **buka / tutup**.');
+  if (p.type === 'instant') info.push('ℹ️ Harga & stock **Premium App** diatur otomatis dari Waroeng — di sini hanya **buka / tutup**.');
   if (p.type === 'rekber') info.push('ℹ️ Fee rekber diatur di `store.json` → `feeTiers`.');
   for (const b of [notice || null, info.join('\n')].filter(Boolean)) {
     box.addSeparatorComponents(line());
@@ -235,7 +249,8 @@ function productView(guild, cfg, p, notice) {
   const open = ps.open;
   const rows = [
     rowOf(
-      btn(`store:cptog:${p.id}`, open ? 'Tutup Produk' : 'Buka Produk', open ? '🔴' : '🟢', open ? ButtonStyle.Danger : ButtonStyle.Success),
+      btn(`store:cpopen:${p.id}`, open ? 'Umumkan Buka Lagi' : 'Buka Produk', '🟢', open ? ButtonStyle.Success : ButtonStyle.Secondary),
+      btn(`store:cpclose:${p.id}`, open ? 'Tutup Produk' : 'Umumkan Tutup Lagi', '🔴', open ? ButtonStyle.Secondary : ButtonStyle.Danger),
       btn(`store:cpreason:${p.id}`, open ? 'Tutup + Alasan' : 'Buka + Catatan', '📝'),
     ),
   ];
@@ -294,22 +309,26 @@ async function refresh() {
 
 // ───────────────────────── Aksi ─────────────────────────
 /** Buka / tutup produk (otomatis diumumkan ke channel stock). Return teks hasil. */
-async function setOpen(guild, products, open, reason, by) {
+async function setOpen(guild, products, open, reason, by, force = false) {
   const notes = [];
+  const again = new Set(); // produk yang statusnya sudah sama → pengumuman dikirim ulang (force)
   const changed = products.filter((p) => {
     if (open && hasStock(p) && stockOf(p) <= 0) {
       notes.push(`⚠️ **${p.label}** tidak bisa dibuka — stock masih **0**. Atur stock dulu.`);
       return false;
     }
-    if (productState(p.id).open === open) return false;
+    if (productState(p.id).open === open) {
+      if (!force) return false;
+      again.add(p.id);
+    }
     return true;
   });
   if (changed.length) {
     await ctx.setProductsOpen(guild, changed, open, { reason: reason ? `📌 ${reason}` : undefined });
-    logAction(`${open ? '🟢' : '🔴'} <@${by}> ${open ? 'membuka' : 'menutup'} ${changed.map((p) => `**${p.label}**`).join(', ')}`);
+    logAction(`${open ? '🟢' : '🔴'} <@${by}> ${changed.every((p) => again.has(p.id)) ? `mengumumkan ulang ${open ? 'BUKA' : 'TUTUP'}` : open ? 'membuka' : 'menutup'} ${changed.map((p) => `**${p.label}**`).join(', ')}`);
   }
   refresh();
-  const done = changed.map((p) => `${open ? '🟢' : '🔴'} **${p.label}** ${open ? 'DIBUKA' : 'DITUTUP'} & diumumkan`);
+  const done = changed.map((p) => (again.has(p.id) ? `📢 **${p.label}** memang sudah ${open ? 'buka' : 'tutup'} — pengumuman **${open ? 'BUKA' : 'TUTUP'}** dikirim ulang` : `${open ? '🟢' : '🔴'} **${p.label}** ${open ? 'DIBUKA' : 'DITUTUP'} & diumumkan`));
   return [...done, ...notes].join('\n') || `ℹ️ Tidak ada perubahan (produk sudah ${open ? 'buka' : 'tutup'}).`;
 }
 
@@ -422,7 +441,7 @@ async function handle(interaction, action, arg) {
     return true;
   }
   const tool = T.ACTIONS.includes(action);
-  if (!tool && !['cpsel', 'cptog', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
+  if (!tool && !['cpsel', 'cptog', 'cpopen', 'cpclose', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
   if (!isAdmin(interaction.member)) {
     await interaction.reply({ content: '⛔ Panel ini khusus **Administrator**.', flags: EPH }).catch(() => {});
     return true;
@@ -475,6 +494,13 @@ async function handle(interaction, action, arg) {
     if (inPanel) await interaction.deferReply({ flags: EPH });
     else await interaction.deferUpdate();
     const res = await setOpen(guild, [p], !productState(p.id).open, null, by);
+    await answer(res);
+    return true;
+  }
+  if (action === 'cpopen' || action === 'cpclose') {
+    if (inPanel) await interaction.deferReply({ flags: EPH });
+    else await interaction.deferUpdate();
+    const res = await setOpen(guild, [p], action === 'cpopen', null, by, true);
     await answer(res);
     return true;
   }
