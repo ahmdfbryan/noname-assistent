@@ -130,7 +130,7 @@ function summaryOf(p) {
 }
 
 // ═════════════════════════════ Kotak V2 (tanpa garis warna, mengikuti ui.json) ═════════════════════════════
-function card(cfg, { header, thumb, blocks = [], image, footer, rows = [], top }) {
+function card(cfg, { header, thumb, blocks = [], image, bottomImage, footer, rows = [], top }) {
   const box = UI.accent(new ContainerBuilder(), brand(cfg));
   if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
   else box.addTextDisplayComponents(text(header));
@@ -139,6 +139,8 @@ function card(cfg, { header, thumb, blocks = [], image, footer, rows = [], top }
     box.addSeparatorComponents(line());
     box.addTextDisplayComponents(text(b));
   }
+  // Gambar di bawah isi (misal banner panel Premium App, tepat di bawah langkah "Cara Order").
+  if (bottomImage) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(bottomImage)));
   if (footer) {
     box.addSeparatorComponents(line());
     box.addTextDisplayComponents(text(`-# ${footer}`));
@@ -401,7 +403,7 @@ function buildPanel(guild, cfg) {
   const payload = card(cfg, {
     thumb: pt.thumbnail || p.thumbnail || guild.iconURL({ extension: 'png', size: 256 }),
     header: `# ${fill(pt.title || '👑 Premium App', name)}\n-# ${fill(pt.subtitle || 'Auto Delivery 24 Jam • {server}', name)}`,
-    image: banner?.url || null,
+    bottomImage: banner?.url || null, // banner tepat di bawah "Cara Order"
     blocks: [
       fill(
         pt.description ||
