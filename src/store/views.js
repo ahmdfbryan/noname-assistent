@@ -2386,7 +2386,7 @@ function buildPanelV2(guild, cfg, group = 'main') {
   const digital = group === 'digital';
   const orders = products.reduce((a, x) => a + (productStatsOf(x.id).orders || 0), 0);
   const stats = digital
-    ? [`🧾 **Order Produk Digital:** \`${num(orders)} order\``, `🛒 **Produk Tersedia:** \`${products.filter((x) => x.type !== 'soon').length} produk\``, ratingLine()]
+    ? [`🧾 **Total Transaksi:** \`${num(orders)} transaksi\``, ratingLine()] // total order semua produk di panel Produk Digital
     : [`🧾 **Total Transaksi:** \`${num((s.transactions || 0) + (s.rekber || 0))} transaksi\``, ratingLine()];
   return pcard({
     accent: color(cfg, 'brand', 0x3498db),
