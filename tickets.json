@@ -26,6 +26,7 @@
     "description": "Pilih jenis ticket yang mau dibuka dari dropdown di bawah. Setelah mengisi form (kalau perlu), channel ticket bakal dibuat otomatis oleh system.",
     "placeholder": "📂 Pilih jenis ticket...",
     "bannerImage": "",
+    "bottomBanner": "assets/ticket-banner.gif",
     "notes": [
       "Buka ticket **sesuai kebutuhan** — satu masalah, satu ticket.",
       "Jelaskan kendalamu dengan **detail** agar cepat ditangani.",
