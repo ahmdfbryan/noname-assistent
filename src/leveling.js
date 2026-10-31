@@ -17,6 +17,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  AttachmentBuilder,
 } = require('discord.js');
 
 /**
@@ -26,6 +27,7 @@ const {
  * - /rank [member] • /level leaderboard • /level panel • /level set / tambah-xp / reset (admin).
  */
 const { fetchAllMembers } = require('./member-cache');
+const Cards = require('./level-cards');
 const FILE = path.join(__dirname, '..', 'leveling.json');
 const DATA = path.join(__dirname, '..', 'data', 'leveling.json');
 const V2 = MessageFlags.IsComponentsV2;
@@ -58,7 +60,7 @@ const DEFAULT = {
   stickyLeaderboard: true,
   keepPreviousRoles: false,
   titles: DEFAULT_TITLES,
-  levelUp: { title: '🎉 Level Up!', message: 'Selamat {user}! Kamu naik ke **Level {level}** 🚀\nTerus aktif ngobrol & nongkrong di voice untuk naik level berikutnya!' },
+  levelUp: { title: '🎉 Level Up — Level {level}!', message: 'Selamat {user}! Kamu resmi naik ke **Level {level}** ✨\nKonsistensimu di **{server}** terbayar — terus aktif ngobrol & nongkrong di voice untuk membuka gelar berikutnya! 🚀' },
   leaderboard: { title: '🏆 Top 10 Level | {server}', subtitle: '{server} • Level Leaderboard', bannerImage: '' },
 };
 function loadConfig() {
@@ -141,49 +143,92 @@ const ranking = () =>
 const rankOf = (id) => ranking().findIndex(([uid]) => uid === id) + 1;
 
 // ───────────────────────── Tampilan ─────────────────────────
-function rankCard(guild, cfg, user, member) {
+/** Perkiraan sisa aktivitas untuk naik level: "≈ 12 pesan atau 30 menit di voice". */
+function etaText(cfg, left) {
+  const avgMsgXp = (Number(cfg.xp.messageMin) + Number(cfg.xp.messageMax)) / 2 || 20;
+  const msgs = Math.max(1, Math.ceil(left / avgMsgXp));
+  const mins = Math.max(1, Math.ceil(left / (Number(cfg.xp.voicePerMinute) || 10)));
+  return `≈ \`${num(msgs)} pesan\`${cfg.xp.voiceEnabled ? ` atau \`${voiceText(mins)}\` di voice` : ''}`;
+}
+/** Server Tag member (fitur Discord) — tampil di kartu rank kalau dipasang. */
+function guildTag(user) {
+  const pg = user?.primaryGuild;
+  if (!pg?.identityEnabled || !pg.tag) return { tag: null, badge: null };
+  let badge = null;
+  try {
+    badge = user.guildTagBadgeURL?.({ extension: 'png', size: 64 }) || null;
+  } catch {}
+  return { tag: pg.tag, badge };
+}
+
+/** Kartu /rank: gambar Rank Card premium + ringkasan statistik. */
+async function rankCard(guild, cfg, user, member) {
   const u = data.users[user.id] || { xp: 0, messages: 0, voiceMin: 0 };
   const info = levelInfo(u.xp);
   const title = titleFor(cfg, info.level);
   const next = nextTitle(cfg, info.level);
   const rank = rankOf(user.id);
   const total = ranking().length;
-  const avgMsgXp = (Number(cfg.xp.messageMin) + Number(cfg.xp.messageMax)) / 2 || 20;
   const left = info.need - info.current;
+  const name = member?.displayName || user.globalName || user.username;
+  const { tag, badge } = guildTag(user);
+  const png = await Cards.renderRankCard({
+    avatarUrl: (member || user).displayAvatarURL({ extension: 'png', size: 256 }),
+    name,
+    username: user.username,
+    server: guild.name,
+    tag,
+    tagBadgeUrl: badge,
+    rank,
+    level: info.level,
+    current: info.current,
+    need: info.need,
+    pct: info.pct,
+    messages: u.messages,
+    voice: voiceShort(u.voiceMin),
+    tier: title.none ? 'Belum ada' : title.name,
+    status: member?.presence?.status || null,
+  }).catch((e) => {
+    console.warn('[level] gagal membuat rank card:', e.message);
+    return null;
+  });
+
   const box = boxFor(cfg);
-  const header = `# ${member?.displayName || user.globalName || user.username}\n-# @${user.username} • ${guild.name}\n**${title.name}** • Level **${info.level}**${rank ? ` • Peringkat **#${rank}**` : ''}`;
-  box.addSectionComponents(
-    new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL((member || user).displayAvatarURL({ extension: 'png', size: 256 }))),
-  );
+  const stats = [
+    `**🎖️ Gelar:** ${title.name}　•　**🏆 Peringkat:** \`${rank ? `#${num(rank)} dari ${num(total)}` : 'Belum ada'}\``,
+    `**💠 Total XP:** \`${num(u.xp)} XP\`　•　**⏳ Menuju Level ${info.level + 1}:** \`${num(left)} XP lagi\``,
+    `-# ${etaText(cfg, left)}`,
+    next ? `**🎯 Gelar Berikutnya:** ${next.name} — di **Level ${next.level}** (\`${num(next.level - info.level)} level lagi\`)` : '**👑 Gelar tertinggi sudah kamu raih — legenda sejati!**',
+    voiceLine(cfg, member),
+  ]
+    .filter(Boolean)
+    .join('\n');
+  if (png) {
+    box.addTextDisplayComponents(text(`## 🏅 Rank Card\n-# ${name} • ${guild.name}`));
+    box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://rank-card.png').setDescription(`Rank card ${name}`)));
+  } else {
+    // Cadangan tanpa gambar (canvas belum ter-install)
+    box.addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(text(`## 🏅 ${name}\n-# @${user.username} • ${guild.name}\n**Level ${info.level}** • ${bar(info.pct, 10)} \`${info.pct}%\`\n\`${num(info.current)} / ${num(info.need)} XP\` • 💬 \`${num(u.messages)}\`${cfg.xp.voiceEnabled ? ` • 🎙️ \`${voiceText(u.voiceMin)}\`` : ''}`))
+        .setThumbnailAccessory(new ThumbnailBuilder().setURL((member || user).displayAvatarURL({ extension: 'png', size: 256 }))),
+    );
+  }
   box.addSeparatorComponents(line());
-  box.addTextDisplayComponents(
-    text(
-      [
-        `### 📈 Progres ke Level ${info.level + 1}`,
-        `${bar(info.pct)} \`${info.pct}%\``,
-        `**✨ XP:** \`${num(info.current)} / ${num(info.need)}\` • **Kurang:** \`${num(left)} XP\``,
-        `-# ≈ ${num(Math.ceil(left / avgMsgXp))} pesan lagi${cfg.xp.voiceEnabled ? ` atau ${num(Math.ceil(left / (Number(cfg.xp.voicePerMinute) || 10)))} menit di voice` : ''}`,
-      ].join('\n'),
-    ),
-  );
+  box.addTextDisplayComponents(text(stats));
   box.addSeparatorComponents(line());
-  box.addTextDisplayComponents(
-    text(
-      [
-        '### 📊 Statistik',
-        `**🏅 Level:** \`${info.level}\` • **🏆 Peringkat:** \`${rank ? `#${num(rank)} dari ${num(total)}` : '-'}\``,
-        `**💠 Total XP:** \`${num(u.xp)}\``,
-        `**💬 Pesan:** \`${num(u.messages)}\`${cfg.xp.voiceEnabled ? ` • **🎙️ Voice:** \`${voiceText(u.voiceMin)}\`` : ''}`,
-        next ? `**🎯 Role Berikutnya:** ${next.name} di Level \`${next.level}\`` : '**🎯 Gelar:** `Gelar tertinggi tercapai! 👑`',
-        voiceLine(cfg, member),
-      ]
-        .filter(Boolean)
-        .join('\n'),
-    ),
-  );
-  box.addSeparatorComponents(line());
-  box.addTextDisplayComponents(text(`-# 💡 Dapatkan XP dengan chat${cfg.xp.voiceEnabled ? ' & nongkrong di voice' : ''} • ${guild.name}`));
-  return { components: [box], flags: V2, allowedMentions: { parse: [] } };
+  box.addTextDisplayComponents(text(`-# 💡 XP didapat dari chat${cfg.xp.voiceEnabled ? ' & nongkrong di voice' : ''} • ${guild.name}`));
+  return {
+    components: [box],
+    files: png ? [new AttachmentBuilder(png, { name: 'rank-card.png' })] : [],
+    flags: V2,
+    allowedMentions: { parse: [] },
+  };
+}
+/** "36 jam" / "45 menit" — versi singkat untuk kartu gambar. */
+function voiceShort(min) {
+  const m = Math.round(Number(min) || 0);
+  return m < 60 ? `${m} menit` : `${num(Math.floor(m / 60))} jam`;
 }
 function voiceLine(cfg, member) {
   if (!cfg.xp.voiceEnabled || !member?.voice?.channel) return null;
@@ -235,35 +280,65 @@ function buildLeaderboard(guild, cfg) {
   return { components: [box], flags: V2, allowedMentions: { parse: [] } };
 }
 
-function levelUpCard(guild, cfg, member, from, to, newRoles = []) {
+/** Notifikasi naik level: gambar "LEVEL UP!" premium + ringkasan hadiah & target berikutnya. */
+async function levelUpCard(guild, cfg, member, from, to, newRoles = []) {
   const u = data.users[member.id];
   const oldTitle = titleFor(cfg, from);
   const newTitle = titleFor(cfg, to);
+  const next = nextTitle(cfg, to);
   const info = levelInfo(u.xp);
+  const rank = rankOf(member.id);
+  const name = member.displayName || member.user.username;
+  const fill = (t) =>
+    String(t || '')
+      .replace(/\{user\}/g, `<@${member.id}>`)
+      .replace(/\{name\}/g, name)
+      .replace(/\{level\}/g, to)
+      .replace(/\{server\}/g, guild.name);
+  const png = await Cards.renderLevelUp({
+    avatarUrl: member.displayAvatarURL({ extension: 'png', size: 256 }),
+    name,
+    from,
+    to,
+    current: info.current,
+    need: info.need,
+  }).catch((e) => {
+    console.warn('[level] gagal membuat kartu level up:', e.message);
+    return null;
+  });
+
   const box = boxFor(cfg);
-  const msg = String(cfg.levelUp.message || '').replace(/\{user\}/g, `<@${member.id}>`).replace(/\{level\}/g, to).replace(/\{server\}/g, guild.name);
-  box.addSectionComponents(
-    new SectionBuilder()
-      .addTextDisplayComponents(text(`## ${cfg.levelUp.title}\n${msg}`))
-      .setThumbnailAccessory(new ThumbnailBuilder().setURL(member.displayAvatarURL({ extension: 'png', size: 256 }))),
-  );
+  const head = `## ${fill(cfg.levelUp.title)}\n${fill(cfg.levelUp.message)}`;
+  if (png) {
+    box.addTextDisplayComponents(text(head));
+    box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://level-up.png').setDescription(`${name} naik ke Level ${to}`)));
+  } else {
+    box.addSectionComponents(
+      new SectionBuilder().addTextDisplayComponents(text(head)).setThumbnailAccessory(new ThumbnailBuilder().setURL(member.displayAvatarURL({ extension: 'png', size: 256 }))),
+    );
+  }
   box.addSeparatorComponents(line());
   box.addTextDisplayComponents(
     text(
       [
-        `**🏅 Level:** \`${from}\` ➜ \`${to}\` • **🏆 Peringkat:** \`#${num(rankOf(member.id))}\``,
-        newTitle.name !== oldTitle.name ? `**🎖️ Gelar Baru:** ${newTitle.name}` : `**🎖️ Gelar:** ${newTitle.name}`,
-        newRoles.length ? `**🎁 Role Baru:** ${newRoles.map((id) => `<@&${id}>`).join(' ')}` : null,
-        nextTitle(cfg, to) ? `**🎯 Role Berikutnya:** ${nextTitle(cfg, to).name} di Level \`${nextTitle(cfg, to).level}\`` : null,
-        `**✨ Menuju Level ${to + 1}:** ${bar(info.pct, 10)} \`${num(info.current)} / ${num(info.need)} XP\``,
+        `**🏅 Level:** \`${from}\` ➜ \`${to}\`　•　**🏆 Peringkat:** \`#${num(rank)} dari ${num(ranking().length)}\``,
+        newTitle.name !== oldTitle.name ? `**🎖️ Gelar Baru Terbuka:** ${newTitle.name} 🎊` : `**🎖️ Gelar Saat Ini:** ${newTitle.name}`,
+        newRoles.length ? `**🎁 Hadiah Role:** ${newRoles.map((id) => `<@&${id}>`).join(' ')}` : null,
+        next ? `**🎯 Gelar Berikutnya:** ${next.name} — di **Level ${next.level}** (\`${num(next.level - to)} level lagi\`)` : '**👑 Semua gelar sudah kamu raih — kamu legenda server ini!**',
+        `**✨ Menuju Level ${to + 1}:** \`${num(info.current)} / ${num(info.need)} XP\`　${etaText(cfg, info.need - info.current)}`,
       ]
         .filter(Boolean)
         .join('\n'),
     ),
   );
   box.addSeparatorComponents(line());
-  box.addTextDisplayComponents(text(`-# 💡 Cek progresmu dengan \`/rank\` • ${guild.name}`));
-  return { components: [box], flags: V2, allowedMentions: { users: cfg.pingOnLevelUp ? [member.id] : [] } };
+  box.addTextDisplayComponents(text(`-# 💡 Pamerkan kartu rank-mu dengan \`/rank\` • ${guild.name}`));
+  return {
+    components: [box],
+    files: png ? [new AttachmentBuilder(png, { name: 'level-up.png' })] : [],
+    flags: V2,
+    allowedMentions: { users: cfg.pingOnLevelUp ? [member.id] : [] },
+  };
 }
 
 // ───────────────────────── Reward role ─────────────────────────
@@ -318,7 +393,7 @@ async function announceLevelUp(member, from, to, cfg = loadConfig()) {
   const newRoles = await syncRoles(member, cfg).catch(() => []);
   if (isId(cfg.channelId)) {
     const ch = await member.guild.channels.fetch(cfg.channelId).catch(() => null);
-    if (ch?.isTextBased()) await ch.send(levelUpCard(member.guild, cfg, member, from, to, newRoles)).catch((e) => console.warn('[level] gagal kirim level up:', e.message));
+    if (ch?.isTextBased()) await ch.send(await levelUpCard(member.guild, cfg, member, from, to, newRoles)).catch((e) => console.warn('[level] gagal kirim level up:', e.message));
   }
   scheduleLeaderboard(true);
 }
@@ -471,7 +546,8 @@ const rankCommand = {
     const user = interaction.options.getUser('member') || interaction.user;
     if (user.bot) return interaction.reply({ content: '🤖 Bot tidak punya level.', flags: EPH });
     const member = await interaction.guild.members.fetch(user.id).catch(() => null);
-    return interaction.reply(rankCard(interaction.guild, loadConfig(), user, member));
+    await interaction.deferReply(); // gambar rank card butuh ±1 detik
+    return interaction.editReply(await rankCard(interaction.guild, loadConfig(), user, member));
   },
 };
 
