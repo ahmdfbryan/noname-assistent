@@ -20,6 +20,7 @@ const {
   version: djsVersion,
 } = require('discord.js');
 const UI = require('./ui');
+const { CANVA } = require('./emojis');
 
 /**
  * System Operational (Components V2): 1 pesan dashboard status bot yang ter-update otomatis.
@@ -103,7 +104,7 @@ async function checkRoblox() {
   return roblox;
 }
 
-// Waroengkuy (API Premium App) — dicek maks tiap 5 menit. Saldo TIDAK ditampilkan (dashboard publik).
+// Waroeng (API Premium App) — dicek maks tiap 5 menit. Saldo TIDAK ditampilkan (dashboard publik).
 let wrk = { ok: null, ms: 0, at: 0, code: null };
 async function checkWaroengkuy() {
   if (Date.now() - wrk.at < 5 * 60 * 1000 && wrk.ok !== null) return wrk;
@@ -150,7 +151,7 @@ async function services(guild) {
     add('store', '🛒 Noname Store', 'down', 'Gagal dimuat');
   }
 
-  // 👑 Premium App (Waroengkuy)
+  // 👑 Premium App (Waroeng)
   try {
     const { state, isProductOpen } = require('./store/state');
     const { loadConfig: storeCfg } = require('./store/config');
@@ -158,7 +159,7 @@ async function services(guild) {
     const p = I.instantProduct(storeCfg());
     if (p) {
       const w = await checkWaroengkuy();
-      add('waroengkuy', '🔌 Waroengkuy API', w.ok ? (w.ms > 3000 ? 'warn' : 'ok') : 'down', w.ok ? `Respon ${num(w.ms)} ms` : WRK_NOTE[w.code] || 'Tidak bisa dihubungi');
+      add('waroengkuy', '🔌 Waroeng API', w.ok ? (w.ms > 3000 ? 'warn' : 'ok') : 'down', w.ok ? `Respon ${num(w.ms)} ms` : WRK_NOTE[w.code] || 'Tidak bisa dihubungi');
       const list = Object.values(state.tickets || {}).filter((t) => t.kind === 'instant' && t.status === 'open');
       const help = list.filter((t) => t.ins?.stage === 'need_help').length;
       const proc = list.filter((t) => t.ins?.stage !== 'waiting_payment').length;
@@ -223,7 +224,7 @@ async function services(guild) {
 
   // Canva Manager
   const cv = readJson('data/canva-manager.json', null);
-  add('canva', '🎨 Canva Manager', cv?.dashboard ? 'ok' : 'off', cv?.dashboard ? `${num(Object.keys(cv.entries || {}).length)} pelanggan manual + order Discord` : 'Dashboard belum dikirim');
+  add('canva', `${CANVA} Canva Manager`, cv?.dashboard ? 'ok' : 'off', cv?.dashboard ? `${num(Object.keys(cv.entries || {}).length)} pelanggan manual + order Discord` : 'Dashboard belum dikirim');
 
   return list;
 }
