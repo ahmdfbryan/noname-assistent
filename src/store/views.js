@@ -16,7 +16,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const UI = require('../ui');
-const { ROBUX: RBX } = require('../emojis');
+const { ROBUX: RBX, CANVA } = require('../emojis');
 const { color, rupiah, num, fill, ts, loadConfig, GROUPS, groupOf, productsOf, groupText } = require('./config');
 const SP = require('./spender');
 const { state, productState, productStatsOf, hasStock, stockOf, stockUnit, isProductOpen, kindOf, planStockOf } = require('./state');
@@ -1462,7 +1462,7 @@ function buildCanvaInfo(guild, cfg, product) {
   const avg = s.ratingCount ? (s.ratingSum / s.ratingCount).toFixed(1) : '-';
   const e = new EmbedBuilder()
     .setColor(color(cfg, 'brand', 0x3498db))
-    .setTitle(`${product.emoji || '🎨'} ${product.label}`)
+    .setTitle(`${product.emoji || CANVA} ${product.label}`)
     .setDescription(fill(product.description || '', name) || null)
     .setThumbnail(product.thumbnail || guild.iconURL({ extension: 'png', size: 256 }) || null);
   const table = planTable(product);
@@ -2463,7 +2463,7 @@ function buildCanvaInfoV2(guild, cfg, product) {
   return pcard({
     accent: color(cfg, 'brand', 0x3498db),
     thumb: product.thumbnail || icon256(guild),
-    header: `## ${product.emoji || '🎨'} ${product.label}\n${fill(product.description || '', name)}`,
+    header: `## ${product.emoji || CANVA} ${product.label}\n${fill(product.description || '', name)}`,
     blocks: [
       table ? `### 🗓️ Pilihan Paket\n${table}` : null,
       [`🎟️ **Sisa Slot:** \`${num(stockOf(product))} ${stockUnit(product)}\``, `🏪 **Status:** ${openBadge(open)}`, '📧 **Aktivasi:** `Undangan via email`'].join('\n'),
