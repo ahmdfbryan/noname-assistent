@@ -20,11 +20,16 @@ const {
   TextInputBuilder,
   TextInputStyle,
   UserSelectMenuBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
 } = require('discord.js');
 const UI = require('./ui');
 const { userInfoCommand, robloxCommand } = require('./profile-info');
 const { serverCheckCommand } = require('./server-check');
 const Tools = require('./tools-noname');
+const { bannerOf, editPanelMessage } = require('./store/banner');
+/** Banner panel (path file di folder bot atau link https). Kosongkan untuk tanpa banner. */
+const BANNER = 'assets/command-center-banner.gif';
 
 /**
  * Bot Command Center — panel sticky (Components V2) di channel bot command.
@@ -79,10 +84,15 @@ function buildPanel(guild, client) {
   box.addSectionComponents(item('🎮 Info Akun Roblox', 'Avatar, status, teman, grup & username lama.', 'bp:roblox', 'Cek Roblox', '🎮'));
   box.addSectionComponents(item('🔍 Cek Server Discord', 'Member, online, boost, fitur & info invite server lain.', 'bp:server', 'Cek Server', '🔍'));
   box.addSectionComponents(item('⚙️ Tools Noname', 'PDF ↔ Word, Office → PDF, gabung / pisah / kompres PDF, kompres & ubah format gambar, QR Code.', 'bp:tools', 'Buka Tools', '⚙️'));
+  // Banner tepat di bawah Tools Noname (di-upload sekali, dipakai ulang saat panel di-update).
+  const banner = bannerOf(BANNER, 'command-center-banner');
+  if (banner) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(banner.url)));
 
   box.addSeparatorComponents(line());
   box.addTextDisplayComponents(text(`-# 📬 Hasil pengecekan dikirim ke <#${RESULT_CHANNEL}>`));
-  return { components: [box], flags: V2, allowedMentions: { parse: [] } };
+  const payload = { components: [box], flags: V2, allowedMentions: { parse: [] } };
+  if (banner?.files.length) payload.files = banner.files;
+  return payload;
 }
 
 // ───────────────────────── Form (modal) ─────────────────────────
@@ -260,7 +270,7 @@ function registerBotPanel(c) {
     const ch = await c.channels.fetch(panel.channelId).catch(() => null);
     if (!ch) return;
     try {
-      await ch.messages.edit(panel.messageId, buildPanel(ch.guild, c));
+      await editPanelMessage(await ch.messages.fetch(panel.messageId), buildPanel(ch.guild, c));
     } catch (e) {
       if (e.code === 10008) {
         panel = null;
