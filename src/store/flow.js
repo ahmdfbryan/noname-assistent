@@ -28,6 +28,7 @@ const SP = require('./spender');
 const H = require('./howto');
 const C = require('./catalog');
 const I = require('./instant');
+const { editPanelMessage } = require('./banner');
 const F = require('./forum');
 const CP = require('./control');
 
@@ -95,7 +96,7 @@ async function editTracked(key, build) {
   const payload = build(channel.guild, cfg);
   try {
     // Panel dengan lampiran (banner Premium App) → pakai ulang lampiran yang sudah ada, tidak upload ulang.
-    if (payload.files?.length) await I.editPanelMessage(await channel.messages.fetch(loc.messageId), payload);
+    if (payload.files?.length) await editPanelMessage(await channel.messages.fetch(loc.messageId), payload);
     else await channel.messages.edit(loc.messageId, payload);
   } catch (err) {
     if (err.code === RESTJSONErrorCodes.UnknownMessage) {
