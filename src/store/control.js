@@ -1,5 +1,3 @@
-const fs = require('fs');
-const path = require('path');
 const {
   ActionRowBuilder,
   ButtonBuilder,
@@ -20,7 +18,7 @@ const {
   RESTJSONErrorCodes,
 } = require('discord.js');
 const UI = require('../ui');
-const { loadConfig, isId, rupiah, num, getProduct } = require('./config');
+const { loadConfig, isId, rupiah, num, getProduct, setPlanPrices, clearPlanPrices, hasPlanOverride } = require('./config');
 const { state, save, productState, hasStock, stockOf, setStock, stockUnit, planStockOf, setPlanStock, isProductOpen } = require('./state');
 const V = require('./views');
 const W = require('./waroengkuy');
@@ -33,7 +31,6 @@ const T = require('./control-tools');
  * Channel: store.json → channels.controlPanel. Panel dikirim otomatis saat bot menyala & ter-update otomatis.
  */
 
-const STORE_FILE = path.join(__dirname, '..', '..', 'store.json');
 const DEFAULT_CHANNEL = '1565263344250912868';
 const EPH = MessageFlags.Ephemeral;
 const V2F = MessageFlags.IsComponentsV2;
@@ -242,6 +239,8 @@ function productView(guild, cfg, p, notice) {
   if (st) info.push(`📦 **Stock:** ${st}`);
   if (p.type === 'instant') info.push('ℹ️ Harga & stock **Premium App** diatur otomatis dari Waroeng — di sini hanya **buka / tutup**.');
   if (p.type === 'rekber') info.push('ℹ️ Fee rekber diatur di `store.json` → `feeTiers`.');
+  const custom = customPrice(p);
+  if (custom) info.push(`-# 🔧 Harga diatur dari panel ini (asli di store.json: ${custom}). Klik ↩️ **Reset Harga** untuk kembali ke harga store.json.`);
   for (const b of [notice || null, info.join('\n')].filter(Boolean)) {
     box.addSeparatorComponents(line());
     box.addTextDisplayComponents(text(b));
@@ -259,6 +258,7 @@ function productView(guild, cfg, p, notice) {
   if (hasStock(p) && p.type !== 'boost') edit.push(btn(`store:cpadd:${p.id}`, 'Tambah Stock', '➕', ButtonStyle.Primary));
   if (p.type === 'robux' || p.type === 'gamepass') edit.push(btn(`store:cprate:${p.id}`, 'Ubah Rate', '💱', ButtonStyle.Primary));
   if (p.type === 'canva' || p.type === 'boost') edit.push(btn(`store:cpprice:${p.id}`, 'Ubah Harga Paket', '💱', ButtonStyle.Primary));
+  if (custom) edit.push(btn(`store:cpreset:${p.id}`, 'Reset Harga', '↩️'));
   if (edit.length) rows.push(rowOf(...edit));
   for (const r of rows) box.addActionRowComponents(r);
   return { components: [box], flags: V2F, allowedMentions: { parse: [] } };
@@ -356,14 +356,18 @@ async function announcePrice(guild, cfg, p, changes) {
   return true;
 }
 
-/** Simpan harga paket ke store.json (format file tetap rapi). */
-function savePlanPrices(productId, prices) {
-  const raw = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
-  const prod = (raw.products || []).find((x) => x.id === productId);
-  if (!prod) throw new Error('Produk tidak ditemukan di store.json');
-  for (const pl of prod.plans || []) if (prices[pl.id] != null) pl.price = prices[pl.id];
-  fs.writeFileSync(`${STORE_FILE}.tmp`, `${JSON.stringify(raw, null, 2)}\n`);
-  fs.renameSync(`${STORE_FILE}.tmp`, STORE_FILE);
+/** Simpan harga paket — ke data/price-overrides.json, store.json tidak diubah (aman untuk git pull). */
+const savePlanPrices = (productId, prices) => setPlanPrices(productId, prices);
+
+/** Harga produk sedang diatur dari panel (beda dari store.json)? Return teks harga asli, atau null. */
+function customPrice(p) {
+  if (p.type === 'robux' || p.type === 'gamepass') {
+    const r = Number(state.rates?.[p.id]);
+    return r && r !== Number(p.rate) ? `${rupiah(p.rate)} / Robux` : null;
+  }
+  if (!hasPlanOverride(p.id)) return null;
+  const changed = plansOf(p).filter((x) => x.basePrice != null && Number(x.basePrice) !== Number(x.price));
+  return changed.length ? changed.map((x) => `${x.label} ${rupiah(x.basePrice)}`).join(', ') : null;
 }
 
 // ───────────────────────── Form (modal) ─────────────────────────
@@ -441,7 +445,7 @@ async function handle(interaction, action, arg) {
     return true;
   }
   const tool = T.ACTIONS.includes(action);
-  if (!tool && !['cpsel', 'cptog', 'cpopen', 'cpclose', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
+  if (!tool && !['cpsel', 'cptog', 'cpopen', 'cpclose', 'cpreset', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
   if (!isAdmin(interaction.member)) {
     await interaction.reply({ content: '⛔ Panel ini khusus **Administrator**.', flags: EPH }).catch(() => {});
     return true;
@@ -502,6 +506,29 @@ async function handle(interaction, action, arg) {
     else await interaction.deferUpdate();
     const res = await setOpen(guild, [p], action === 'cpopen', null, by, true);
     await answer(res);
+    return true;
+  }
+  if (action === 'cpreset') {
+    if (inPanel) await interaction.deferReply({ flags: EPH });
+    else await interaction.deferUpdate();
+    const changes = [];
+    if (p.type === 'robux' || p.type === 'gamepass') {
+      const before = V.rateOf(cfg, p);
+      delete state.rates[p.id];
+      save();
+      if (before !== Number(p.rate)) changes.push({ label: 'Rate', before, after: Number(p.rate), suffix: ' / Robux' });
+    } else {
+      const before = new Map(plansOf(p).map((x) => [x.id, Number(x.price)]));
+      clearPlanPrices(p.id);
+      const fresh = getProduct(loadConfig(), p.id);
+      for (const x of plansOf(fresh)) if (before.get(x.id) !== Number(x.price)) changes.push({ label: x.label, before: before.get(x.id), after: Number(x.price), suffix: p.type === 'boost' ? ' / boost' : '' });
+    }
+    if (!changes.length) return void (await answer('ℹ️ Harga sudah sama dengan store.json.')) || true;
+    logAction(`↩️ <@${by}> reset harga **${p.label}** ke store.json`);
+    ctx.refreshPanel();
+    const announced = await announcePrice(guild, loadConfig(), getProduct(loadConfig(), p.id), changes);
+    await answer([`↩️ Harga **${p.label}** kembali ke store.json:`, ...changes.map((c) => `💱 **${c.label}**: ${rupiah(c.before)} → **${rupiah(c.after)}${c.suffix || ''}**`), announced ? '📢 Perubahan harga sudah **diumumkan** di channel stock.' : null].filter(Boolean).join('\n'));
+    refresh();
     return true;
   }
   if (action === 'cpreason') {
@@ -602,7 +629,7 @@ async function handle(interaction, action, arg) {
       try {
         savePlanPrices(p.id, prices);
       } catch (e) {
-        return void (await answer(`❌ Gagal menyimpan store.json: ${e.message}`)) || true;
+        return void (await answer(`❌ Gagal menyimpan harga: ${e.message}`)) || true;
       }
       logAction(`💱 <@${by}> harga paket **${p.label}** diubah`);
       ctx.refreshPanel();
