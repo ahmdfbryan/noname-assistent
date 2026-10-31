@@ -13,6 +13,7 @@ const {
   ButtonStyle,
 } = require('discord.js');
 const UI = require('../ui');
+const { ROBUX: RBX } = require('../emojis');
 const { color, rupiah, num, GROUPS, getProduct } = require('./config');
 const { state, kindOf } = require('./state');
 
@@ -139,7 +140,7 @@ function buildReputation(guild, cfg) {
         `**🧾 Transaksi Sukses:** \`${num(s.transactions)}\` • **📅 30 Hari:** \`${num(r.last30)}\``,
         `**✅ Tingkat Keberhasilan:** \`${r.success}%\` ${bar(r.success, 8)}`,
         `**👥 Pembeli Puas:** \`${num(buyers)} pembeli\` • **💬 Testimoni:** \`${num(s.testimonies || r.count)}\``,
-        `**💎 Robux Terkirim:** \`${num(s.robux)} Robux\``,
+        `**${RBX} Robux Terkirim:** \`${num(s.robux)} Robux\``,
         s.rekber ? `**🤝 Rekber Sukses:** \`${num(s.rekber)}\` • **🛡️ Dana Diamankan:** \`${rupiah(s.rekberVolume)}\`` : null,
         `**⚡ Rata-rata Proses:** \`${avgDuration(r.completed)}\``,
       ]
