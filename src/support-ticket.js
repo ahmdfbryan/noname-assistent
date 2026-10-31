@@ -26,6 +26,7 @@ const {
 } = require('discord.js');
 const UI = require('./ui');
 const { ROBUX } = require('./emojis');
+const { bannerOf, editPanelMessage } = require('./store/banner');
 const giveaway = require('./giveaway');
 const { archiveNcsTicket } = require('./ticket-archive');
 
@@ -114,6 +115,9 @@ function buildPanel(guild, cfg) {
     box.addSeparatorComponents(line()); // garis sebelum "Sebelum Membuka Ticket"
     box.addTextDisplayComponents(text(`### 📌 Sebelum Membuka Ticket\n${p.notes.map((x) => `▸ ${x}`).join('\n')}`));
   }
+  // Banner (tickets.json → panel.bottomBanner: path file di folder bot atau link https) — tepat di atas "Ticket Aktif".
+  const bottom = bannerOf(p.bottomBanner, 'ticket-banner');
+  if (bottom) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(bottom.url)));
   box.addSeparatorComponents(line());
   box.addTextDisplayComponents(text(`🟢 **Ticket Aktif:** \`${open} ticket\`　•　⏱️ **Respon:** \`Secepatnya\``));
 
@@ -129,7 +133,9 @@ function buildPanel(guild, cfg) {
       })),
     );
   box.addActionRowComponents(new ActionRowBuilder().addComponents(select));
-  return { components: [box], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
+  const payload = { components: [box], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
+  if (bottom?.files.length) payload.files = bottom.files;
+  return payload;
 }
 
 async function refreshPanel() {
@@ -137,7 +143,8 @@ async function refreshPanel() {
   if (!client || !loc) return;
   const ch = await client.channels.fetch(loc.channelId).catch(() => null);
   if (!ch?.guild) return;
-  await ch.messages.edit(loc.messageId, buildPanel(ch.guild, loadConfig())).catch(() => {});
+  const msg = await ch.messages.fetch(loc.messageId).catch(() => null);
+  if (msg) await editPanelMessage(msg, buildPanel(ch.guild, loadConfig())).catch(() => {});
 }
 
 // ───────────────────────── Jenis hadiah (claim giveaway) ─────────────────────────
@@ -783,7 +790,7 @@ async function handleInteraction(interaction) {
     if (action === 'open' && interaction.isStringSelectMenu()) {
       const type = typeOf(cfg, interaction.values[0]);
       // Reset pilihan dropdown supaya bisa dipilih lagi.
-      interaction.message?.edit(buildPanel(interaction.guild, cfg)).catch(() => {});
+      if (interaction.message) editPanelMessage(interaction.message, buildPanel(interaction.guild, cfg)).catch(() => {});
       if (!type || type.enabled === false || type.comingSoon) {
         return void (await interaction.reply({ content: '🔒 Layanan ini **segera hadir**. Nantikan ya! ✨', flags: EPH }));
       }
