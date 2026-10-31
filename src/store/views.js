@@ -16,6 +16,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const UI = require('../ui');
+const { ROBUX: RBX } = require('../emojis');
 const { color, rupiah, num, fill, ts, loadConfig, GROUPS, groupOf, productsOf, groupText } = require('./config');
 const SP = require('./spender');
 const { state, productState, productStatsOf, hasStock, stockOf, stockUnit, isProductOpen, kindOf, planStockOf } = require('./state');
@@ -90,15 +91,15 @@ function buildProductInfo(guild, cfg, product) {
   const avg = s.ratingCount ? (s.ratingSum / s.ratingCount).toFixed(1) : '-';
   const embed = new EmbedBuilder()
     .setColor(color(cfg, 'brand', 0x3498db))
-    .setTitle(`${product.emoji || '💎'} ${product.label}`)
+    .setTitle(`${product.emoji || RBX} ${product.label}`)
     .setDescription(fill(product.description || '', { name: storeName(cfg, guild) }) || null)
     .setThumbnail(guild.iconURL({ extension: 'png', size: 256 }) || null)
     .addFields(
-      { name: `💎 Harga ${product.label}`, value: `\`${rupiah(rateOf(cfg, product))} / Robux\``, inline: true },
+      { name: `${RBX} Harga ${product.label}`, value: `\`${rupiah(rateOf(cfg, product))} / Robux\``, inline: true },
       { name: '📦 Sisa Stock', value: `\`${num(state.stock)} Robux\``, inline: true },
       { name: '🏪 Status', value: open ? '`🟢 BUKA`' : '`🔴 TUTUP`', inline: true },
       { name: '🧾 Total Transaksi', value: `\`${num(s.transactions)} transaksi\``, inline: true },
-      { name: `💎 ${product.label} Terjual`, value: `\`${num(productStatsOf(product.id).robux)} Robux\``, inline: true },
+      { name: `${RBX} ${product.label} Terjual`, value: `\`${num(productStatsOf(product.id).robux)} Robux\``, inline: true },
       { name: '⭐ Rating Pembeli', value: `\`${avg} / 5 (${num(s.ratingCount)} ulasan)\``, inline: true },
     );
 
@@ -193,7 +194,7 @@ function buildAmountPicker(cfg, product, roblox) {
   const max = Math.min(Number(product.maxAmount) || 5000, state.stock);
   const embed = new EmbedBuilder()
     .setColor(color(cfg, 'brand', 0x3498db))
-    .setTitle(`${product.emoji || '💎'} Pilih Jumlah ${product.label}`)
+    .setTitle(`${product.emoji || RBX} Pilih Jumlah ${product.label}`)
     .setDescription(
       `Akun Roblox: **${roblox.displayName}** (\`@${roblox.name}\`)\n\n` +
         `💱 Rate: **${rupiah(rate)} / Robux**\n📦 Sisa stock: **${num(state.stock)} Robux**\n\n` +
@@ -206,13 +207,13 @@ function buildAmountPicker(cfg, product, roblox) {
     label: `${num(amount)} Robux`,
     description: `${rupiah(amount * rate)}${amount > state.stock ? ' • stock tidak cukup' : ''}`,
     value: String(amount),
-    emoji: amount > state.stock ? '⛔' : '💎',
+    emoji: amount > state.stock ? '⛔' : RBX,
   }));
   options.push({ label: 'Jumlah Lain', description: `Maksimal ${num(product.maxAmount || 5000)} Robux`, value: 'custom', emoji: '✏️' });
 
   const select = new StringSelectMenuBuilder()
     .setCustomId(`store:amount:${product.id}`)
-    .setPlaceholder('💎 Pilih jumlah Robux...')
+    .setPlaceholder('Pilih jumlah Robux...')
     .addOptions(options);
   const cancel = new ButtonBuilder().setCustomId('store:confirm:no').setLabel('Batalkan').setEmoji('✖️').setStyle(ButtonStyle.Secondary);
   return {
@@ -248,7 +249,7 @@ function buildTicketMessage(guild, cfg, t) {
       },
       { name: '🆔 Roblox ID', value: `\`${t.roblox.id}\``, inline: true },
       { name: '📦 Produk', value: `\`${t.productLabel}\``, inline: true },
-      { name: '💎 Jumlah', value: `\`${num(t.amount)} Robux\``, inline: true },
+      { name: `${RBX} Jumlah`, value: `\`${num(t.amount)} Robux\``, inline: true },
       { name: '💱 Rate', value: `\`${rupiah(t.rate)} / Robux\``, inline: true },
       { name: '💰 Total Bayar', value: `## ${rupiah(t.price)}`, inline: false },
       { name: '📌 Status', value: `**${ticketStatusText(t)}**`, inline: true },
@@ -384,7 +385,7 @@ function buildTestimony(guild, cfg, t, buyer) {
     .addFields(
       { name: '👤 Pembeli', value: `<@${t.userId}>`, inline: true },
       { name: '📦 Produk', value: `\`${t.productLabel}\``, inline: true },
-      { name: '💎 Jumlah', value: `\`${num(t.amount)} Robux\``, inline: true },
+      { name: `${RBX} Jumlah`, value: `\`${num(t.amount)} Robux\``, inline: true },
       { name: '🎮 Roblox', value: `\`@${t.roblox.name}\``, inline: true },
       { name: '💰 Total', value: `\`${rupiah(t.price)}\``, inline: true },
       { name: '🎫 Ticket', value: `\`${t.id}\``, inline: true },
@@ -568,7 +569,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
 
   if (kind === 'open') {
     const info = [];
-    if (robuxIncluded) info.push(`**💎 Stock Robux:** \`${num(state.stock)} Robux\``, `**💱 Rate Visend:** \`${rupiah(robux ? rateOf(cfg, robux) : 0)} / Robux\``);
+    if (robuxIncluded) info.push(`**${RBX} Stock Robux:** \`${num(state.stock)} Robux\``, `**💱 Rate Visend:** \`${rupiah(robux ? rateOf(cfg, robux) : 0)} / Robux\``);
     for (const gp of gamepass) info.push(`**${gp.emoji || '🎟️'} Rate ${gp.label}:** \`${rupiah(rateOf(cfg, gp))} / Robux\``);
     for (const sp of slotProducts) info.push(`**${sp.emoji || '📦'} Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
     const gallery = multiImages(products);
@@ -589,7 +590,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     });
   } else if (kind === 'close') {
     const left = [];
-    if (robuxIncluded) left.push(`**💎 Sisa Stock Robux:** \`${num(state.stock)} Robux\``);
+    if (robuxIncluded) left.push(`**${RBX} Sisa Stock Robux:** \`${num(state.stock)} Robux\``);
     for (const sp of slotProducts) left.push(`**${sp.emoji || '📦'} Sisa Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
     const gallery = multiImages(products);
     card = pcard({
@@ -1178,7 +1179,7 @@ function buildGamepassInfo(guild, cfg, product) {
   embed.addFields(
     { name: '📝 Catatan', value: notes.join('\n').slice(0, 1024) },
     { name: '🧾 Transaksi Gamepass', value: `\`${num(ps.orders)} transaksi\``, inline: true },
-    { name: '💎 Robux Terkirim', value: `\`${num(ps.robux)} Robux\``, inline: true },
+    { name: `${RBX} Robux Terkirim`, value: `\`${num(ps.robux)} Robux\``, inline: true },
     { name: '⭐ Rating Pembeli', value: `\`${avg} / 5 (${num(s.ratingCount)} ulasan)\``, inline: true },
   );
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(gpButtons(product))] };
@@ -1237,7 +1238,7 @@ function buildGamepassCalc(guild, cfg, product, mode, input) {
           `_Roblox memotong pajak **${taxOf(product)}%** dari setiap penjualan gamepass._`,
       )
       .addFields(
-        { name: '💎 Robux Diterima', value: `\`${num(q.after)} Robux\``, inline: true },
+        { name: `${RBX} Robux Diterima`, value: `\`${num(q.after)} Robux\``, inline: true },
         { name: '🎟️ Before Tax', value: `\`${num(q.before)} Robux\``, inline: true },
         { name: `🏛️ Pajak Roblox (${taxOf(product)}%)`, value: `\`${num(q.tax)} Robux\``, inline: true },
         { name: '💰 Total Harga', value: `## ${rupiah(q.price)}\n\`${num(q.before)} × ${rupiah(q.rate)}\`` },
@@ -1247,7 +1248,7 @@ function buildGamepassCalc(guild, cfg, product, mode, input) {
       .setDescription(`Perhitungan harga untuk gamepass seharga **${num(q.before)} Robux** (Before Tax).`)
       .addFields(
         { name: '🎟️ Harga Gamepass (Before Tax)', value: `\`${num(q.before)} Robux\``, inline: true },
-        { name: '💎 Robux Diterima (After Tax)', value: `\`${num(q.after)} Robux\``, inline: true },
+        { name: `${RBX} Robux Diterima (After Tax)`, value: `\`${num(q.after)} Robux\``, inline: true },
         { name: '💱 Rate', value: `\`${rupiah(q.rate)} / Robux\``, inline: true },
         { name: '💰 Total Harga', value: `## ${rupiah(q.price)}\n\`${num(q.before)} × ${rupiah(q.rate)}\`` },
       );
@@ -1286,7 +1287,7 @@ function buildGamepassConfirm(guild, cfg, product, d) {
         inline: true,
       },
       { name: '🎟️ Harga Gamepass (Before Tax)', value: `\`${num(d.before)} Robux\``, inline: true },
-      { name: '💎 Robux Diterima (After Tax)', value: `\`${num(d.after)} Robux\``, inline: true },
+      { name: `${RBX} Robux Diterima (After Tax)`, value: `\`${num(d.after)} Robux\``, inline: true },
       { name: '💱 Rate', value: `\`${rupiah(d.rate)} / Robux\``, inline: true },
       { name: '💰 Total Bayar', value: `## ${rupiah(d.price)}\n\`${num(d.before)} × ${rupiah(d.rate)}\`` },
       { name: '⏳ Estimasi', value: gpEstimate(product) },
@@ -1330,7 +1331,7 @@ function buildGamepassTicket(guild, cfg, t) {
       { name: '🔢 Gamepass ID', value: `\`${gp.id}\``, inline: true },
       { name: '✅ Verifikasi', value: gp.verified ? '`🟢 Otomatis`' : '`🟡 Manual`', inline: true },
       { name: '🎟️ Harga Gamepass', value: `\`${num(t.before)} Robux\`\n┗ Before Tax`, inline: true },
-      { name: '💎 Robux Diterima', value: `\`${num(t.amount)} Robux\`\n┗ After Tax`, inline: true },
+      { name: `${RBX} Robux Diterima`, value: `\`${num(t.amount)} Robux\`\n┗ After Tax`, inline: true },
       { name: '💱 Rate', value: `\`${rupiah(t.rate)} / Robux\``, inline: true },
       { name: '💰 Total Bayar', value: `## ${rupiah(t.price)}`, inline: false },
       { name: '📌 Status', value: `**${ticketStatusText(t)}**`, inline: true },
@@ -1905,7 +1906,7 @@ function buildOrderLog(guild, cfg, t) {
     if (pl.showBuyer) e.addFields({ name: '👤 Pembeli', value: `<@${t.userId}>`, inline: true });
     e.addFields(
       { name: '📦 Produk', value: `\`${t.productLabel}\``, inline: true },
-      { name: kindOf(t) === 'gamepass' ? '💎 Robux Diterima' : '💎 Jumlah', value: `\`${num(t.amount)} Robux\``, inline: true },
+      { name: kindOf(t) === 'gamepass' ? `${RBX} Robux Diterima` : `${RBX} Jumlah`, value: `\`${num(t.amount)} Robux\``, inline: true },
     );
     if (kindOf(t) === 'gamepass') e.addFields({ name: '🎟️ Harga Gamepass', value: `\`${num(t.before)} Robux\``, inline: true });
     e.addFields({ name: '💱 Rate', value: `\`${rupiah(t.rate)} / Robux\``, inline: true });
@@ -2405,12 +2406,12 @@ function buildProductInfoV2(guild, cfg, product) {
   return pcard({
     accent: color(cfg, 'brand', 0x3498db),
     thumb: product.thumbnail || icon256(guild),
-    header: `## ${product.emoji || '💎'} ${product.label}\n${fill(product.description || '', name)}`,
+    header: `## ${product.emoji || RBX} ${product.label}\n${fill(product.description || '', name)}`,
     blocks: [
-      [`💎 **Harga:** \`${rupiah(rateOf(cfg, product))} / Robux\``, `📦 **Sisa Stock:** \`${num(state.stock)} Robux\``, `🏪 **Status:** ${openBadge(open)}`].join('\n'),
+      [`${RBX} **Harga:** \`${rupiah(rateOf(cfg, product))} / Robux\``, `📦 **Sisa Stock:** \`${num(state.stock)} Robux\``, `🏪 **Status:** ${openBadge(open)}`].join('\n'),
       [
         `🧾 **Total Transaksi:** \`${num(state.stats.transactions)} transaksi\``,
-        `💎 **${product.label} Terjual:** \`${num(productStatsOf(product.id).robux)} Robux\``,
+        `${RBX} **${product.label} Terjual:** \`${num(productStatsOf(product.id).robux)} Robux\``,
         ratingLine(),
       ].join('\n'),
     ],
@@ -2446,7 +2447,7 @@ function buildGamepassInfoV2(guild, cfg, product) {
       [`💱 **Rate:** \`${rupiah(rateOf(cfg, product))} / Robux\``, `⏱️ **Estimasi:** \`± ${num(product.pendingDays || 5)} hari\``, `🏪 **Status:** ${openBadge(open)}`].join('\n'),
       ex ? `### 📊 Contoh Harga (After Tax)\n${ex}` : null,
       `### 📝 Catatan\n${notes.join('\n')}`,
-      [`🧾 **Transaksi Gamepass:** \`${num(ps.orders)} transaksi\``, `💎 **Robux Terkirim:** \`${num(ps.robux)} Robux\``, ratingLine()].join('\n'),
+      [`🧾 **Transaksi Gamepass:** \`${num(ps.orders)} transaksi\``, `${RBX} **Robux Terkirim:** \`${num(ps.robux)} Robux\``, ratingLine()].join('\n'),
     ],
     footer: `${name.name} • ${nowTs()}`,
     rows: [btnRow(gpButtons(product))],
