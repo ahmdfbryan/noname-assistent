@@ -284,7 +284,7 @@
       "id": "canva-pro",
       "type": "canva",
       "label": "Canva Pro",
-      "emoji": "🎨",
+      "emoji": "<:canva:1566139381616746607>",
       "description": "Nikmati **Canva Pro** dengan harga super hemat! ✨\n\nCukup kirim **alamat email** kamu, lalu admin **{server}** akan mengundangmu ke **Team Canva Pro**. Terima undangan lewat email, dan akunmu langsung bisa memakai semua fitur Pro.\n\n🛡️ Team Canva kami **dirawat langsung oleh admin** dan **dibatasi untuk beberapa email saja** — jadi lebih **awet & stabil**.",
       "plans": [
         {
@@ -337,13 +337,13 @@
         "idPrefix": "CV"
       },
       "howTo": {
-        "intro": "Aktifkan **Canva Pro** cukup dengan **alamat email** — tanpa login ke akun orang lain. Kamu diundang ke **Team Canva Pro** yang dirawat admin. 🎨",
+        "intro": "Aktifkan **Canva Pro** cukup dengan **alamat email** — tanpa login ke akun orang lain. Kamu diundang ke **Team Canva Pro** yang dirawat admin. <:canva:1566139381616746607>",
         "requirements": [
           "**Alamat email** aktif (boleh akun Canva lama / email baru)",
           "Pilih paket **1 Bulan** atau **1 Tahun**"
         ],
         "steps": [
-          "Buka channel **Store**, klik **🎨 Canva Pro** ➜ **🛒 Order Sekarang**",
+          "Buka channel **Store**, klik **<:canva:1566139381616746607> Canva Pro** ➜ **🛒 Order Sekarang**",
           "Pilih **paket** & masukkan **alamat email** (2x untuk konfirmasi)",
           "Cek ringkasan, lalu klik **Ya, Buat Ticket**",
           "Bayar sesuai **Total Bayar** di ticket & kirim bukti",
@@ -357,7 +357,7 @@
         ]
       },
       "catalog": {
-        "tagline": "Canva Pro **super hemat** via undangan team — cukup kirim **email**, tanpa login akun orang lain. 🎨",
+        "tagline": "Canva Pro **super hemat** via undangan team — cukup kirim **email**, tanpa login akun orang lain. <:canva:1566139381616746607>",
         "highlights": [
           "Team **dirawat admin** & dibatasi beberapa email — **awet**",
           "Aktivasi cukup lewat **undangan email**",
