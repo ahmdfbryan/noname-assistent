@@ -193,9 +193,9 @@ async function announce(guild, kind, extra = {}, ping = false) {
   const channel = await guild.channels.fetch(cfg.channels.stock).catch(() => null);
   if (!channel?.isTextBased()) return { ok: false, error: `channel stock (${cfg.channels.stock}) tidak ditemukan / bot tidak bisa melihatnya` };
   // Components V2 (premium). Kalau gagal dibuat, pakai tampilan embed lama.
-  let payload = null;
+  let payload = extra.payload || null; // pengumuman yang sudah disusun (misal Status Toko dari Control Center)
   try {
-    payload = V.buildStoreAnnouncementV2(guild, cfg, kind, extra, ping);
+    if (!payload) payload = V.buildStoreAnnouncementV2(guild, cfg, kind, extra, ping);
   } catch (e) {
     console.warn('[store] pengumuman V2 gagal dibuat, pakai embed:', e.message);
   }
