@@ -421,7 +421,7 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
 
   if (kind === 'open') {
     e.setColor(color(cfg, 'open', 0x2ecc71))
-      .setTitle(`🟢 ${label} Sudah Dibuka!`)
+      .setTitle(`🟢 ${label} Telah Dibuka!`)
       .setDescription(
         (single
           ? `**${single.label}** di **${name}** sekarang **BUKA** dan siap menerima pesanan! 🎉`
@@ -578,7 +578,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
       accent: color(cfg, 'open', 0x2ecc71),
       thumb: single ? thumbOf(single) : gallery.length ? null : icon,
       images: gallery,
-      header: `# 🟢 ${single ? single.label : name} Resmi Dibuka!\n-# ${name} • Store Update`,
+      header: `# 🟢 ${single ? single.label : name} Telah Dibuka!\n-# ${name} • Store Update`,
       blocks: [
         single
           ? `Kabar baik! **${single.label}** sekarang **BUKA** dan siap melayani pesananmu ✨\nProses **cepat, aman & terpercaya** — dibantu admin sampai selesai.`
