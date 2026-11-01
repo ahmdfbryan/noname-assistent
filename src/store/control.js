@@ -323,13 +323,16 @@ async function setOpen(guild, products, open, reason, by, force = false) {
     }
     return true;
   });
+  let sent = null;
   if (changed.length) {
-    await ctx.setProductsOpen(guild, changed, open, { reason: reason ? `📌 ${reason}` : undefined });
+    sent = await ctx.setProductsOpen(guild, changed, open, { reason: reason ? `📌 ${reason}` : undefined });
     logAction(`${open ? '🟢' : '🔴'} <@${by}> ${changed.every((p) => again.has(p.id)) ? `mengumumkan ulang ${open ? 'BUKA' : 'TUTUP'}` : open ? 'membuka' : 'menutup'} ${changed.map((p) => `**${p.label}**`).join(', ')}`);
   }
   refresh();
-  const done = changed.map((p) => (again.has(p.id) ? `📢 **${p.label}** memang sudah ${open ? 'buka' : 'tutup'} — pengumuman **${open ? 'BUKA' : 'TUTUP'}** dikirim ulang` : `${open ? '🟢' : '🔴'} **${p.label}** ${open ? 'DIBUKA' : 'DITUTUP'} & diumumkan`));
-  return [...done, ...notes].join('\n') || `ℹ️ Tidak ada perubahan (produk sudah ${open ? 'buka' : 'tutup'}).`;
+  const done = changed.map((p) => (again.has(p.id) ? `🔁 **${p.label}** memang sudah ${open ? 'buka' : 'tutup'} — pengumuman **${open ? 'BUKA' : 'TUTUP'}** dikirim ulang` : `${open ? '🟢' : '🔴'} **${p.label}** ${open ? 'DIBUKA' : 'DITUTUP'}`));
+  // Konfirmasi pengumuman: link ke pesannya, atau alasan kalau gagal terkirim.
+  const ann = !changed.length || !sent ? null : sent.ok ? `📢 Pengumuman terkirim → [lihat pengumuman](${sent.url})` : `⚠️ **Pengumuman GAGAL terkirim**${sent.channelId ? ` ke <#${sent.channelId}>` : ''}: \`${String(sent.error).slice(0, 180)}\``;
+  return [...done, ann, ...notes].filter(Boolean).join('\n') || `ℹ️ Tidak ada perubahan (produk sudah ${open ? 'buka' : 'tutup'}).`;
 }
 
 /** Ubah stock (set / tambah) + pengumuman, tutup / buka otomatis seperti /store stok-set. */
