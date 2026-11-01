@@ -186,11 +186,12 @@ const refreshLeaderboard = () => {
 const refreshReputation = () => debounce('reputation', () => editTracked('reputation', REP.buildReputation), 2500);
 
 // ══════════════════════ Pengumuman di channel stock ══════════════════════
+/** Kirim pengumuman ke channel stock. Return { ok, url } atau { ok: false, error } (dipakai Control Center untuk konfirmasi). */
 async function announce(guild, kind, extra = {}, ping = false) {
   const cfg = loadConfig();
-  if (!isId(cfg?.channels?.stock)) return;
+  if (!isId(cfg?.channels?.stock)) return { ok: false, error: 'channels.stock di store.json belum diisi' };
   const channel = await guild.channels.fetch(cfg.channels.stock).catch(() => null);
-  if (!channel?.isTextBased()) return;
+  if (!channel?.isTextBased()) return { ok: false, error: `channel stock (${cfg.channels.stock}) tidak ditemukan / bot tidak bisa melihatnya` };
   // Components V2 (premium). Kalau gagal dibuat, pakai tampilan embed lama.
   let payload = null;
   try {
@@ -205,7 +206,13 @@ async function announce(guild, kind, extra = {}, ping = false) {
       allowedMentions: { parse: ping ? ['everyone'] : [] },
     };
   }
-  await channel.send(payload).catch((e) => console.error('[store] gagal kirim pengumuman:', e.message));
+  try {
+    const sent = await channel.send(payload);
+    return { ok: true, url: sent.url, channelId: channel.id };
+  } catch (e) {
+    console.error('[store] gagal kirim pengumuman:', e.message);
+    return { ok: false, error: e.message, channelId: channel.id };
+  }
 }
 
 /**
@@ -224,8 +231,9 @@ async function setProductsOpen(guild, products, open, { reason, auto = false } =
   save();
   refreshPanel();
   if (products.length) {
-    await announce(guild, open ? 'open' : 'close', { reason, products }, Boolean(cfg?.pingEveryone?.[open ? 'open' : 'close']));
+    return announce(guild, open ? 'open' : 'close', { reason, products }, Boolean(cfg?.pingEveryone?.[open ? 'open' : 'close']));
   }
+  return null;
 }
 
 const robuxProduct = (cfg) => (cfg?.products || []).find((p) => p.type === 'robux') || null;
