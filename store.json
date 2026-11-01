@@ -73,6 +73,7 @@
     "title": "📖 How to Order | {server}",
     "description": "Selamat datang di **{server}**! 👋\nBelanja di sini **mudah, cepat, dan aman** — semua transaksi diproses lewat **ticket pribadi** dan diawasi langsung oleh admin.\n\nBaru pertama kali order? Tenang, ikuti panduan di bawah ini. ✨",
     "flow": "`🛒 Pilih Produk` ➜ `📝 Isi Form` ➜ `🎫 Ticket Dibuat` ➜ `💳 Bayar` ➜ `✅ Selesai` ➜ `⭐ Testimoni`",
+    "flowBanner": "assets/howto-banner.gif",
     "whyUs": [
       "**Ticket pribadi** — hanya kamu & admin yang bisa melihat pesananmu",
       "**Proses transparan** — setiap order tercatat di channel log",
