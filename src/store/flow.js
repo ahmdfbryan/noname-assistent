@@ -2327,7 +2327,7 @@ async function onHowTo(interaction) {
   const guide = H.buildHowToGuide(interaction.guild, cfg, interaction.values[0]);
   await interaction.reply({ ...guide, flags: (guide.flags || 0) | EPH });
   // Reset pilihan dropdown supaya produk yang sama bisa dipilih lagi.
-  interaction.message?.edit(H.buildHowToPanel(interaction.guild, cfg)).catch(() => {});
+  if (interaction.message) editPanelMessage(interaction.message, H.buildHowToPanel(interaction.guild, cfg)).catch(() => {});
 }
 
 // ══════════════════════ Perbarui tampilan lama → Components V2 ══════════════════════
