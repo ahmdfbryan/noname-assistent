@@ -25,10 +25,10 @@
   "storeName": "Noname Store",
   "channels": {
     "panel": "1553667092711088160",
-    "testimoni": "",
+    "testimoni": "1553667870221934654",
     "leaderboard": "1559751984012329080",
-    "stock": "100000000000001001",
-    "log": "100000000000001003",
+    "stock": "1553666054499344434",
+    "log": "1553667797383520347",
     "howToOrder": "1553666097620848700",
     "catalog": "1553666501662351391",
     "instantPanel": "1565040089573101588",
@@ -495,7 +495,7 @@
         "hideManual": false
       },
       "maxQty": 5,
-      "alertChannelId": "100000000000001000",
+      "alertChannelId": "1565037054339850260",
       "alertRoleId": "",
       "ticket": {
         "categoryName": "👑 TICKET PREMIUM APP",
