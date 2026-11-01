@@ -91,6 +91,85 @@ const statusWord = (p) => {
   return ps.autoClosed ? '`🔴 TUTUP (stock habis)`' : '`🔴 TUTUP`';
 };
 
+// ───────────────────────── 📢 Pengumuman Status Toko (publik) ─────────────────────────
+/** Harga versi publik (tanpa info internal). */
+function publicPrice(cfg, p) {
+  if (p.type === 'instant') {
+    const s = require('./instant').summaryOf(p);
+    return s.min ? `Mulai \`${rupiah(s.min)}\`` : null;
+  }
+  if (p.type === 'rekber') return priceText(cfg, p);
+  return priceText(cfg, p);
+}
+/** Stock versi publik. */
+function publicStock(p) {
+  if (p.type === 'boost') return plansOf(p).map((x) => `${x.label} \`${num(planStockOf(p, x.id))} boost\``).join(' • ');
+  if (hasStock(p)) return `\`${num(stockOf(p))} ${stockUnit(p)}\``;
+  if (p.type === 'instant') {
+    const s = require('./instant').summaryOf(p);
+    return s.products ? `\`${num(s.products)} produk • ${num(s.variants)} varian ready\`` : null;
+  }
+  return null;
+}
+/** Pengumuman premium: semua produk yang BUKA + harga & stock terkini, produk tutup diringkas. */
+function buildStatusAnnouncement(guild, cfg) {
+  const name = V.storeName(cfg, guild);
+  const list = sellable(cfg);
+  const open = list.filter((p) => isProductOpen(p));
+  const closed = list.filter((p) => !isProductOpen(p));
+  const box = UI.accent(new ContainerBuilder(), brand(cfg));
+  const icon = guild.iconURL({ extension: 'png', size: 256 });
+  const header = `# 🛍️ Status Toko Hari Ini\n-# ${name} • Store Update`;
+  if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
+  else box.addTextDisplayComponents(text(header));
+  box.addSeparatorComponents(line());
+  box.addTextDisplayComponents(
+    text(
+      open.length
+        ? `Halo semuanya! 👋 Berikut **produk yang sedang BUKA** di **${name}** beserta **harga & stock terkini** — langsung order sebelum kehabisan! ✨`
+        : `Halo semuanya! 👋 Saat ini **semua produk ${name} sedang TUTUP**. Pantau terus channel ini — kami kabari begitu dibuka kembali! 💙`,
+    ),
+  );
+  if (open.length) {
+    const rows = open.map((p) => {
+      const price = publicPrice(cfg, p);
+      const stock = publicStock(p);
+      const info = [price ? `💱 ${price}` : null, stock ? `📦 ${stock}` : p.type === 'rekber' ? '🤝 `Siap melayani`' : null].filter(Boolean).join('　•　');
+      return `${p.emoji || '🛒'} **${p.label}**${p.type === 'instant' ? ' `⚡ Auto 24 Jam`' : ''}${info ? `\n┗ ${info}` : ''}`;
+    });
+    box.addSeparatorComponents(line());
+    box.addTextDisplayComponents(text(`### 🟢 Sedang Buka (${open.length})\n${rows.join('\n')}`));
+  }
+  if (closed.length) {
+    const why = (p) => (productState(p.id).open && hasStock(p) && stockOf(p) <= 0 ? '`Stock Habis`' : '`Tutup`');
+    box.addSeparatorComponents(line());
+    box.addTextDisplayComponents(text(`### 🔴 Sedang Tutup (${closed.length})\n${closed.map((p) => `${p.emoji || '🛒'} ${p.label} — ${why(p)}`).join('\n')}`));
+  }
+  if (open.length) {
+    box.addSeparatorComponents(line());
+    box.addTextDisplayComponents(text('### ⚡ Jangan Sampai Kehabisan\nStock bisa berubah sewaktu-waktu — **siapa cepat dia dapat!** Klik tombol di bawah untuk langsung order. 🚀'));
+  }
+  box.addSeparatorComponents(line());
+  box.addTextDisplayComponents(text(`-# ${name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:f>`));
+  // Tombol link ke panel yang punya produk buka
+  const groups = [
+    ['main', 'Store', '🛒'],
+    ['digital', 'Produk Digital', '💻'],
+    ['instant', 'Premium App', '👑'],
+  ];
+  const { groupOf } = require('./config');
+  const links = groups
+    .filter(([g]) => open.some((p) => groupOf(p) === g))
+    .map(([g, label, emoji]) => {
+      const url = V.panelUrlFor(guild, g);
+      return url ? new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(url).setLabel(label).setEmoji(emoji) : null;
+    })
+    .filter(Boolean);
+  if (links.length) box.addActionRowComponents(new ActionRowBuilder().addComponents(links));
+  const ping = Boolean(cfg.pingEveryone?.status ?? cfg.pingEveryone?.open);
+  return { components: ping ? [text('@everyone'), box] : [box], flags: V2F, allowedMentions: { parse: ping ? ['everyone'] : [] } };
+}
+
 // Saldo & status API Waroeng (panel ini private admin) — cache 2 menit.
 let wrk = { at: 0, ok: null, balance: null, code: null };
 async function refreshWrk() {
@@ -205,6 +284,7 @@ function buildPanel(guild, cfg) {
     b.addSeparatorComponents(line());
     b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# Tombol berwarna = status sekarang. Klik 🟢 Buka / 🔴 Tutup → langsung diumumkan ke channel stock (klik lagi = kirim ulang pengumuman).'));
     for (const r of toggleRows) b.addActionRowComponents(r);
+    b.addActionRowComponents(rowOf(btn('store:cpstatus', 'Umumkan Status & Stock Semua Produk', '📢')));
     b.addTextDisplayComponents(text('### ⚙️ Kelola Produk'));
     b.addActionRowComponents(select);
     b.addTextDisplayComponents(text('### 🧰 Alat Admin'));
@@ -448,7 +528,7 @@ async function handle(interaction, action, arg) {
     return true;
   }
   const tool = T.ACTIONS.includes(action);
-  if (!tool && !['cpsel', 'cptog', 'cpopen', 'cpclose', 'cpreset', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
+  if (!tool && !['cpsel', 'cptog', 'cpopen', 'cpclose', 'cpreset', 'cpstatus', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
   if (!isAdmin(interaction.member)) {
     await interaction.reply({ content: '⛔ Panel ini khusus **Administrator**.', flags: EPH }).catch(() => {});
     return true;
@@ -491,6 +571,16 @@ async function handle(interaction, action, arg) {
     await interaction.deferReply({ flags: EPH });
     const res = await setOpen(guild, list, arg === 'open', null, by);
     await interaction.editReply({ content: res });
+    return true;
+  }
+  if (action === 'cpstatus') {
+    await interaction.deferReply({ flags: EPH });
+    const r = await ctx.announce(guild, 'status', { payload: buildStatusAnnouncement(guild, cfg) });
+    if (r?.ok) logAction(`📢 <@${by}> mengumumkan status & stock semua produk`);
+    refresh();
+    await interaction.editReply({
+      content: r?.ok ? `📢 Status & stock semua produk sudah **diumumkan** → [lihat pengumuman](${r.url})` : `⚠️ **Pengumuman GAGAL terkirim**${r?.channelId ? ` ke <#${r.channelId}>` : ''}: \`${String(r?.error || 'tidak diketahui').slice(0, 180)}\``,
+    });
     return true;
   }
   if (!p && !(action === 'cpmreason' && arg === 'all')) {
