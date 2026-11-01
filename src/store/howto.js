@@ -33,21 +33,25 @@ const text = (content) => new TextDisplayBuilder().setContent(String(content).sl
 const V2 = MessageFlags.IsComponentsV2;
 
 /** Kotak V2: header (+ logo), lalu blok-blok teks dipisah garis. */
-function card(cfg, guild, { header, blocks = [], image, rows = [], thumb = true }) {
+function card(cfg, guild, { header, blocks = [], image, rows = [], thumb = true, inlineImage = null }) {
   const box = UI.accent(new ContainerBuilder(), color(cfg, 'brand', 0x3498db));
   const icon = thumb ? guild.iconURL({ extension: 'png', size: 256 }) : null;
   if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
   else box.addTextDisplayComponents(text(header));
   if (image) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image)));
-  for (const b of blocks.filter(Boolean)) {
+  blocks.forEach((b, i) => {
+    if (!b) return;
     box.addSeparatorComponents(line());
     box.addTextDisplayComponents(text(b));
-  }
+    // Gambar tepat di bawah blok tertentu (misal GIF alur order di bawah "Alur Order Singkat").
+    if (inlineImage && inlineImage.after === i) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(inlineImage.url)));
+  });
   for (const r of rows.filter(Boolean)) box.addActionRowComponents(r);
   return { components: [box], flags: V2, allowedMentions: { parse: [] } };
 }
 
 const { groupOf } = require('./config');
+const { bannerOf } = require('./banner');
 
 function storeLinkButton(guild, label = 'Order di Store', product = null) {
   // Produk digital (Canva Pro, ...) → link ke panel Produk Digital.
@@ -88,9 +92,12 @@ function buildHowToPanel(guild, cfg) {
   options.push({ label: 'Metode Pembayaran', description: 'Cara bayar & konfirmasi pembayaran', value: '_pay', emoji: '💳' });
   if (h.faq?.length) options.push({ label: 'FAQ — Pertanyaan Umum', description: 'Jawaban pertanyaan yang sering ditanyakan', value: '_faq', emoji: '❓' });
 
-  return card(cfg, guild, {
+  // GIF alur order: store.json → howToOrder.flowBanner (path file di folder bot atau link https).
+  const flowGif = bannerOf(h.flowBanner, 'howto-banner');
+  const payload = card(cfg, guild, {
     header: `# ${fill(h.title || '📖 How to Order', name)}\n${fill(h.description || '', name)}`,
     image: h.bannerImage || null,
+    inlineImage: flowGif ? { after: 0, url: flowGif.url } : null,
     blocks: [
       h.flow ? `### ⚡ Alur Order Singkat\n${h.flow}` : null,
       h.whyUs?.length ? `### 🛡️ Kenapa ${V.storeName(cfg, guild)}?\n${bullets(h.whyUs)}` : null,
@@ -103,6 +110,8 @@ function buildHowToPanel(guild, cfg) {
       linkRow(guild, 'Buka Store'),
     ],
   });
+  if (flowGif?.files.length) payload.files = flowGif.files;
+  return payload;
 }
 
 // ───────────────────────── Panduan per produk (hanya terlihat yang memilih) ─────────────────────────
