@@ -389,7 +389,8 @@ async function refresh() {
 
 // ───────────────────────── Aksi ─────────────────────────
 /** Buka / tutup produk (otomatis diumumkan ke channel stock). Return teks hasil. */
-async function setOpen(guild, products, open, reason, by, force = false) {
+/** opts.statusGif = pakai GIF OPEN / CLOSED (Jam Operasional) di pengumuman, bukan foto produk. */
+async function setOpen(guild, products, open, reason, by, force = false, opts = {}) {
   const notes = [];
   const again = new Set(); // produk yang statusnya sudah sama → pengumuman dikirim ulang (force)
   const changed = products.filter((p) => {
@@ -405,7 +406,7 @@ async function setOpen(guild, products, open, reason, by, force = false) {
   });
   let sent = null;
   if (changed.length) {
-    sent = await ctx.setProductsOpen(guild, changed, open, { reason: reason ? `📌 ${reason}` : undefined });
+    sent = await ctx.setProductsOpen(guild, changed, open, { reason: reason ? (opts.statusGif ? reason : `📌 ${reason}`) : undefined, statusGif: Boolean(opts.statusGif) });
     logAction(`${open ? '🟢' : '🔴'} <@${by}> ${changed.every((p) => again.has(p.id)) ? `mengumumkan ulang ${open ? 'BUKA' : 'TUTUP'}` : open ? 'membuka' : 'menutup'} ${changed.map((p) => `**${p.label}**`).join(', ')}`);
   }
   refresh();
