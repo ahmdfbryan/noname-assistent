@@ -18,14 +18,14 @@ const {
 } = require('discord.js');
 const UI = require('../ui');
 const { loadConfig, isId, rupiah, num, getProduct } = require('./config');
-const { state, save, hasStock, stockOf, stockUnit, planStockOf, isProductOpen, kindOf } = require('./state');
+const { state, save, hasStock, stockOf, stockUnit, planStockOf, isProductOpen, kindOf, productState } = require('./state');
 const V = require('./views');
 
 /**
  * Alat tambahan Store Control Center:
  *  📋 Antrean Pesanan     — pembayaran menunggu verifikasi (✅ Dana Masuk langsung dari panel), Premium App butuh bantuan
  *  ⏰ Jam Operasional      — buka / tutup otomatis + pengecualian "On 24 Jam" & "Libur" (jadwal fleksibel)
- *  ⚠️ Peringatan           — ping admin saat stock / saldo Waroengkuy menipis
+ *  ⚠️ Peringatan           — ping admin saat stock / saldo Waroeng menipis
  *  📢 Pengumuman Cepat     — template restock / flash sale / libur / info ke channel stock
  *  📊 Laporan Penjualan    — rekap omzet, order, untung Premium App + unduh CSV
  *  🛠️ Mode Maintenance     — tutup semua sekaligus, saat selesai dibuka kembali sesuai kondisi sebelumnya
@@ -140,15 +140,40 @@ async function onPaid(interaction, ticketId) {
 }
 
 // ═════════════════════════════ ⏰ JAM OPERASIONAL ═════════════════════════════
+const SCHED_DEFAULT = { enabled: false, open: '08:00', close: '22:00', products: null, skipNextOpen: false, skipNextClose: false, lastOpenAt: 0, lastCloseAt: 0 };
+/** Pengaturan jadwal (objek yang SAMA tiap dipanggil — perubahan tidak hilang). */
 const sched = () => {
-  state.schedule = { enabled: false, open: '08:00', close: '22:00', products: null, skipNextOpen: false, skipNextClose: false, lastOpenAt: 0, lastCloseAt: 0, ...(state.schedule || {}) };
-  return state.schedule;
+  const s = (state.schedule ||= {});
+  for (const [k, v] of Object.entries(SCHED_DEFAULT)) if (!(k in s)) s[k] = v;
+  return s;
 };
 /** Produk yang ikut jadwal (default: semua produk kecuali Coming Soon). */
 const schedProducts = (cfg) => {
   const s = sched();
   const all = sellable(cfg);
   return Array.isArray(s.products) && s.products.length ? all.filter((p) => s.products.includes(p.id)) : all;
+};
+
+/**
+ * Ingat produk yang SEDANG BUKA tepat sebelum tutup otomatis / Libur → hanya produk itu yang dibuka lagi saat jam buka.
+ * Produk yang kamu tutup manual sebelumnya (misal Gamepass) tetap tutup. Kalau saat tutup tidak ada yang buka
+ * (misal sudah ditutup Libur), catatan lama dipertahankan.
+ */
+function rememberOpen(cfg) {
+  const s = sched();
+  const open = schedProducts(cfg)
+    .filter((p) => productState(p.id).open)
+    .map((p) => p.id);
+  if (open.length || !Array.isArray(s.reopen)) {
+    s.reopen = open;
+    save();
+  }
+}
+/** Produk yang akan dibuka saat jam buka (default sebelum ada catatan: semua produk jadwal). */
+const reopenProducts = (cfg) => {
+  const s = sched();
+  const list = schedProducts(cfg);
+  return Array.isArray(s.reopen) ? list.filter((p) => s.reopen.includes(p.id)) : list;
 };
 
 function scheduleLine(cfg) {
@@ -173,6 +198,8 @@ function scheduleView(guild, cfg, notice) {
       `🟢 **Buka otomatis:** \`${s.open} WIB\` • berikutnya ${tsR(no)}${s.skipNextOpen ? ' **→ dilewati (Libur)**' : ''}`,
       `🔴 **Tutup otomatis:** \`${s.close} WIB\` • berikutnya ${tsR(nc)}${s.skipNextClose ? ' **→ dilewati (On 24 Jam)**' : ''}`,
       `🛍️ **Produk:** ${list.map((p) => `${p.emoji || '🛒'} ${p.label}`).join(', ') || '-'}`,
+      `🔁 **Dibuka saat jam buka:** ${reopenProducts(cfg).map((p) => `${p.emoji || '🛒'} ${p.label}`).join(', ') || '`tidak ada`'}`,
+      '-# Hanya produk yang **sedang buka sebelum tutup otomatis** yang dibuka lagi — produk yang kamu tutup manual tetap tutup.',
     ].join('\n'),
     [
       '### 🔀 Jadwal Fleksibel',
@@ -224,7 +251,14 @@ async function scheduleTick(guild) {
       h.refresh();
       continue;
     }
-    const res = await h.setOpen(guild, schedProducts(cfg), kind === 'open', kind === 'close' ? `⏰ Jam operasional selesai — buka kembali **${s.open} WIB**` : null, by);
+    if (kind === 'close') rememberOpen(cfg);
+    const list = kind === 'open' ? reopenProducts(cfg) : schedProducts(cfg);
+    if (!list.length) {
+      h.logAction(`⏰ Buka otomatis: tidak ada produk yang perlu dibuka`);
+      h.refresh();
+      continue;
+    }
+    const res = await h.setOpen(guild, list, kind === 'open', kind === 'close' ? `⏰ Jam operasional selesai — buka kembali **${s.open} WIB**` : null, by);
     console.log(`[control] jadwal ${kind}: ${res.replace(/\n/g, ' | ')}`);
   }
 }
@@ -252,7 +286,7 @@ function watchList(cfg) {
     else out.push({ key: p.id, label: p.label, value: stockOf(p), limit: limitOf(p), unit: stockUnit(p) });
   }
   const w = h.getWrk();
-  if (sellable(cfg).some((p) => p.type === 'instant') && w.ok && Number(a.saldo) > 0) out.push({ key: 'saldo', label: 'Saldo Waroengkuy', value: w.balance, limit: Number(a.saldo), unit: 'rupiah' });
+  if (sellable(cfg).some((p) => p.type === 'instant') && w.ok && Number(a.saldo) > 0) out.push({ key: 'saldo', label: 'Saldo Waroeng', value: w.balance, limit: Number(a.saldo), unit: 'rupiah' });
   return out;
 }
 const fmtVal = (x) => (x.unit === 'rupiah' ? rupiah(x.value) : `${num(x.value)} ${x.unit}`);
@@ -267,7 +301,7 @@ function alertsView(guild, cfg, notice) {
     if (!ps.open && !ps.autoClosed) lines.push(`⚪ **${p.label}:** \`${num(stockOf(p))} ${stockUnit(p)}\` • batas \`${limitOf(p) > 0 ? `${num(limitOf(p))} ${stockUnit(p)}` : 'nonaktif'}\` • _tutup, tidak dipantau_`);
   }
   const instOn = sellable(cfg).some((p) => p.type === 'instant');
-  if (instOn && !(Number(a.saldo) > 0)) lines.push('⚪ **Saldo Waroengkuy:** peringatan `nonaktif`');
+  if (instOn && !(Number(a.saldo) > 0)) lines.push('⚪ **Saldo Waroeng:** peringatan `nonaktif`');
   const ch = alertChannelId(cfg);
   return card(
     cfg,
@@ -292,7 +326,7 @@ function alertsModal(cfg) {
   if (sellable(cfg).some((p) => p.type === 'instant')) {
     labels.push(
       new LabelBuilder()
-        .setLabel('Saldo Waroengkuy minimal (Rp)')
+        .setLabel('Saldo Waroeng minimal (Rp)')
         .setDescription('Peringatan kalau saldo ≤ angka ini (mode manual butuh saldo). 0 = nonaktif.')
         .setTextInputComponent(new TextInputBuilder().setCustomId('t_saldo').setStyle(TextInputStyle.Short).setMaxLength(12).setRequired(true).setValue(String(Number(a.saldo) || 0))),
     );
@@ -329,8 +363,8 @@ async function alertsTick(guild) {
       await sendAlert(
         guild,
         cfg,
-        x.key === 'saldo' ? 'Saldo Waroengkuy Menipis' : `Stock ${x.label} Menipis`,
-        `${x.value <= 0 ? '🔴 **HABIS!**' : '🟠 **Hampir habis!**'} **${x.label}** sekarang tinggal \`${fmtVal(x)}\` (batas \`${fmtLim(x)}\`).\n${x.key === 'saldo' ? 'Isi saldo di panel reseller Waroengkuy supaya pesanan tetap terkirim otomatis.' : 'Isi stock lewat **🎛️ Store Control Center → Kelola produk → Atur / Tambah Stock**.'}`,
+        x.key === 'saldo' ? 'Saldo Waroeng Menipis' : `Stock ${x.label} Menipis`,
+        `${x.value <= 0 ? '🔴 **HABIS!**' : '🟠 **Hampir habis!**'} **${x.label}** sekarang tinggal \`${fmtVal(x)}\` (batas \`${fmtLim(x)}\`).\n${x.key === 'saldo' ? 'Isi saldo di panel reseller Waroeng supaya pesanan tetap terkirim otomatis.' : 'Isi stock lewat **🎛️ Store Control Center → Kelola produk → Atur / Tambah Stock**.'}`,
       );
     } else if (!low && a.flags[x.key]) {
       a.flags[x.key] = false;
@@ -625,6 +659,7 @@ async function handle(interaction, action, arg) {
         s.skipNextClose = false;
         await interaction.deferUpdate();
         save();
+        rememberOpen(cfg); // setelah libur, yang dibuka lagi = yang buka sebelum libur
         const res = await h.setOpen(guild, schedProducts(cfg), false, '🏖️ **Hari ini libur dulu ya** — terima kasih atas pengertiannya 🙏', by);
         h.logAction(`🏖️ <@${by}> mengaktifkan **Libur**`);
         h.refresh();
