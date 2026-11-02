@@ -258,7 +258,7 @@ async function scheduleTick(guild) {
       h.refresh();
       continue;
     }
-    const res = await h.setOpen(guild, list, kind === 'open', kind === 'close' ? `⏰ Jam operasional selesai — buka kembali **${s.open} WIB**` : null, by);
+    const res = await h.setOpen(guild, list, kind === 'open', kind === 'close' ? `⏰ Jam operasional selesai — buka kembali **${s.open} WIB**` : null, by, false, { statusGif: true });
     console.log(`[control] jadwal ${kind}: ${res.replace(/\n/g, ' | ')}`);
   }
 }
@@ -660,7 +660,7 @@ async function handle(interaction, action, arg) {
         await interaction.deferUpdate();
         save();
         rememberOpen(cfg); // setelah libur, yang dibuka lagi = yang buka sebelum libur
-        const res = await h.setOpen(guild, schedProducts(cfg), false, '🏖️ **Hari ini libur dulu ya** — terima kasih atas pengertiannya 🙏', by);
+        const res = await h.setOpen(guild, schedProducts(cfg), false, '🏖️ **Hari ini libur dulu ya** — terima kasih atas pengertiannya 🙏', by, false, { statusGif: true });
         h.logAction(`🏖️ <@${by}> mengaktifkan **Libur**`);
         h.refresh();
         return interaction.editReply(scheduleView(guild, loadConfig(), `🏖️ **Libur aktif** — buka otomatis ${tsR(nextAt(s.open))} dilewati.\n${res}`));
