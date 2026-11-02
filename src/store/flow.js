@@ -221,7 +221,7 @@ async function announce(guild, kind, extra = {}, ping = false) {
  * otomatis saat stock kembali (cancel / refund / stock ditambah). Produk yang ditutup manual
  * lewat /store tutup tetap tutup sampai admin membukanya.
  */
-async function setProductsOpen(guild, products, open, { reason, auto = false } = {}) {
+async function setProductsOpen(guild, products, open, { reason, auto = false, statusGif = false } = {}) {
   const cfg = loadConfig();
   for (const p of products) {
     const ps = productState(p.id);
@@ -231,7 +231,7 @@ async function setProductsOpen(guild, products, open, { reason, auto = false } =
   save();
   refreshPanel();
   if (products.length) {
-    return announce(guild, open ? 'open' : 'close', { reason, products }, Boolean(cfg?.pingEveryone?.[open ? 'open' : 'close']));
+    return announce(guild, open ? 'open' : 'close', { reason, products, statusGif }, Boolean(cfg?.pingEveryone?.[open ? 'open' : 'close']));
   }
   return null;
 }
