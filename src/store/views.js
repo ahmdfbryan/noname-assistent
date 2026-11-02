@@ -566,6 +566,17 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     return `${'🟦'.repeat(f)}${'⬛'.repeat(10 - f)} \`${pct}%\``;
   };
   const statusBadge = (sp) => (sp && isProductOpen(sp) ? '`🟢 BUKA`' : '`🔴 TUTUP`');
+  /**
+   * Jam Operasional → GIF status toko (OPEN / CLOSED) menggantikan foto produk.
+   * store.json → statusGifs: { "open": "assets/store-open.gif", "close": "assets/store-closed.gif" } (opsional).
+   */
+  const statusGif = (() => {
+    if (!extra.statusGif || (kind !== 'open' && kind !== 'close')) return null;
+    const g = { open: 'assets/store-open.gif', close: 'assets/store-closed.gif', ...(cfg.statusGifs || {}) };
+    const b = bannerOf(g[kind], kind === 'open' ? 'store-open' : 'store-closed');
+    if (b) for (const f of b.files) files.push(f);
+    return b?.url || null;
+  })();
   let card;
 
   if (kind === 'open') {
@@ -573,10 +584,10 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     if (robuxIncluded) info.push(`**${RBX} Stock Robux:** \`${num(state.stock)} Robux\``, `**💱 Rate Visend:** \`${rupiah(robux ? rateOf(cfg, robux) : 0)} / Robux\``);
     for (const gp of gamepass) info.push(`**${gp.emoji || '🎟️'} Rate ${gp.label}:** \`${rupiah(rateOf(cfg, gp))} / Robux\``);
     for (const sp of slotProducts) info.push(`**${sp.emoji || '📦'} Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
-    const gallery = multiImages(products);
+    const gallery = statusGif ? [statusGif] : multiImages(products);
     card = pcard({
       accent: color(cfg, 'open', 0x2ecc71),
-      thumb: single ? thumbOf(single) : gallery.length ? null : icon,
+      thumb: statusGif ? null : single ? thumbOf(single) : gallery.length ? null : icon,
       images: gallery,
       header: `# 🟢 ${single ? single.label : name} Telah Dibuka!\n-# ${name} • Store Update`,
       blocks: [
@@ -593,10 +604,10 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     const left = [];
     if (robuxIncluded) left.push(`**${RBX} Sisa Stock Robux:** \`${num(state.stock)} Robux\``);
     for (const sp of slotProducts) left.push(`**${sp.emoji || '📦'} Sisa Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
-    const gallery = multiImages(products);
+    const gallery = statusGif ? [statusGif] : multiImages(products);
     card = pcard({
       accent: color(cfg, 'closed', 0xe74c3c),
-      thumb: single ? thumbOf(single) : gallery.length ? null : icon,
+      thumb: statusGif ? null : single ? thumbOf(single) : gallery.length ? null : icon,
       images: gallery,
       header: `# 🔴 ${single ? single.label : name} Sementara Ditutup\n-# ${name} • Store Update`,
       blocks: [
