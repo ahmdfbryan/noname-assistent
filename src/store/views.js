@@ -1702,6 +1702,26 @@ const payAmount = (t) => (kindOf(t) === 'rekber' ? t.buyerPays : t.price);
 /** Sudah lunas? (rekber: dana sudah dikonfirmasi admin) */
 const isPaid = (t) => (kindOf(t) === 'rekber' ? Boolean(t.stage?.funded) : t.payment?.status === 'paid');
 const payMethods = (cfg) => (cfg.payment?.methods || []).filter((m) => m && m.bank && m.number);
+const isWallet = (m) => /^(ewallet|e-wallet|wallet)$/i.test(String(m.type || ''));
+/** QRIS toko (store.json → payment.qris.image: path file di folder bot atau link https). */
+const qrisOf = (cfg) => bannerOf(cfg.payment?.qris?.image, 'qris');
+/**
+ * Kelompokkan metode bayar: bank (1 baris per rekening) & e-wallet (nomor sama digabung 1 baris).
+ * Return { banks: [teks], wallets: [teks] }.
+ */
+function payGroups(cfg, { code = true } = {}) {
+  const methods = payMethods(cfg);
+  const fmt = (n) => (code ? `\`${n}\`` : n);
+  const banks = methods.filter((m) => !isWallet(m)).map((m) => `${m.emoji || '🏦'} **${m.bank}** — ${fmt(m.number)}${m.holder ? ` • a.n. ${m.holder}` : ''}`);
+  const byNum = new Map();
+  for (const m of methods.filter(isWallet)) {
+    const k = `${m.number}|${m.holder || ''}`;
+    if (!byNum.has(k)) byNum.set(k, { number: m.number, holder: m.holder, list: [] });
+    byNum.get(k).list.push(`${m.emoji ? `${m.emoji} ` : ''}**${m.bank}**`);
+  }
+  const wallets = [...byNum.values()].map((g) => `${g.list.join(' • ')}\n┗ 📱 ${fmt(g.number)}${g.holder ? ` • a.n. ${g.holder}` : ''}`);
+  return { banks, wallets };
+}
 
 function payStatusText(t) {
   if (isPaid(t)) return '`✅ Lunas`';
@@ -1715,26 +1735,35 @@ function ticketStatusText(t) {
   return STATUS_LABEL[t.status];
 }
 
-/** Embed rekening pembayaran (hanya tampil selama belum lunas). */
+/** Metode pembayaran (hanya tampil selama belum lunas): Bank • E-Wallet • QRIS, rapi per kelompok. */
 function paymentEmbeds(guild, cfg, t) {
   if (t.status !== 'open' || isPaid(t)) return [];
   const pay = cfg.payment || {};
   const name = { name: storeName(cfg, guild) };
-  const methods = payMethods(cfg);
+  const { banks, wallets } = payGroups(cfg);
+  const qris = qrisOf(cfg);
   const e = new EmbedBuilder()
     .setColor(color(cfg, 'brand', 0x3498db))
-    .setTitle(pay.title || '💳 Cara Pembayaran')
+    .setTitle(pay.title || '💳 Pembayaran')
     .setDescription(
-      `Transfer **tepat** sebesar:\n## ${rupiah(payAmount(t))}\n` +
-        (pay.accountName ? `ke salah satu rekening di bawah — semua **a.n. ${pay.accountName}**` : 'ke salah satu rekening di bawah:'),
+      [
+        `Bayar **tepat** sebesar:\n## ${rupiah(payAmount(t))}`,
+        pay.accountName ? `👤 Semua rekening & e-wallet **a.n. ${pay.accountName}**` : null,
+        '-# Pilih salah satu metode di bawah 👇',
+      ]
+        .filter(Boolean)
+        .join('\n'),
     );
-  for (const m of methods.slice(0, 18)) {
-    e.addFields({ name: `${m.emoji || '🏦'} ${m.bank}`, value: `\`${m.number}\`${m.holder ? `\n┗ a.n. ${m.holder}` : ''}`, inline: true });
+  if (banks.length) e.addFields({ name: '🏦 Transfer Bank', value: banks.join('\n').slice(0, 1024) });
+  if (wallets.length) e.addFields({ name: '📱 E-Wallet', value: wallets.join('\n').slice(0, 1024) });
+  if (qris) {
+    e.addFields({
+      name: '🔳 QRIS',
+      value: `Bisa dibayar dari **semua m-banking & e-wallet**${pay.qris?.merchant ? ` • merchant **${pay.qris.merchant}**` : ''}\nKlik **🔳 Tampilkan QRIS** di bawah, lalu scan.`,
+    });
   }
-  const rest = methods.length % 3;
-  for (let i = 0; rest && i < 3 - rest; i++) e.addFields({ name: '​', value: '​', inline: true }); // rapikan grid
   if (pay.description) e.addFields({ name: '🧾 Langkah Pembayaran', value: fill(pay.description, name).slice(0, 1024) });
-  if (pay.image) e.setImage(pay.image);
+  if (pay.image && /^https?:\/\//i.test(pay.image)) e.setImage(pay.image);
   return [e];
 }
 
@@ -1742,27 +1771,62 @@ function paymentEmbeds(guild, cfg, t) {
 function paymentRows(t) {
   if (t.status !== 'open' || isPaid(t)) return [];
   const st = t.payment?.status;
-  return [
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`store:paybtn:${t.id}`)
-        .setLabel(st === 'pending' || st === 'rejected' ? 'Kirim Ulang Bukti Pembayaran' : 'Konfirmasi Pembayaran')
-        .setEmoji('💳')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`store:copyacc:${t.id}`).setLabel('Salin No. Rekening').setEmoji('📋').setStyle(ButtonStyle.Secondary),
-    ),
+  const cfg = loadConfig();
+  const buttons = [
+    new ButtonBuilder()
+      .setCustomId(`store:paybtn:${t.id}`)
+      .setLabel(st === 'pending' || st === 'rejected' ? 'Kirim Ulang Bukti Pembayaran' : 'Konfirmasi Pembayaran')
+      .setEmoji('💳')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`store:copyacc:${t.id}`).setLabel('Salin Nomor').setEmoji('📋').setStyle(ButtonStyle.Secondary),
   ];
+  if (cfg && qrisOf(cfg)) buttons.push(new ButtonBuilder().setCustomId(`store:qris:${t.id}`).setLabel('Tampilkan QRIS').setEmoji('🔳').setStyle(ButtonStyle.Secondary));
+  return [new ActionRowBuilder().addComponents(buttons)];
 }
 
-/** Daftar nomor rekening polos (mudah disalin di HP). */
+/** Daftar nomor polos (mudah disalin di HP): tekan lama nomor untuk menyalin. */
 function buildCopyAccounts(cfg, t) {
   const methods = payMethods(cfg);
-  const lines = methods.map((m) => `**${m.bank}**\n${m.number}`);
-  return {
-    content:
-      `💰 **Total transfer: ${rupiah(payAmount(t))}**${cfg.payment?.accountName ? `\n👤 a.n. **${cfg.payment.accountName}**` : ''}\n\n` +
-      `${lines.join('\n\n')}\n\n_Tekan lama nomor rekening untuk menyalin._`,
-  };
+  const banks = methods.filter((m) => !isWallet(m)).map((m) => `${m.emoji || '🏦'} **${m.bank}**\n${m.number}`);
+  const byNum = new Map();
+  for (const m of methods.filter(isWallet)) {
+    if (!byNum.has(m.number)) byNum.set(m.number, []);
+    byNum.get(m.number).push(m.bank);
+  }
+  const wallets = [...byNum.entries()].map(([n, list]) => `📱 **${list.join(' • ')}**\n${n}`);
+  const parts = [
+    `💰 **Total bayar: ${rupiah(payAmount(t))}**${cfg.payment?.accountName ? `\n👤 a.n. **${cfg.payment.accountName}**` : ''}`,
+    banks.length ? `### 🏦 Transfer Bank\n${banks.join('\n\n')}` : null,
+    wallets.length ? `### 📱 E-Wallet\n${wallets.join('\n\n')}` : null,
+    qrisOf(cfg) ? '-# 🔳 Mau scan QRIS? Klik **Tampilkan QRIS** di ticket.' : null,
+    '_Tekan lama nomor untuk menyalin._',
+  ];
+  return { content: parts.filter(Boolean).join('\n\n') };
+}
+
+/** QRIS toko (pesan pribadi pembeli): gambar QRIS + nominal + langkah scan. */
+function buildQris(guild, cfg, t) {
+  const pay = cfg.payment || {};
+  const q = qrisOf(cfg);
+  if (!q) return { content: '🔳 QRIS belum tersedia. Silakan bayar lewat transfer bank / e-wallet.', flags: MessageFlags.Ephemeral };
+  const amount = t ? rupiah(payAmount(t)) : null;
+  const box = pcard({
+    accent: color(cfg, 'brand', 0x3498db),
+    header: `## 🔳 Bayar dengan QRIS\n-# ${storeName(cfg, guild)}${pay.qris?.merchant ? ` • merchant ${pay.qris.merchant}` : ''}`,
+    images: [q.url],
+    blocks: [
+      amount ? `💰 **Total bayar:** \`${amount}\`\n-# Masukkan nominal **tepat** sesuai total di atas.` : null,
+      [
+        '### 🧾 Cara Bayar',
+        '`1` Buka aplikasi **m-banking / e-wallet** yang punya fitur QRIS',
+        '`2` **Scan** QRIS di atas (atau simpan gambar lalu upload dari galeri)',
+        `\`3\` Masukkan nominal${amount ? ` **${amount}**` : ''} & selesaikan pembayaran`,
+        '`4` Screenshot bukti bayar → klik **💳 Konfirmasi Pembayaran** di ticket',
+      ].join('\n'),
+    ],
+    footer: `${storeName(cfg, guild)} • Pembayaran aman di dalam ticket`,
+  });
+  return { ...box, files: q.files, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral };
 }
 
 /** Bukti pembayaran dari pembeli (dikirim ke ticket, admin verifikasi). */
@@ -2697,6 +2761,10 @@ module.exports = {
   paymentRows,
   payMethods,
   buildCopyAccounts,
+  buildQris,
+  payGroups,
+  qrisOf,
+  isWallet,
   buildPaymentProof,
   buildDanaMasuk,
   buildPayRejected,
