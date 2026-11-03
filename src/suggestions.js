@@ -136,7 +136,7 @@ function buildPanel(guild, cfg) {
   return card({
     color: hex(cfg.colors?.brand, 0x3498db),
     thumb: guild.iconURL({ extension: 'png', size: 256 }),
-    header: `# ${fill(p.title || '💡 Suggestions | {server}', guild)}\n-# ${fill(p.subtitle || 'Kotak Saran Resmi • {server}', guild)}`,
+    header: `# ${fill(p.title || '💡 Suggestions', guild)}\n-# ${fill(p.subtitle || 'Kotak Saran Resmi • {server}', guild)}`,
     blocks: [
       fill(p.description, guild) || null,
       cats.length ? `### 🗂️ Peruntukan Saran\n${cats.map((x) => `${x.emoji || '💡'} **${x.label}** — ${x.description || ''}`).join('\n')}` : null,
