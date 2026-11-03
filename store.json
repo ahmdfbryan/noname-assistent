@@ -17,7 +17,7 @@
     "How to Order: channels.howToOrder = channel panduan. Teks panel di howToOrder (title, description, flow, whyUs, pickText, paymentIntro, paymentMethods, faq, bannerImage). Panduan per produk di products[].howTo (intro, requirements, steps, tips, image). Kirim panel dengan /store how-to-order. Produk tanpa howTo tidak muncul di dropdown.",
     "Catalog: channels.catalog = channel katalog. Teks header di catalog (title, description, bannerImage). Kartu tiap produk di products[].catalog (tagline, highlights, priceList = daftar jumlah Robux di tabel harga, thumbnail, image = banner kartu). Kirim dengan /store catalog — kirim ulang setelah menambah / menghapus produk.",
     "Canva Pro (type canva): plans = paket (id, label, price, days). Stock = jumlah slot email, atur dengan /store stok-set produk:Canva Pro (habis → tutup otomatis, slot kembali → buka otomatis). remindDays = DM pengingat ke pembeli sebelum masa aktif habis; saat habis admin yang menutup ticket mendapat DM untuk mengeluarkan email dari team. ticket.idPrefix / categoryName = ID & kategori ticket Canva.",
-    "Pembayaran: payment.methods = daftar rekening (bank, number, emoji, holder opsional = atas nama per rekening). payment.accountName = atas nama untuk semua rekening (opsional). Tampil di semua ticket + tombol 💳 Konfirmasi Pembayaran & 📋 Salin No. Rekening. Admin konfirmasi dengan tombol ✅ Dana Masuk di bukti pembayaran atau /danamasuk [nominal] [catatan] di channel ticket.",
+    "Pembayaran: payment.methods = daftar rekening & e-wallet (bank = nama, number, emoji, type \"ewallet\" untuk e-wallet — nomor e-wallet yang sama otomatis digabung 1 baris, holder opsional = atas nama per rekening). payment.qris.image = gambar QRIS (path file di folder bot, contoh assets/qris.jpg) + merchant = nama merchant QRIS → tombol 🔳 Tampilkan QRIS di ticket & di panduan Metode Pembayaran. payment.accountName = atas nama untuk semua rekening (opsional). Tampil di semua ticket + tombol 💳 Konfirmasi Pembayaran & 📋 Salin No. Rekening. Admin konfirmasi dengan tombol ✅ Dana Masuk di bukti pembayaran atau /danamasuk [nominal] [catatan] di channel ticket.",
     "Role Spender (spenderRoles): buyerRoleId = role order pertama. tiers = role berdasarkan total belanja (min dalam Rupiah, dari order Completed; rekber tidak dihitung). keepLowerTiers false = member hanya memegang 1 role tier tertinggi (role lama diganti, seperti role level); true = semua tier yang dicapai tetap terpasang. keepBuyerRole true = role Buyer tetap dipasang untuk semua yang pernah order (Buyer + 1 tier); false = Buyer diganti tier pertama begitu tercapai. announce = ucapan naik level di ticket + DM. Bot butuh izin Manage Roles & role bot harus di atas semua role ini. /store sinkron-role untuk memasang ulang ke semua pembeli.",
     "👑 Premium App (type instant) — produk otomatis dari API Waroengkuy (API key di .env: WRK_KEY=wrk_...). payment.mode: \"deposit\" (default) = pembeli bayar QRIS isi saldo Waroengkuy seharga harga jual, lalu bot membeli pakai saldo — selisih harga (untung) tetap jadi SALDO Waroengkuy, min. belanja Rp10.000, maks 3 pembayaran bersamaan; \"qris\" = QRIS order langsung dari Waroengkuy dengan harga reseller (tanpa untung); \"manual\" = transfer ke rekening toko (payment.methods) + admin klik Dana Masuk, lalu akun dikirim otomatis memakai saldo Waroengkuy (untung masuk rekening kamu, saldo harus selalu terisi). pricing: harga jual = harga reseller + percent% + flat, dibulatkan ke atas kelipatan roundTo, untung minimal minProfit, capAtNormalPrice true = tidak lebih mahal dari harga toko resmi Waroengkuy; overrides = harga tetap per variant_id, contoh {\"8\": 12000}. filter: categories (hanya kategori ini), hideCategories, hideProducts (product_id / nama produk), hideVariants (variant_id), hideNoWarranty, hideManual. maxQty = maks akun per order. alertChannelId = channel admin untuk laporan error / pesanan yang butuh bantuan (alertRoleId = role yang di-ping). ticket.keepMinutes = lama ticket dipertahankan setelah akun terkirim. Buka produk dengan /store buka, cek koneksi & saldo dengan /store premium-app. Panel Premium App ada di channel sendiri (channels.instantPanel) — kirim dengan /store panel jenis:Premium App. Teks panel bisa diatur di products[produk-instan].panel (title, subtitle, description, bannerImage, thumbnail, features, steps). Kartunya tetap tampil di katalog Produk Digital. Katalog forum: forum.channelId = Forum Channel katalog (1 post per produk + post panduan yang di-pin, tag kategori & status, sinkron otomatis tiap 10 menit). lockPosts false (disarankan) = post tidak dikunci supaya tombol bisa diklik; agar member tidak bisa membalas, atur izin forum @everyone → Send Messages in Posts ❌. lockPosts true = post dikunci, tapi tombol jadi TIDAK bisa diklik member. title / subtitle / description / bannerImage / guideTitle = isi post panduan. categoryEmojis = emoji tag per kategori, contoh {\"Streaming\": \"🎬\"}. Jalankan /store premium-forum untuk membuat / menyinkronkan sekarang.",
     "🎛️ Store Control Center (channels.controlPanel, channel PRIVATE admin): panel admin tanpa command — buka / tutup produk sekali klik (otomatis diumumkan ke channels.stock), atur stock, rate Robux & harga paket Canva / Boost (tersimpan otomatis ke file ini). Premium App hanya buka / tutup. Panel dikirim & diperbarui otomatis saat bot menyala; kalau pesannya dihapus, bot mengirim ulang."
@@ -84,8 +84,8 @@
     "paymentIntro": "Semua pembayaran dilakukan **di dalam ticket** setelah ticket order dibuat. **Jangan** melakukan pembayaran di luar ticket atau ke pihak yang mengaku admin lewat DM.",
     "paymentSteps": [
       "Buat order dulu sampai **ticket pribadi** terbuka",
-      "Transfer **tepat** sesuai **Total Bayar** ke salah satu rekening",
-      "Klik **💳 Konfirmasi Pembayaran** di ticket & upload **bukti transfer**",
+      "Bayar **tepat** sesuai **Total Bayar** — via transfer bank, e-wallet, atau scan **QRIS**",
+      "Klik **💳 Konfirmasi Pembayaran** di ticket & upload **bukti pembayaran**",
       "Tunggu admin memverifikasi — kamu akan mendapat notifikasi **💰 Dana Masuk** ✅"
     ],
     "paymentMethods": [
@@ -633,7 +633,7 @@
   ],
   "payment": {
     "title": "💳 Pembayaran",
-    "accountName": "",
+    "accountName": "Ahmad Febrian Sembiring",
     "methods": [
       {
         "bank": "BRI",
@@ -669,9 +669,37 @@
         "bank": "SEA BANK",
         "number": "901591266000",
         "emoji": "🏦"
+      },
+      {
+        "bank": "ShopeePay",
+        "type": "ewallet",
+        "number": "085156954950",
+        "emoji": "🧡"
+      },
+      {
+        "bank": "DANA",
+        "type": "ewallet",
+        "number": "085156954950",
+        "emoji": "💙"
+      },
+      {
+        "bank": "OVO",
+        "type": "ewallet",
+        "number": "085156954950",
+        "emoji": "💜"
+      },
+      {
+        "bank": "GoPay",
+        "type": "ewallet",
+        "number": "085156954950",
+        "emoji": "💚"
       }
     ],
-    "description": "`1` Transfer **tepat** sesuai nominal di atas ke salah satu rekening.\n`2` Klik **💳 Konfirmasi Pembayaran** & upload **bukti transfer**.\n`3` Tunggu admin memverifikasi — kamu akan dapat notifikasi **💰 Dana Masuk**.\n\n⚠️ Jangan melakukan pembayaran di luar ticket ini.",
+    "qris": {
+      "image": "assets/qris.jpg",
+      "merchant": "TOKO AHMAD"
+    },
+    "description": "`1` Bayar **tepat** sesuai nominal di atas — via transfer bank, e-wallet, atau scan **QRIS**.\n`2` Klik **💳 Konfirmasi Pembayaran** & upload **bukti pembayaran**.\n`3` Tunggu admin memverifikasi — kamu akan dapat notifikasi **💰 Dana Masuk**.\n\n⚠️ Jangan melakukan pembayaran di luar ticket ini.",
     "image": ""
   },
   "spenderRoles": {
