@@ -354,21 +354,52 @@ function buildDmClosed(guild, cfg, t) {
 /** Siapa yang diminta memberi testimoni: pembeli Robux / pihak pembeli di rekber. */
 const testimonyUserId = (t) => (kindOf(t) === 'rekber' ? t.buyerId : t.userId);
 
+/**
+ * Ajakan beri testimoni (Components V2): GIF "Thank You for Your Order" + ajakan rating + bukti pesanan + tombol.
+ * GIF: store.json → ticket.thankYouImage (default assets/thank-you.gif, kosongkan "" untuk tanpa GIF).
+ */
+function testimonyPromptCard(guild, cfg, t, { userId, title, text }) {
+  const gifSrc = cfg.ticket?.thankYouImage ?? 'assets/thank-you.gif';
+  const gif = bannerOf(gifSrc, 'thank-you');
+  const box = UI.accent(new ContainerBuilder(), color(cfg, 'brand', 0x3498db));
+  if (gif) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(gif.url).setDescription('Thank you for your order!')));
+  box.addTextDisplayComponents(v2Text(`## ${title}\n${text}`));
+  box.addSeparatorComponents(v2Line());
+  box.addTextDisplayComponents(
+    v2Text(
+      [
+        '### ✨ Kenapa Testimonimu Penting?',
+        '▸ Membantu calon pembeli lain belanja dengan **lebih yakin** 🤝',
+        '▸ Masukanmu bikin pelayanan kami **makin baik** 💙',
+        '▸ Testimonimu tampil di channel **testimoni** — lengkap dengan rating ⭐',
+      ].join('\n'),
+    ),
+  );
+  if (t.proofUrl) {
+    box.addSeparatorComponents(v2Line());
+    box.addTextDisplayComponents(v2Text('**📸 Bukti Pesanan**'));
+    box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(t.proofUrl)));
+  }
+  box.addSeparatorComponents(v2Line());
+  box.addTextDisplayComponents(v2Text(`-# ⏳ Hanya butuh sebentar — pilih rating & tulis ulasan singkat • ${storeName(cfg, guild)}`));
+  box.addActionRowComponents(
+    new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`store:testi:${t.id}`).setLabel('Beri Testimoni').setEmoji('⭐').setStyle(ButtonStyle.Primary)),
+  );
+  return {
+    components: [v2Text(`<@${userId}>`), box],
+    files: gif?.files || [],
+    flags: MessageFlags.IsComponentsV2,
+    allowedMentions: { users: [userId] },
+  };
+}
+
 function buildTestimonyPrompt(guild, cfg, t) {
   if (kindOf(t) === 'rekber') return buildRekberTestimonyPrompt(guild, cfg, t);
-  const embed = new EmbedBuilder()
-    .setColor(color(cfg, 'brand', 0x3498db))
-    .setTitle('⭐ Bagaimana Pengalaman Belanjamu?')
-    .setDescription(
-      `<@${t.userId}>, pesananmu sudah selesai! 🎉\n\nBantu kami jadi lebih baik dengan memberikan **rating & testimoni** ` +
-        `lewat tombol di bawah. Testimonimu akan ditampilkan di channel testimoni.`
-    )
-    .setFooter(serverFooter(guild, storeName(cfg, guild)));
-  if (t.proofUrl) embed.setImage(t.proofUrl);
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`store:testi:${t.id}`).setLabel('Beri Testimoni').setEmoji('⭐').setStyle(ButtonStyle.Primary),
-  );
-  return { content: `<@${t.userId}>`, embeds: [embed], components: [row], allowedMentions: { users: [t.userId] } };
+  return testimonyPromptCard(guild, cfg, t, {
+    userId: t.userId,
+    title: '⭐ Bagaimana Pengalaman Belanjamu?',
+    text: `Hai <@${t.userId}>, pesanan **${t.id}** sudah **selesai**! 🎉\nTerima kasih sudah berbelanja di **${storeName(cfg, guild)}**. Yuk bantu kami dengan memberikan **rating & testimoni** lewat tombol di bawah ya!`,
+  });
 }
 
 function buildTestimony(guild, cfg, t, buyer) {
@@ -964,19 +995,11 @@ function buildRekberDmClosed(guild, cfg, t) {
 }
 
 function buildRekberTestimonyPrompt(guild, cfg, t) {
-  const embed = new EmbedBuilder()
-    .setColor(color(cfg, 'brand', 0x3498db))
-    .setTitle('⭐ Bagaimana Pengalaman Rekber-mu?')
-    .setDescription(
-      `<@${t.buyerId}>, transaksi rekber **${t.id}** sudah selesai! 🎉\n\n` +
-        'Bantu kami jadi lebih baik dengan memberikan **rating & testimoni** lewat tombol di bawah.',
-    )
-    .setFooter(serverFooter(guild, storeName(cfg, guild)));
-  if (t.proofUrl) embed.setImage(t.proofUrl);
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`store:testi:${t.id}`).setLabel('Beri Testimoni').setEmoji('⭐').setStyle(ButtonStyle.Primary),
-  );
-  return { content: `<@${t.buyerId}>`, embeds: [embed], components: [row], allowedMentions: { users: [t.buyerId] } };
+  return testimonyPromptCard(guild, cfg, t, {
+    userId: t.buyerId,
+    title: '⭐ Bagaimana Pengalaman Rekber-mu?',
+    text: `Hai <@${t.buyerId}>, transaksi rekber **${t.id}** sudah **selesai**! 🎉\nTerima kasih sudah mempercayakan transaksimu ke **${storeName(cfg, guild)}**. Yuk bantu kami dengan memberikan **rating & testimoni** lewat tombol di bawah ya!`,
+  });
 }
 
 function buildRekberTestimony(guild, cfg, t, buyer) {
