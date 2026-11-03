@@ -2109,7 +2109,8 @@ async function onCloseModal(interaction, ticketId) {
   if (t.messageId) editTicketMsg(channel, guild, cfg, t).catch(() => {});
 
   if (status === 'completed') {
-    await channel.send(v2({ ...V.buildTestimonyPrompt(guild, cfg, t), files: proof.files }));
+    const prompt = V.buildTestimonyPrompt(guild, cfg, t);
+    await channel.send(v2({ ...prompt, files: [...(prompt.files || []), ...(proof.files || [])] }));
   } else {
     const secs = Number(cfg.ticket?.deleteAfterSeconds) || 15;
     const closedEmbed = V.buildDmClosed(guild, cfg, t).embeds[0].setDescription(
