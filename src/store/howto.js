@@ -121,19 +121,25 @@ function buildHowToGuide(guild, cfg, value) {
 
   if (value === '_pay') {
     const pay = cfg.payment || {};
-    const methods = V.payMethods(cfg);
-    const list = methods.length
-      ? methods.map((m) => `${m.emoji || '🏦'} **${m.bank}** — \`${m.number}\`${m.holder ? ` (a.n. ${m.holder})` : ''}`).join('\n')
-      : bullets(h.paymentMethods);
-    return card(cfg, guild, {
+    const { banks, wallets } = V.payGroups(cfg);
+    const qris = V.qrisOf(cfg);
+    const fallback = !banks.length && !wallets.length ? bullets(h.paymentMethods) : null;
+    const payload = card(cfg, guild, {
       header: `## 💳 Metode Pembayaran\n${fill(h.paymentIntro || 'Semua pembayaran dilakukan **di dalam ticket** setelah ticket order dibuat.', name)}`,
       blocks: [
+        pay.accountName ? `👤 Semua rekening & e-wallet **a.n. ${pay.accountName}**` : null,
+        banks.length ? `### 🏦 Transfer Bank\n${banks.join('\n')}` : null,
+        wallets.length ? `### 📱 E-Wallet\n${wallets.join('\n')}` : null,
+        qris ? `### 🔳 QRIS\nScan dari **semua m-banking & e-wallet**${pay.qris?.merchant ? ` • merchant **${pay.qris.merchant}**` : ''} 👇` : null,
+        fallback ? `### 🏦 Rekening Tersedia\n${fallback}` : null,
         `### 🧾 Langkah Pembayaran\n${h.paymentSteps?.length ? steps(h.paymentSteps) : fill(pay.description || '-', name)}`,
-        list ? `### 🏦 Rekening Tersedia${pay.accountName ? ` (a.n. ${pay.accountName})` : ''}\n${list}` : null,
       ],
-      image: pay.image || null,
+      inlineImage: qris ? { after: 3, url: qris.url } : null,
+      image: pay.image && /^https?:\/\//i.test(pay.image) ? pay.image : null,
       rows: [linkRow(guild)],
     });
+    if (qris?.files.length) payload.files = qris.files;
+    return payload;
   }
 
   if (value === '_faq') {
