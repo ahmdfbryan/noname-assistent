@@ -94,7 +94,7 @@ function buildReputation(guild, cfg) {
   const box = UI.accent(new ContainerBuilder(), color(cfg, 'brand', 0x3498db));
 
   // ── Header
-  const header = `# ${fill(rc.title || '⭐ Reputasi Toko | {server}', { server: guild.name, name })}\n-# ${fill(rc.subtitle || '{name} • Store Reputation', { server: guild.name, name })}`;
+  const header = `# ${fill(rc.title || '⭐ Reputasi Toko', { server: guild.name, name })}\n-# ${fill(rc.subtitle || '{name} • Store Reputation', { server: guild.name, name })}`;
   const icon = guild.iconURL({ extension: 'png', size: 256 });
   if (icon) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(header)).setThumbnailAccessory(new ThumbnailBuilder().setURL(icon)));
   else box.addTextDisplayComponents(text(header));
