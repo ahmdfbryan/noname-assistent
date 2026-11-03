@@ -23,7 +23,7 @@
     "rejected": "#E74C3C"
   },
   "panel": {
-    "title": "💡 Suggestions | {server}",
+    "title": "💡 Suggestions",
     "subtitle": "Kotak Saran Resmi • {server}",
     "description": "Punya ide untuk membuat **{server}** jadi lebih seru? Atau masukan untuk **Noname Store** supaya belanja makin nyaman? 🚀\nSampaikan saranmu di sini — setiap saran akan **dibaca & ditanggapi** langsung oleh tim kami.\n\n> 💙 Saran terbaik dari kalian yang membuat komunitas ini terus berkembang!",
     "steps": [
