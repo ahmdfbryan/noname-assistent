@@ -209,7 +209,7 @@ function buildKnowledge(guild, includePremium) {
       h.flow ? `Alur: ${clean(h.flow, store)}` : '',
       h.paymentIntro ? clean(h.paymentIntro, store) : '',
       (h.paymentSteps || []).map((x, i) => `${i + 1}) ${clean(x, store)}`).join(' '),
-      `Metode bayar: transfer bank / e-wallet (${(cfg.payment?.methods || []).map((m) => m.bank).join(', ')}) — NOMOR REKENING HANYA DIBERIKAN DI DALAM TICKET. Premium App memakai QRIS otomatis.`,
+      `Metode bayar (di dalam ticket): transfer bank (${(cfg.payment?.methods || []).filter((m) => !/wallet/i.test(m.type || '')).map((m) => m.bank).join(', ')}), e-wallet (${(cfg.payment?.methods || []).filter((m) => /wallet/i.test(m.type || '')).map((m) => m.bank).join(', ') || '-'})${cfg.payment?.qris?.image ? ', dan QRIS (bisa dari semua m-banking & e-wallet)' : ''}. NOMOR REKENING / E-WALLET & GAMBAR QRIS HANYA DIBERIKAN DI DALAM TICKET. Premium App memakai QRIS otomatis.`,
       ...(h.faq || []).map((f) => `T: ${clean(f.q, store)}\nJ: ${clean(f.a, store)}`),
     );
 
