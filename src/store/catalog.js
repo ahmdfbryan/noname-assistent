@@ -117,7 +117,7 @@ function buildCatalogHeader(guild, cfg, group = 'main') {
   return card({
     accent: color(cfg, 'brand', 0x3498db),
     thumb: guild.iconURL({ extension: 'png', size: 256 }),
-    header: `# ${fill(c.title || '🛍️ Katalog Produk | {server}', name)}\n-# ${fill(c.subtitle || (group === 'digital' ? 'Digital Catalog • {server}' : 'Official Catalog • {server}'), name)}`,
+    header: `# ${fill(c.title || '🛍️ Katalog Produk', name)}\n-# ${fill(c.subtitle || (group === 'digital' ? 'Digital Catalog • {server}' : 'Official Catalog • {server}'), name)}`,
     blocks: [
       fill(c.description || '', name) || null,
       [
