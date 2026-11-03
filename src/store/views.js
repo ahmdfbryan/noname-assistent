@@ -2010,6 +2010,19 @@ function buildOrderLog(guild, cfg, t) {
 const v2Line = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
 const v2Text = (content) => new TextDisplayBuilder().setContent(String(content).slice(0, 4000));
 const row = (label, value) => `» **${label} :** ${value}`;
+/**
+ * Metode pembayaran yang dipakai pembeli (dari form Konfirmasi Pembayaran) — contoh "`🏦 BCA • Transfer Bank`".
+ * Premium App (QRIS otomatis) → "`🔳 QRIS • Otomatis`". Tidak diketahui (misal Dana Masuk manual tanpa bukti) → null.
+ */
+function paidWith(cfg, t) {
+  if (kindOf(t) === 'instant' && t.ins?.mode && t.ins.mode !== 'manual') return '`🔳 QRIS • Otomatis`';
+  const b = t.payment?.bank;
+  if (!b || b === '-') return null;
+  if (/^qris$/i.test(b)) return '`🔳 QRIS`';
+  const m = payMethods(cfg).find((x) => x.bank === b);
+  if (!m) return `\`💳 ${b}\``;
+  return `\`${m.emoji || (isWallet(m) ? '📱' : '🏦')} ${m.bank} • ${isWallet(m) ? 'E-Wallet' : 'Transfer Bank'}\``;
+}
 /** Isi komentar aman di dalam kotak code block. */
 const boxed = (s) => '```\n' + String(s || '-').replace(/`/g, 'ˋ').slice(0, 900) + '\n```';
 
@@ -2075,6 +2088,8 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
       row('Harga', `\`${rupiah(t.price)}\``),
     ];
   }
+  const via = paidWith(cfg, t);
+  if (via) lines.push(row('Pembayaran', via));
   lines.push(row('Order ID', `\`${t.id}\``));
   // Total belanja pembeli di toko (semua order Completed) + tier spender.
   const sp = state.spenders?.[buyerId];
@@ -2134,6 +2149,8 @@ function buildOrderLogV2(guild, cfg, t) {
     if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
     lines.push(row('Akun Roblox', `\`@${pl.maskRoblox ? maskName(t.roblox?.name) : t.roblox?.name}\``));
   }
+  const via = paidWith(cfg, t);
+  if (via) lines.push(row('Pembayaran', via));
   const status = [row('Status', `**${pub}**`), row('Order Masuk', ts(t.createdAt, 'f'))];
   if (t.closedAt) {
     status.push(row(t.status === 'completed' ? 'Selesai Pada' : 'Ditutup Pada', ts(t.closedAt, 'f')), row('Waktu Proses', `\`${duration(t.closedAt - t.createdAt)}\``));
