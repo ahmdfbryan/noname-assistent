@@ -1746,30 +1746,31 @@ async function onPayButton(interaction, ticketId) {
     return interaction.reply({ content: 'Tunggu pihak lawan **menyetujui transaksi** sebelum melakukan pembayaran.', flags: EPH });
   }
   const cfg = loadConfig();
-  const methods = V.payMethods(cfg).slice(0, 25);
+  const methods = V.payMethods(cfg).slice(0, 24);
   const modal = new ModalBuilder().setCustomId(`store:paymodal:${t.id}`).setTitle('Konfirmasi Pembayaran');
   const labels = [];
-  if (methods.length) {
+  const options = methods.map((m) => ({
+    label: m.bank.slice(0, 100),
+    description: `${V.isWallet(m) ? 'E-Wallet' : 'Transfer Bank'} • ${m.number}`.slice(0, 100),
+    value: m.bank.slice(0, 100),
+    emoji: m.emoji || (V.isWallet(m) ? '📱' : '🏦'),
+  }));
+  if (V.qrisOf(cfg)) options.push({ label: 'QRIS', description: 'Scan QRIS (m-banking / e-wallet)', value: 'QRIS', emoji: '🔳' });
+  if (options.length) {
     labels.push(
       new LabelBuilder()
-        .setLabel('Transfer ke Rekening')
-        .setStringSelectMenuComponent(
-          new StringSelectMenuBuilder()
-            .setCustomId('bank')
-            .setPlaceholder('Pilih rekening tujuan...')
-            .setRequired(true)
-            .addOptions(methods.map((m) => ({ label: m.bank.slice(0, 100), description: m.number.slice(0, 100), value: m.bank.slice(0, 100), emoji: m.emoji || '🏦' }))),
-        ),
+        .setLabel('Metode Pembayaran')
+        .setStringSelectMenuComponent(new StringSelectMenuBuilder().setCustomId('bank').setPlaceholder('Pilih metode yang kamu pakai...').setRequired(true).addOptions(options)),
     );
   }
   labels.push(
     new LabelBuilder()
-      .setLabel('Nama Pemilik Rekening Pengirim')
-      .setDescription('Nama yang tertera di bukti transfer.')
+      .setLabel('Nama Pengirim')
+      .setDescription('Nama pemilik rekening / akun e-wallet yang tertera di bukti bayar.')
       .setTextInputComponent(new TextInputBuilder().setCustomId('sender').setStyle(TextInputStyle.Short).setPlaceholder('contoh: Ahmad Febryan').setMinLength(2).setMaxLength(60).setRequired(true)),
     new LabelBuilder()
-      .setLabel('Bukti Transfer')
-      .setDescription(`Screenshot bukti transfer sebesar ${rupiah(V.payAmount(t))}.`)
+      .setLabel('Bukti Pembayaran')
+      .setDescription(`Screenshot bukti bayar sebesar ${rupiah(V.payAmount(t))}.`)
       .setFileUploadComponent(new FileUploadBuilder().setCustomId('proof').setMinValues(1).setMaxValues(1).setRequired(true)),
     new LabelBuilder()
       .setLabel('Catatan (opsional)')
@@ -1789,7 +1790,12 @@ async function onPayModal(interaction, ticketId) {
   if (!upload) return interaction.editReply('📸 Wajib upload **screenshot bukti transfer**.');
   if (upload.contentType && !upload.contentType.startsWith('image/')) return interaction.editReply('❌ Bukti transfer harus berupa **gambar** (PNG / JPG).');
   const methods = V.payMethods(cfg);
-  const bank = (methods.length ? interaction.fields.getStringSelectValues('bank')?.[0] : null) || '-';
+  let bank = '-';
+  if (methods.length || V.qrisOf(cfg)) {
+    try {
+      bank = interaction.fields.getStringSelectValues('bank')?.[0] || '-';
+    } catch {}
+  }
   const sender = interaction.fields.getTextInputValue('sender').trim();
   const note = (interaction.fields.getTextInputValue('note') || '').trim();
 
@@ -1808,6 +1814,12 @@ async function onPayModal(interaction, ticketId) {
   logOrder(guild, t, '💳 Pembeli mengirim bukti pembayaran');
   await refreshTicketMessage(guild, t);
   return interaction.editReply('✅ Bukti pembayaran terkirim! Admin akan segera memverifikasi pembayaranmu. ⏳');
+}
+
+async function onShowQris(interaction, ticketId) {
+  const t = state.tickets[ticketId];
+  if (!t) return interaction.reply({ content: 'Ticket tidak ditemukan.', flags: EPH });
+  return interaction.reply(V.buildQris(interaction.guild, loadConfig(), t));
 }
 
 async function onCopyAccounts(interaction, ticketId) {
@@ -2454,6 +2466,7 @@ async function handleInteraction(interaction) {
       else if (action === 'gpcheck') await onGamepassCheck(interaction, arg);
       else if (action === 'paybtn') await onPayButton(interaction, arg);
       else if (action === 'copyacc') await onCopyAccounts(interaction, arg);
+      else if (action === 'qris') await onShowQris(interaction, arg);
       else if (action === 'paid') await onPaidButton(interaction, arg);
       else if (action === 'payreject') await onPayRejectButton(interaction, arg);
       else if (action === 'cvconfirm') await onCanvaConfirm(interaction, arg === 'yes');
