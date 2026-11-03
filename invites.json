@@ -14,7 +14,7 @@
     "leave": "#E74C3C"
   },
   "leaderboard": {
-    "title": "🏆 Top 10 Inviter | {server}",
+    "title": "🏆 Top 10 Inviter",
     "description": "Ajak teman-temanmu bergabung ke **{server}** dan jadilah **Top Inviter**! 🚀",
     "empty": "_Belum ada undangan. Jadilah inviter pertama!_ 🎉"
   }
