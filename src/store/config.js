@@ -118,7 +118,7 @@ const DIGITAL_TEXT = {
       'Butuh **akun premium & produk digital** dengan harga super hemat? ✨\n\nPilih produk di bawah untuk melihat detail & membuka ticket pemesanan. Proses **cepat, aman,** dan dibantu admin sampai aktif!',
   },
   catalog: {
-    title: '🛒 Katalog Produk Digital | {server}',
+    title: '🛒 Katalog Produk Digital',
     subtitle: 'Digital Catalog • {server}',
     description:
       'Semua **produk digital {server}** ada di sini! 💎\nSetiap kartu menampilkan **harga, paket, dan sisa slot terkini** — semuanya ter-update otomatis.\n\nKlik **🛒 Order Sekarang** di kartu produk untuk mulai belanja.',
