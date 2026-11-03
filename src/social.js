@@ -164,7 +164,7 @@ async function buildSocial(client, guild) {
     box({
       accent: color(cfg.color, 0x3498db),
       thumb: guild.iconURL({ extension: 'png', size: 256 }),
-      header: `# ${fill(cfg.title || '🌐 Social Media | {server}', guild)}\n-# ${fill(cfg.subtitle || 'Official Social Media • {server}', guild)}`,
+      header: `# ${fill(cfg.title || '🌐 Social Media', guild)}\n-# ${fill(cfg.subtitle || 'Official Social Media • {server}', guild)}`,
       image: cfg.bannerImage || null,
       blocks: [fill(cfg.description, guild) || null],
     }),
