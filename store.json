@@ -70,7 +70,7 @@
     "bottomBanner": "assets/store-banner.gif"
   },
   "howToOrder": {
-    "title": "📖 How to Order | {server}",
+    "title": "📖 How to Order",
     "description": "Selamat datang di **{server}**! 👋\nBelanja di sini **mudah, cepat, dan aman** — semua transaksi diproses lewat **ticket pribadi** dan diawasi langsung oleh admin.\n\nBaru pertama kali order? Tenang, ikuti panduan di bawah ini. ✨",
     "flow": "`🛒 Pilih Produk` ➜ `📝 Isi Form` ➜ `🎫 Ticket Dibuat` ➜ `💳 Bayar` ➜ `✅ Selesai` ➜ `⭐ Testimoni`",
     "flowBanner": "assets/howto-banner.gif",
@@ -122,7 +122,7 @@
     "bannerImage": ""
   },
   "catalog": {
-    "title": "🛍️ Katalog Produk | {server}",
+    "title": "🛍️ Katalog Produk",
     "description": "Temukan semua layanan **{server}** di sini! ✨\nSetiap kartu menampilkan **harga, status, dan stock terkini** — semuanya ter-update otomatis.\n\nKlik **🛒 Order Sekarang** di kartu produk untuk mulai belanja, atau **📖 Cara Order** untuk melihat panduannya.",
     "bannerImage": ""
   },
