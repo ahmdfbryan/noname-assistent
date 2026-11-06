@@ -50,6 +50,15 @@ function rateOf(cfg, product) {
   return Number(state.rates[product.id]) || Number(product.rate) || 0;
 }
 
+/** Kelipatan jumlah order (store.json → amountStep, contoh 100). Tanpa nilai → bebas (1). */
+const stepOf = (product) => Math.max(1, Math.floor(Number(product?.amountStep) || 1));
+/** Minimal order: diatur dari Control Center (state.minAmounts), kalau belum → store.json (minAmount). Selalu kelipatan step. */
+function minAmountOf(product) {
+  const step = stepOf(product);
+  const raw = Number(state.minAmounts?.[product?.id]) || Number(product?.minAmount) || step;
+  return Math.max(step, Math.ceil(raw / step) * step);
+}
+
 // ───────────────────────── Panel utama ─────────────────────────
 /** Panel di channel store: hanya judul, keterangan, logo server, dan tombol produk. */
 function buildPanel(guild, cfg) {
@@ -200,17 +209,17 @@ function buildAmountPicker(cfg, product, roblox) {
       `Akun Roblox: **${roblox.displayName}** (\`@${roblox.name}\`)\n\n` +
         `💱 Rate: **${rupiah(rate)} / Robux**\n📦 Sisa stock: **${num(state.stock)} Robux**\n\n` +
         `Pilih jumlah di bawah, atau pilih **✏️ Jumlah Lain** untuk memasukkan jumlah sendiri ` +
-        `(${num(product.minAmount || 1)} – ${num(Math.max(max, 0))} Robux).`,
+        `(${num(minAmountOf(product))} – ${num(Math.max(max, 0))} Robux${stepOf(product) > 1 ? `, kelipatan ${num(stepOf(product))}` : ''}).`,
     );
   if (roblox.avatar) embed.setThumbnail(roblox.avatar);
 
-  const options = (product.presets || []).slice(0, 24).map((amount) => ({
+  const options = (product.presets || []).filter((a) => a >= minAmountOf(product)).slice(0, 24).map((amount) => ({
     label: `${num(amount)} Robux`,
     description: `${rupiah(amount * rate)}${amount > state.stock ? ' • stock tidak cukup' : ''}`,
     value: String(amount),
     emoji: amount > state.stock ? '⛔' : RBX,
   }));
-  options.push({ label: 'Jumlah Lain', description: `Maksimal ${num(product.maxAmount || 5000)} Robux`, value: 'custom', emoji: '✏️' });
+  options.push({ label: 'Jumlah Lain', description: `Min ${num(minAmountOf(product))}, maks ${num(product.maxAmount || 5000)} Robux${stepOf(product) > 1 ? ` • kelipatan ${num(stepOf(product))}` : ''}`, value: 'custom', emoji: '✏️' });
 
   const select = new StringSelectMenuBuilder()
     .setCustomId(`store:amount:${product.id}`)
@@ -2841,6 +2850,8 @@ module.exports = {
   buildOrderLogLegacy: buildOrderLog,
   buildTestimonyThanks,
   rateOf,
+  stepOf,
+  minAmountOf,
   buildPanel: buildPanelV2,
   buildProductInfo: buildProductInfoV2,
   buildProductTerms: buildProductTermsV2,
