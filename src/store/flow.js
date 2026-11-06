@@ -458,7 +458,7 @@ async function onAmountSelect(interaction, productId) {
       .addLabelComponents(
         new LabelBuilder()
           .setLabel('Jumlah Robux')
-          .setDescription(`Minimal ${num(product?.minAmount || 1)}, maksimal ${num(max)} Robux. Sisa stock: ${num(state.stock)}.`)
+          .setDescription(`Minimal ${num(product ? V.minAmountOf(product) : 1)}, maksimal ${num(max)} Robux${product && V.stepOf(product) > 1 ? `, kelipatan ${num(V.stepOf(product))}` : ''}. Sisa stock: ${num(state.stock)}.`)
           .setTextInputComponent(
             new TextInputBuilder()
               .setCustomId('amount')
@@ -492,10 +492,14 @@ async function createOrder(interaction, productId, amount) {
     );
 
   if (!session || !product) return fail('⌛ Sesi sudah berakhir. Silakan klik tombol produk lagi.');
-  const min = Number(product.minAmount) || 1;
+  const min = V.minAmountOf(product);
+  const step = V.stepOf(product);
   const max = Number(product.maxAmount) || 5000;
   if (!Number.isInteger(amount) || amount < min || amount > max) {
-    return fail(`❌ Jumlah tidak valid. Masukkan angka **${num(min)} – ${num(max)}** Robux.`, true);
+    return fail(`❌ Jumlah tidak valid. Masukkan angka **${num(min)} – ${num(max)}** Robux${step > 1 ? ` (kelipatan ${num(step)})` : ''}.`, true);
+  }
+  if (amount % step !== 0) {
+    return fail(`❌ Jumlah harus **kelipatan ${num(step)}** Robux (contoh: ${num(min)}, ${num(min + step)}, ${num(min + step * 2)}).`, true);
   }
   if (!isProductOpen(product)) return fail(`🔴 Maaf, **${product.label}** sedang **TUTUP** atau stock sudah habis.`);
   if (amount > state.stock) {
