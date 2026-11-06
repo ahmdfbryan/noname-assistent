@@ -57,7 +57,8 @@ const wib = () => {
 
 // ───────────────────────── Ringkasan per produk ─────────────────────────
 function priceText(cfg, p) {
-  if (p.type === 'robux' || p.type === 'gamepass') return `\`${rupiah(V.rateOf(cfg, p))} / Robux\``;
+  if (p.type === 'robux') return `\`${rupiah(V.rateOf(cfg, p))} / Robux\` • min \`${num(V.minAmountOf(p))}\``;
+  if (p.type === 'gamepass') return `\`${rupiah(V.rateOf(cfg, p))} / Robux\``;
   if (p.type === 'canva' || p.type === 'boost') return plansOf(p).map((x) => `${x.label} \`${rupiah(x.price)}\``).join(' • ') || '`-`';
   if (p.type === 'rekber') {
     const fees = (p.feeTiers || []).map((x) => (x.percent != null ? null : Number(x.fee))).filter((x) => x != null);
@@ -337,6 +338,7 @@ function productView(guild, cfg, p, notice) {
   if (hasStock(p)) edit.push(btn(`store:cpstock:${p.id}`, p.type === 'boost' ? 'Atur Stock per Paket' : 'Atur Stock', '📦', ButtonStyle.Primary));
   if (hasStock(p) && p.type !== 'boost') edit.push(btn(`store:cpadd:${p.id}`, 'Tambah Stock', '➕', ButtonStyle.Primary));
   if (p.type === 'robux' || p.type === 'gamepass') edit.push(btn(`store:cprate:${p.id}`, 'Ubah Rate', '💱', ButtonStyle.Primary));
+  if (p.type === 'robux') edit.push(btn(`store:cpmin:${p.id}`, 'Minimal Order', '🔻', ButtonStyle.Primary));
   if (p.type === 'canva' || p.type === 'boost') edit.push(btn(`store:cpprice:${p.id}`, 'Ubah Harga Paket', '💱', ButtonStyle.Primary));
   if (custom) edit.push(btn(`store:cpreset:${p.id}`, 'Reset Harga', '↩️'));
   if (edit.length) rows.push(rowOf(...edit));
@@ -482,6 +484,18 @@ function rateModal(cfg, p) {
     .setTitle(`Ubah Rate ${p.label}`.slice(0, 45))
     .addLabelComponents(input('value', 'Rate baru (Rp per 1 Robux)', { value: V.rateOf(cfg, p), desc: `Sekarang ${rupiah(V.rateOf(cfg, p))} / Robux. Ticket berjalan tetap pakai rate lama.` }));
 }
+function minModal(p) {
+  const step = V.stepOf(p);
+  return new ModalBuilder()
+    .setCustomId(`store:cpmmin:${p.id}`)
+    .setTitle(`Minimal Order ${p.label}`.slice(0, 45))
+    .addLabelComponents(
+      input('value', 'Minimal order (Robux)', {
+        value: V.minAmountOf(p),
+        desc: `Sekarang ${num(V.minAmountOf(p))} Robux${step > 1 ? ` • harus kelipatan ${num(step)}` : ''}. Maksimal ${num(p.maxAmount || 5000)}.`,
+      }),
+    );
+}
 function priceModal(p) {
   return new ModalBuilder()
     .setCustomId(`store:cpmprice:${p.id}`)
@@ -530,7 +544,7 @@ async function handle(interaction, action, arg) {
     return true;
   }
   const tool = T.ACTIONS.includes(action);
-  if (!tool && !['cpsel', 'cptog', 'cpopen', 'cpclose', 'cpreset', 'cpstatus', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmprice', 'cpmreason'].includes(action)) return false;
+  if (!tool && !['cpsel', 'cptog', 'cpopen', 'cpclose', 'cpreset', 'cpstatus', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpmin', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmmin', 'cpmprice', 'cpmreason'].includes(action)) return false;
   if (!isAdmin(interaction.member)) {
     await interaction.reply({ content: '⛔ Panel ini khusus **Administrator**.', flags: EPH }).catch(() => {});
     return true;
@@ -642,6 +656,10 @@ async function handle(interaction, action, arg) {
     await interaction.showModal(rateModal(cfg, p));
     return true;
   }
+  if (action === 'cpmin') {
+    await interaction.showModal(minModal(p));
+    return true;
+  }
   if (action === 'cpprice') {
     if (!plansOf(p).length) return void (await reply('ℹ️ Produk ini tidak punya paket.')) || true;
     await interaction.showModal(priceModal(p));
@@ -703,6 +721,23 @@ async function handle(interaction, action, arg) {
     logAction(`💱 <@${by}> rate **${p.label}**: ${rupiah(before)} → ${rupiah(v)}`);
     const announced = before !== v ? await announcePrice(guild, cfg, p, [{ label: 'Rate', before, after: v, suffix: ' / Robux' }]) : false;
     await answer(`💱 Rate **${p.label}**: ${rupiah(before)} → **${rupiah(v)} / Robux**.${announced ? '\n📢 Perubahan harga sudah **diumumkan** di channel stock.' : ''}\n-# Ticket yang sudah berjalan tetap memakai rate lama.`);
+    refresh();
+    return true;
+  }
+  if (action === 'cpmmin') {
+    const step = V.stepOf(p);
+    const v = parseNum(field('value'));
+    const max = Number(p.maxAmount) || 5000;
+    if (!Number.isFinite(v) || !Number.isInteger(v) || v < step) return void (await answer(`❌ Minimal order tidak valid. Isi angka bulat, minimal **${num(step)}**.`)) || true;
+    if (v % step !== 0) return void (await answer(`❌ Minimal order harus **kelipatan ${num(step)}** (contoh: ${num(step)}, ${num(step * 2)}, ${num(step * 5)}).`)) || true;
+    if (v > max) return void (await answer(`❌ Minimal order tidak boleh lebih dari maksimal (**${num(max)} Robux**).`)) || true;
+    const before = V.minAmountOf(p);
+    if (v === Number(p.minAmount)) delete state.minAmounts[p.id];
+    else state.minAmounts[p.id] = v;
+    save();
+    ctx.refreshPanel();
+    logAction(`🔻 <@${by}> minimal order **${p.label}**: ${num(before)} → ${num(v)} Robux`);
+    await answer(`🔻 Minimal order **${p.label}**: ${num(before)} → **${num(v)} Robux**${step > 1 ? ` (kelipatan ${num(step)})` : ''}.\n-# Berlaku untuk order baru. Pilihan jumlah di bawah ${num(v)} otomatis disembunyikan dari pembeli.`);
     refresh();
     return true;
   }
