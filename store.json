@@ -152,6 +152,7 @@
         1000
       ],
       "minAmount": 100,
+      "amountStep": 100,
       "maxAmount": 5000,
       "howTo": {
         "intro": "Robux dikirim **langsung ke akun Roblox kamu** melalui Visend. Cepat, praktis, tanpa perlu membuat gamepass.",
