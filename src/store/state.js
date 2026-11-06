@@ -12,6 +12,7 @@ const DEFAULT = {
   stock: 0, // stock Robux
   stocks: {}, // stock produk lain { productId: jumlah } — misal slot Canva Pro
   rates: {}, // { productId: rate }
+  minAmounts: {}, // { productId: minimal order Robux } — diatur dari Store Control Center
   panel: null, // { channelId, messageId }
   leaderboard: null, // { channelId, messageId }
   reputation: null, // panel Store Reputation { channelId, messageId }
