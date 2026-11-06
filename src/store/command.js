@@ -9,7 +9,7 @@ const H = require('./howto');
 const C = require('./catalog');
 const I = require('./instant');
 const F = require('./forum');
-const { setProductsOpen, reopenIfAutoClosed, closeIfSoldOut, announce, refreshPanel, onDanaMasukCommand, migrateToV2, postCatalog } = require('./flow');
+const { setProductsOpen, closeIfSoldOut, announce, refreshPanel, onDanaMasukCommand, migrateToV2, postCatalog } = require('./flow');
 
 const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 
@@ -242,12 +242,11 @@ const storeCommand = {
         text: `Stock **${label}** diperbarui: **${num(before)} → ${num(after)} ${unit}**.`,
       });
       await closeIfSoldOut(guild, `📦 **Stock ${target.label} sudah HABIS!** ${target.label} otomatis ditutup.`, target);
-      const reopened = await reopenIfAutoClosed(guild, target);
+      // Update stock mengikuti kondisi produk — TIDAK membuka produk yang sedang tutup. Buka/tutup hanya lewat panel / `/store buka`.
       return interaction.editReply(
         `📦 Stock **${label}**: **${num(before)} → ${num(after)} ${unit}**.` +
           (plan ? `\n🚀 Total stock ${target.label}: **${num(stockOf(target))} ${unit}**` : '') +
-          (reopened ? `\n🟢 **${target.label}** otomatis **DIBUKA** lagi (sebelumnya tutup karena stock habis).` : '') +
-          (!isProductOpen(target) && after > 0 ? `\n**${target.label}** masih TUTUP (ditutup manual) — buka dengan \`/store buka\`.` : ''),
+          (!isProductOpen(target) && stockOf(target) > 0 ? `\nℹ️ **${target.label}** masih **TUTUP** — buka lewat panel / \`/store buka\` kalau mau dijual.` : ''),
       );
     }
 
