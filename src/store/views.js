@@ -1949,10 +1949,10 @@ function buildPayRejected(guild, cfg, t, reason, by) {
 // ───────────────────────── Log order (channel log admin) ─────────────────────────
 function duration(ms) {
   const m = Math.max(1, Math.round(ms / 60000));
-  if (m < 60) return `${m} menit`;
+  if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam ${m % 60} menit`;
-  return `${Math.floor(h / 24)} hari ${h % 24} jam`;
+  if (h < 24) return `${h} hr ${m % 60} min`;
+  return `${Math.floor(h / 24)} d ${h % 24} hr`;
 }
 
 /** Samarkan username Roblox untuk log publik: Builderman → Bu******an */
@@ -1963,8 +1963,8 @@ function maskName(n) {
 }
 
 const PUBLIC_STATUS = {
-  robux: { open: '⏳ Sedang Diproses', completed: '✅ Selesai', cancelled: '❌ Dibatalkan', refund: '💸 Refund' },
-  rekber: { open: '🔄 Sedang Berjalan', completed: '✅ Selesai', cancelled: '❌ Dibatalkan', refund: '💸 Refund' },
+  robux: { open: '⏳ Processing', completed: '✅ Completed', cancelled: '❌ Cancelled', refund: '💸 Refunded' },
+  rekber: { open: '🔄 In Progress', completed: '✅ Completed', cancelled: '❌ Cancelled', refund: '💸 Refunded' },
 };
 
 /**
@@ -2047,13 +2047,13 @@ const row = (label, value) => `» **${label} :** ${value}`;
  * Premium App (QRIS otomatis) → "`🔳 QRIS • Otomatis`". Tidak diketahui (misal Dana Masuk manual tanpa bukti) → null.
  */
 function paidWith(cfg, t) {
-  if (kindOf(t) === 'instant' && t.ins?.mode && t.ins.mode !== 'manual') return '`🔳 QRIS • Otomatis`';
+  if (kindOf(t) === 'instant' && t.ins?.mode && t.ins.mode !== 'manual') return '`🔳 QRIS • Automatic`';
   const b = t.payment?.bank;
   if (!b || b === '-') return null;
   if (/^qris$/i.test(b)) return '`🔳 QRIS`';
   const m = payMethods(cfg).find((x) => x.bank === b);
   if (!m) return `\`💳 ${b}\``;
-  return `\`${m.emoji || (isWallet(m) ? '📱' : '🏦')} ${m.bank} • ${isWallet(m) ? 'E-Wallet' : 'Transfer Bank'}\``;
+  return `\`${m.emoji || (isWallet(m) ? '📱' : '🏦')} ${m.bank} • ${isWallet(m) ? 'E-Wallet' : 'Bank Transfer'}\``;
 }
 /** Isi komentar aman di dalam kotak code block. */
 const boxed = (s) => '```\n' + String(s || '-').replace(/`/g, 'ˋ').slice(0, 900) + '\n```';
@@ -2091,51 +2091,51 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
   let lines;
   if (k === 'rekber') {
     lines = [
-      row('Layanan', '`🤝 Rekber`'),
-      row('Pembeli', `<@${t.buyerId}>`),
-      row('Penjual', `<@${t.sellerId}>`),
-      row('Objek', `\`${t.item.slice(0, 80)}\``),
-      row('Nominal', `\`${rupiah(t.nominal)}\``),
+      row('Service', '`🤝 Escrow (Rekber)`'),
+      row('Buyer', `<@${t.buyerId}>`),
+      row('Seller', `<@${t.sellerId}>`),
+      row('Item', `\`${t.item.slice(0, 80)}\``),
+      row('Amount', `\`${rupiah(t.nominal)}\``),
     ];
   } else if (k === 'canva') {
-    lines = [row('Pembeli', `<@${t.userId}>`), row('Produk', `\`${t.productLabel}\``), row('Paket', `\`${t.plan.label}\``), row('Harga', `\`${rupiah(t.price)}\``)];
+    lines = [row('Buyer', `<@${t.userId}>`), row('Product', `\`${t.productLabel}\``), row('Plan', `\`${t.plan.label}\``), row('Price', `\`${rupiah(t.price)}\``)];
   } else if (k === 'boost') {
     lines = [
-      row('Pembeli', `<@${t.userId}>`),
-      row('Produk', `\`${t.productLabel}\``),
-      row('Paket', `\`${num(t.qty)} Boost • ${t.plan.label}\``),
+      row('Buyer', `<@${t.userId}>`),
+      row('Product', `\`${t.productLabel}\``),
+      row('Plan', `\`${num(t.qty)} Boost • ${t.plan.label}\``),
       row('Server', `\`${t.server?.name || '-'}\``),
-      row('Harga', `\`${rupiah(t.price)}\``),
+      row('Price', `\`${rupiah(t.price)}\``),
     ];
   } else if (k === 'instant') {
     lines = [
-      row('Pembeli', `<@${t.userId}>`),
-      row('Produk', `\`${t.ins?.product || t.productLabel}\``),
-      row('Varian', `\`${t.ins?.variant || '-'} × ${num(t.qty || 1)}\``),
-      row('Pengiriman', '`⚡ Otomatis`'),
-      row('Harga', `\`${rupiah(t.price)}\``),
+      row('Buyer', `<@${t.userId}>`),
+      row('Product', `\`${t.ins?.product || t.productLabel}\``),
+      row('Variant', `\`${t.ins?.variant || '-'} × ${num(t.qty || 1)}\``),
+      row('Delivery', '`⚡ Automatic`'),
+      row('Price', `\`${rupiah(t.price)}\``),
     ];
   } else {
     lines = [
-      row('Pembeli', `<@${t.userId}>`),
-      row('Produk', `\`${t.productLabel}\``),
-      row(k === 'gamepass' ? 'Robux Diterima' : 'Jumlah', `\`${num(t.amount)} Robux\``),
-      row('Akun Roblox', `\`@${maskName(t.roblox?.name)}\``), // disensor: Bu******an
-      row('Harga', `\`${rupiah(t.price)}\``),
+      row('Buyer', `<@${t.userId}>`),
+      row('Product', `\`${t.productLabel}\``),
+      row(k === 'gamepass' ? 'Robux Received' : 'Amount', `\`${num(t.amount)} Robux\``),
+      row('Roblox Account', `\`@${maskName(t.roblox?.name)}\``), // disensor: Bu******an
+      row('Price', `\`${rupiah(t.price)}\``),
     ];
   }
   const via = paidWith(cfg, t);
-  if (via) lines.push(row('Pembayaran', via));
+  if (via) lines.push(row('Payment', via));
   lines.push(row('Order ID', `\`${t.id}\``));
   // Total belanja pembeli di toko (semua order Completed) + tier spender.
   const sp = state.spenders?.[buyerId];
   const after = [
-    r ? row('Rating', `${STARS(r.rating)}  **${r.rating}/5**`) : row('Status', '`✅ Transaksi Berhasil`'),
-    `**💬 Komentar**\n${boxed(r ? r.comment : 'Pembeli tidak memberikan ulasan.')}`,
+    r ? row('Rating', `${STARS(r.rating)}  **${r.rating}/5**`) : row('Status', '`✅ Transaction Successful`'),
+    `**💬 Comment**\n${boxed(r ? r.comment : 'The buyer did not leave a review.')}`,
   ];
   return v2Card({
     color: color(cfg, 'brand', 0x3498db),
-    header: `## 🧾 Testimoni #${String(no).padStart(4, '0')}`,
+    header: `## 🧾 Testimonial #${String(no).padStart(4, '0')}`,
     lines,
     thumb: buyer?.displayAvatarURL({ extension: 'png', size: 256 }) || guild.iconURL({ extension: 'png', size: 256 }) || null,
     after,
@@ -2160,42 +2160,42 @@ function buildOrderLogV2(guild, cfg, t) {
   const pub = PUBLIC_STATUS[rekber ? 'rekber' : 'robux'][t.status];
   const lines = [];
   if (rekber) {
-    if (pl.showBuyer) lines.push(row('Pembeli', `<@${t.buyerId}>`), row('Penjual', `<@${t.sellerId}>`));
-    lines.push(row('Layanan', '`🤝 Rekber`'));
-    if (pl.showRekberItem) lines.push(row('Objek', `\`${t.item.slice(0, 80)}\``));
-    if (pl.showPrice) lines.push(row('Nominal', `\`${rupiah(t.nominal)}\``));
+    if (pl.showBuyer) lines.push(row('Buyer', `<@${t.buyerId}>`), row('Seller', `<@${t.sellerId}>`));
+    lines.push(row('Service', '`🤝 Escrow (Rekber)`'));
+    if (pl.showRekberItem) lines.push(row('Item', `\`${t.item.slice(0, 80)}\``));
+    if (pl.showPrice) lines.push(row('Amount', `\`${rupiah(t.nominal)}\``));
   } else if (k === 'canva') {
-    if (pl.showBuyer) lines.push(row('Pembeli', `<@${t.userId}>`));
-    lines.push(row('Produk', `\`${t.productLabel}\``), row('Paket', `\`${t.plan.label}\``));
+    if (pl.showBuyer) lines.push(row('Buyer', `<@${t.userId}>`));
+    lines.push(row('Product', `\`${t.productLabel}\``), row('Plan', `\`${t.plan.label}\``));
     if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
     lines.push(row('Email', `\`${maskEmail(t.email)}\``));
   } else if (k === 'boost') {
-    if (pl.showBuyer) lines.push(row('Pembeli', `<@${t.userId}>`));
-    lines.push(row('Produk', `\`${t.productLabel}\``), row('Paket', `\`${num(t.qty)} Boost • ${t.plan.label}\``));
+    if (pl.showBuyer) lines.push(row('Buyer', `<@${t.userId}>`));
+    lines.push(row('Product', `\`${t.productLabel}\``), row('Plan', `\`${num(t.qty)} Boost • ${t.plan.label}\``));
     if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
   } else if (k === 'instant') {
-    if (pl.showBuyer) lines.push(row('Pembeli', `<@${t.userId}>`));
-    lines.push(row('Produk', `\`${t.ins?.product || t.productLabel}\``), row('Varian', `\`${t.ins?.variant || '-'} × ${num(t.qty || 1)}\``), row('Pengiriman', '`⚡ Otomatis`'));
+    if (pl.showBuyer) lines.push(row('Buyer', `<@${t.userId}>`));
+    lines.push(row('Product', `\`${t.ins?.product || t.productLabel}\``), row('Variant', `\`${t.ins?.variant || '-'} × ${num(t.qty || 1)}\``), row('Delivery', '`⚡ Automatic`'));
     if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
   } else {
-    if (pl.showBuyer) lines.push(row('Pembeli', `<@${t.userId}>`));
-    lines.push(row('Produk', `\`${t.productLabel}\``), row(k === 'gamepass' ? 'Robux Diterima' : 'Jumlah', `\`${num(t.amount)} Robux\``));
-    if (k === 'gamepass') lines.push(row('Harga Gamepass', `\`${num(t.before)} Robux\``));
+    if (pl.showBuyer) lines.push(row('Buyer', `<@${t.userId}>`));
+    lines.push(row('Product', `\`${t.productLabel}\``), row(k === 'gamepass' ? 'Robux Received' : 'Amount', `\`${num(t.amount)} Robux\``));
+    if (k === 'gamepass') lines.push(row('Gamepass Price', `\`${num(t.before)} Robux\``));
     lines.push(row('Rate', `\`${rupiah(t.rate)} / Robux\``));
     if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
-    lines.push(row('Akun Roblox', `\`@${pl.maskRoblox ? maskName(t.roblox?.name) : t.roblox?.name}\``));
+    lines.push(row('Roblox Account', `\`@${pl.maskRoblox ? maskName(t.roblox?.name) : t.roblox?.name}\``));
   }
   const via = paidWith(cfg, t);
-  if (via) lines.push(row('Pembayaran', via));
-  const status = [row('Status', `**${pub}**`), row('Order Masuk', ts(t.createdAt, 'f'))];
+  if (via) lines.push(row('Payment', via));
+  const status = [row('Status', `**${pub}**`), row('Order Placed', ts(t.createdAt, 'f'))];
   if (t.closedAt) {
-    status.push(row(t.status === 'completed' ? 'Selesai Pada' : 'Ditutup Pada', ts(t.closedAt, 'f')), row('Waktu Proses', `\`${duration(t.closedAt - t.createdAt)}\``));
+    status.push(row(t.status === 'completed' ? 'Completed At' : 'Closed At', ts(t.closedAt, 'f')), row('Processing Time', `\`${duration(t.closedAt - t.createdAt)}\``));
   }
   if (t.testimony) status.push(row('Rating', `${STARS(t.testimony.rating)}  **${t.testimony.rating}/5**`));
   const timeline = (t.log || []).slice(-10).map((x) => `${ts(x.at, 't')} ┃ ${x.text}`).join('\n');
   return v2Card({
     color: statusColor,
-    header: `## ${rekber ? '🤝' : '🧾'} ${t.id} • ${pub}\n-# ${rekber ? 'Rekber Log' : 'Order Log'}`,
+    header: `## ${rekber ? '🤝' : '🧾'} ${t.id} • ${pub}\n-# ${rekber ? 'Escrow Log' : 'Order Log'}`,
     lines,
     // Foto profil pembeli (disimpan saat log dibuat); fallback ke logo server.
     thumb: t.buyerAvatar || guild.client?.users?.cache?.get(rekber ? t.buyerId : t.userId)?.displayAvatarURL({ extension: 'png', size: 256 }) || guild.iconURL({ extension: 'png', size: 256 }) || null,
