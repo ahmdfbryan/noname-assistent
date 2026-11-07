@@ -2,19 +2,30 @@ const fs = require('fs');
 const { fetchAllMembers } = require('./member-cache');
 const path = require('path');
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, Events } = require('discord.js');
-const { state: storeState } = require('./store/state');
+const { state: storeState, isProductOpen } = require('./store/state');
+const { loadConfig: loadStoreConfig, groupOf } = require('./store/config');
 
 /**
  * Server Stats: kategori + voice channel terkunci yang namanya menampilkan angka terkini.
- * Members / Active Tickets / Total Orders. Teks di server-stats.json.
- * Discord membatasi ganti nama channel 2x per 10 menit → di-update tiap updateMinutes (min. 5) & hanya kalau angkanya berubah.
+ * Active Tickets / Total Orders + status buka/tutup produk (🟢 buka, 🔴 tutup). Teks di server-stats.json.
+ * Angka dicek tiap 1 menit; nama channel hanya diganti kalau angkanya berubah.
+ * Discord membatasi ganti nama channel 2x per 10 menit → tiap channel diganti paling cepat 5 menit sekali
+ * (perubahan di antaranya otomatis menyusul begitu jedanya lewat, tidak perlu refresh manual).
  */
 const FILE = path.join(__dirname, '..', 'server-stats.json');
 const DATA = path.join(__dirname, '..', 'data', 'server-stats.json');
-const KEYS = ['members', 'tickets', 'orders'];
+const KEYS = ['tickets', 'orders', 'robux', 'gamepass', 'digital', 'premium'];
+const STATUS_KEYS = ['robux', 'gamepass', 'digital', 'premium']; // nilainya buka/tutup, bukan angka
 const DEFAULTS = {
   categoryName: '—・✦ Noname Studios Creative ✦・—',
-  channels: { members: '👥 Members: {count}', tickets: '🎫 Active Tickets: {count}', orders: '✅ Total Orders: {count}' },
+  channels: {
+    tickets: '🎫 Active Tickets: {count}',
+    orders: '✅ Total Orders: {count}',
+    robux: '{status} Robux Visend',
+    gamepass: '{status} Robux Gamepass',
+    digital: '{status} Produk Digital',
+    premium: '{status} Premium App',
+  },
   countBots: false,
   formatNumber: false,
   updateMinutes: 5,
@@ -55,16 +66,39 @@ async function memberCount(guild, cfg) {
   return guild.memberCount;
 }
 
+/** Ticket aktif = ticket order store (termasuk Premium App) + ticket NCS Ticket Center. */
+function activeTickets() {
+  const store = Object.values(storeState.tickets || {}).filter((t) => t.status === 'open').length;
+  let ncs = 0;
+  try {
+    ncs = require('./support-ticket').openCount(); // dimuat saat dipakai (hindari require melingkar)
+  } catch {}
+  return store + ncs;
+}
+
+/** Status buka (true) / tutup (false) tiap produk. Produk Digital & Premium App = buka kalau ada minimal satu produknya yang buka. */
+function productStatus() {
+  const products = (loadStoreConfig()?.products || []).filter((p) => p.type !== 'soon');
+  const anyOpen = (list) => list.some((p) => isProductOpen(p));
+  return {
+    robux: anyOpen(products.filter((p) => p.id === 'robux-visend')),
+    gamepass: anyOpen(products.filter((p) => p.id === 'robux-gamepass')),
+    digital: anyOpen(products.filter((p) => groupOf(p) === 'digital')),
+    premium: anyOpen(products.filter((p) => p.type === 'instant')),
+  };
+}
+
 async function values(guild, cfg) {
-  const members = await memberCount(guild, cfg);
-  const tickets = Object.values(storeState.tickets || {}).filter((t) => t.status === 'open').length;
+  const tickets = activeTickets();
   const orders = (storeState.stats?.transactions || 0) + (storeState.stats?.rekber || 0);
-  return { members, tickets, orders };
+  return { tickets, orders, ...productStatus() };
 }
 function nameFor(key, value, cfg) {
+  if (STATUS_KEYS.includes(key)) return String(cfg.channels[key] || `{status} ${key}`).replace(/\{status\}/g, value ? '🟢' : '🔴').slice(0, 100);
   const n = cfg.formatNumber ? Number(value).toLocaleString('id-ID') : String(value);
   return String(cfg.channels[key] || `${key}: {count}`).replace(/\{count\}/g, n).slice(0, 100);
 }
+const summary = (v) => `🎫 ${v.tickets} • ✅ ${v.orders} • ${v.robux ? '🟢' : '🔴'} Robux • ${v.gamepass ? '🟢' : '🔴'} Gamepass • ${v.digital ? '🟢' : '🔴'} Digital • ${v.premium ? '🟢' : '🔴'} Premium`;
 
 /** Izin: semua bisa melihat tapi tidak bisa masuk (gembok 🔒). */
 function lockedOverwrites(guild) {
@@ -75,6 +109,8 @@ function lockedOverwrites(guild) {
 }
 
 let busy = false;
+const RENAME_GAP = 5 * 60 * 1000; // aman dari batas Discord (2x / 10 menit per channel)
+const lastRename = {}; // key → waktu ganti nama terakhir
 /** Perbarui nama channel yang angkanya berubah. force = abaikan cek nama sama. */
 async function update(client, { force = false } = {}) {
   if (busy || !data.guildId) return { ok: false, reason: 'belum di-setup' };
@@ -89,6 +125,26 @@ async function update(client, { force = false } = {}) {
       const cat = guild.channels.cache.get(data.categoryId) || (await guild.channels.fetch(data.categoryId).catch(() => null));
       if (cat && cat.name !== cfg.categoryName) await cat.setName(cfg.categoryName).catch(() => {});
     }
+    // Channel "Members" (versi lama) dihapus otomatis; channel baru yang belum ada dibuat di kategori yang sama.
+    if (data.channels?.members) {
+      const old = guild.channels.cache.get(data.channels.members) || (await guild.channels.fetch(data.channels.members).catch(() => null));
+      if (old) await old.delete('Server stats: Members dihapus').catch(() => {});
+      delete data.channels.members;
+      save();
+    }
+    if (data.categoryId && data.channels && guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      for (const key of KEYS) {
+        if (data.channels[key]) continue;
+        const made = await guild.channels
+          .create({ name: nameFor(key, v[key], cfg), type: ChannelType.GuildVoice, parent: data.categoryId, permissionOverwrites: lockedOverwrites(guild) })
+          .catch((e) => (console.warn(`[server-stats] gagal membuat channel ${key}:`, e.message), null));
+        if (made) {
+          data.channels[key] = made.id;
+          lastRename[key] = Date.now();
+          save();
+        }
+      }
+    }
     for (const key of KEYS) {
       const id = data.channels?.[key];
       if (!id) continue;
@@ -96,6 +152,9 @@ async function update(client, { force = false } = {}) {
       if (!ch) continue;
       const name = nameFor(key, v[key], cfg);
       if (!force && ch.name === name) continue;
+      // Baru saja diganti → tunggu jeda (dicek lagi tiap menit, otomatis menyusul).
+      if (!force && Date.now() - (lastRename[key] || 0) < RENAME_GAP) continue;
+      lastRename[key] = Date.now();
       // Batas Discord: ganti nama channel 2x / 10 menit. Kalau kena batas, setName menunggu → beri batas waktu.
       await Promise.race([ch.setName(name, 'Server stats'), new Promise((r) => setTimeout(r, 15000))]).catch((e) =>
         console.warn(`[server-stats] gagal ganti nama ${key}:`, e.message),
@@ -153,7 +212,7 @@ const serverStatsCommand = {
       await category.setPosition(0).catch(() => {});
       return interaction.editReply(
         `✅ Server stats dibuat di kategori **${cfg.categoryName}** (paling atas).\n` +
-          `👥 ${v.members} • 🎫 ${v.tickets} • ✅ ${v.orders}\nAngka ter-update otomatis tiap ~${Math.max(5, Number(cfg.updateMinutes) || 5)} menit.`,
+          `${summary(v)}\nAngka & status ter-update otomatis (dicek tiap menit, maks. 1x ganti nama per 5 menit per channel — batas Discord).`,
       );
     }
 
@@ -162,7 +221,7 @@ const serverStatsCommand = {
       const res = await update(interaction.client, { force: true });
       if (!res.ok) return interaction.editReply(`❌ Gagal: ${res.reason}`);
       return interaction.editReply(
-        `✅ Diperbarui: 👥 ${res.values.members} • 🎫 ${res.values.tickets} • ✅ ${res.values.orders}\n` +
+        `✅ Diperbarui: ${summary(res.values)}\n` +
           '_Catatan: Discord membatasi ganti nama channel 2x / 10 menit, jadi perubahan bisa tertunda._',
       );
     }
@@ -195,8 +254,8 @@ async function removeAll(guild) {
 function registerServerStats(client) {
   client.once(Events.ClientReady, () => {
     update(client).catch(() => {});
-    const every = Math.max(5, Number(loadConfig().updateMinutes) || 5) * 60 * 1000;
-    setInterval(() => update(client).catch((e) => console.warn('[server-stats]', e.message)), every);
+    // Cek angka tiap 1 menit (ringan: hanya hitung data di memori). Ganti nama tetap dibatasi RENAME_GAP per channel.
+    setInterval(() => update(client).catch((e) => console.warn('[server-stats]', e.message)), 60 * 1000);
   });
   // Channel stats dihapus manual → berhenti meng-update channel itu.
   client.on(Events.ChannelDelete, (ch) => {
