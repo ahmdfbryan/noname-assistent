@@ -589,7 +589,7 @@ async function createOrder(interaction, productId, amount) {
     await msg.pin().catch(() => {});
     ticket.messageId = msg.id;
     save();
-    logOrder(guild, ticket, '🆕 Order masuk & menunggu pembayaran');
+    logOrder(guild, ticket, '🆕 Order received — awaiting payment');
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
@@ -847,7 +847,7 @@ async function onRekberConfirm(interaction, yes) {
     await msg.pin().catch(() => {});
     ticket.messageId = msg.id;
     save();
-    logOrder(guild, ticket, '🆕 Transaksi rekber dimulai');
+    logOrder(guild, ticket, '🆕 Escrow transaction started');
 
     await channel.send(v2(V.buildRekberStep(guild, cfg, ticket, 'invite'))).catch(() => {});
 
@@ -875,17 +875,17 @@ async function onRekberConfirm(interaction, yes) {
 /** Update tampilan ticket rekber + kirim log langkah di channel. */
 // Teks riwayat untuk log publik (tanpa nama admin / detail sensitif).
 const STEP_LOG = {
-  agreed: () => '🤝 Kedua pihak menyetujui transaksi',
-  funded: () => '💰 Dana pembeli diamankan admin',
-  received: () => '📦 Barang / jasa diterima pembeli',
+  agreed: () => '🤝 Both parties agreed to the transaction',
+  funded: () => '💰 Buyer’s funds secured by admin',
+  received: () => '📦 Buyer received the item / service',
 };
 const CLOSE_LOG = {
-  robux: { completed: '✅ Robux berhasil dikirim', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
-  canva: { completed: '✅ Canva Pro aktif', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
-  instant: { completed: '✅ Akun terkirim', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
-  boost: { completed: '✅ Server Boost aktif', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
-  gamepass: { completed: '✅ Gamepass dibeli — Robux masuk setelah masa pending', cancelled: '❌ Order dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
-  rekber: { completed: '✅ Dana dicairkan ke penjual', cancelled: '❌ Transaksi dibatalkan', refund: '💸 Dana dikembalikan ke pembeli' },
+  robux: { completed: '✅ Robux delivered successfully', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
+  canva: { completed: '✅ Canva Pro activated', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
+  instant: { completed: '✅ Account delivered', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
+  boost: { completed: '✅ Server Boost activated', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
+  gamepass: { completed: '✅ Gamepass purchased — Robux arrive after the pending period', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
+  rekber: { completed: '✅ Funds released to the seller', cancelled: '❌ Transaction cancelled', refund: '💸 Funds returned to the buyer' },
 };
 
 async function advanceRekber(interaction, t, step) {
@@ -1211,7 +1211,7 @@ async function onGamepassConfirm(interaction, yes) {
     await msg.pin().catch(() => {});
     ticket.messageId = msg.id;
     save();
-    logOrder(guild, ticket, '🆕 Order masuk & menunggu pembayaran');
+    logOrder(guild, ticket, '🆕 Order received — awaiting payment');
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
@@ -1411,7 +1411,7 @@ async function onCanvaConfirm(interaction, yes) {
     await msg.pin().catch(() => {});
     ticket.messageId = msg.id;
     save();
-    logOrder(guild, ticket, '🆕 Order masuk & menunggu pembayaran');
+    logOrder(guild, ticket, '🆕 Order received — awaiting payment');
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
@@ -1464,7 +1464,7 @@ async function onCanvaInvite(interaction, ticketId) {
   if (!t) return;
   t.stage.invited = true;
   t.stage.invitedAt = Date.now();
-  return advanceCanva(interaction, t, 'invited', '📨 Undangan team dikirim ke email pembeli');
+  return advanceCanva(interaction, t, 'invited', '📨 Team invitation sent to the buyer’s email');
 }
 
 /** Pembeli: sudah menerima undangan & bergabung ke team. */
@@ -1475,7 +1475,7 @@ async function onCanvaJoined(interaction, ticketId) {
   if (!t.stage.invited) return interaction.reply({ content: 'Tunggu admin mengirim undangan terlebih dahulu.', flags: EPH });
   t.stage.joined = true;
   t.stage.joinedAt = Date.now();
-  return advanceCanva(interaction, t, 'joined', '🎉 Pembeli bergabung ke team Canva Pro');
+  return advanceCanva(interaction, t, 'joined', '🎉 Buyer joined the Canva Pro team');
 }
 
 // ══════════════════════ SERVER BOOST ══════════════════════
@@ -1657,7 +1657,7 @@ async function onBoostConfirm(interaction, yes) {
     await msg.pin().catch(() => {});
     ticket.messageId = msg.id;
     save();
-    logOrder(guild, ticket, '🆕 Order masuk & menunggu pembayaran');
+    logOrder(guild, ticket, '🆕 Order received — awaiting payment');
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
@@ -1706,7 +1706,7 @@ async function onBoostSent(interaction, ticketId) {
   if (!V.isPaid(t)) return interaction.reply({ content: '⚠️ Pembayaran ticket ini **belum diverifikasi**. Konfirmasi dana masuk dulu ya.', flags: EPH });
   t.stage.sent = true;
   t.stage.sentAt = Date.now();
-  return advanceBoost(interaction, t, 'sent', `🚀 ${num(t.qty)} boost dikirim ke server ${t.server?.name || ''}`.trim());
+  return advanceBoost(interaction, t, 'sent', `🚀 ${num(t.qty)} boost sent to server ${t.server?.name || ''}`.trim());
 }
 /** Pembeli: boost sudah masuk ke server. */
 async function onBoostReceived(interaction, ticketId) {
@@ -1716,7 +1716,7 @@ async function onBoostReceived(interaction, ticketId) {
   if (!t.stage.sent) return interaction.reply({ content: 'Tunggu admin mem-boost server kamu terlebih dahulu.', flags: EPH });
   t.stage.received = true;
   t.stage.receivedAt = Date.now();
-  return advanceBoost(interaction, t, 'received', '✅ Pembeli konfirmasi boost sudah masuk');
+  return advanceBoost(interaction, t, 'received', '✅ Buyer confirmed the boosts arrived');
 }
 
 // ══════════════════════ PEMBAYARAN (semua produk) ══════════════════════
@@ -1815,7 +1815,7 @@ async function onPayModal(interaction, ticketId) {
   await interaction.channel.send(v2({ ...base, ...extra, files: [{ attachment: upload.url, name: fileName }] })).catch(async () => {
     await interaction.channel.send(v2({ ...V.buildPaymentProof(guild, cfg, t, t.payment, upload.url), ...extra })).catch(() => {});
   });
-  logOrder(guild, t, '💳 Pembeli mengirim bukti pembayaran');
+  logOrder(guild, t, '💳 Buyer sent proof of payment');
   await refreshTicketMessage(guild, t);
   return interaction.editReply('✅ Bukti pembayaran terkirim! Admin akan segera memverifikasi pembayaranmu. ⏳');
 }
@@ -1855,7 +1855,7 @@ async function markPaid(guild, channel, t, { by, amount, note }) {
     await channel.send(v2(V.buildRekberStep(guild, cfg, t, 'funded'))).catch(() => {});
     if (note || nominal !== V.payAmount(t)) await channel.send(v2(V.buildDanaMasuk(guild, cfg, t, { amount: nominal, note, by }))).catch(() => {});
   } else {
-    logOrder(guild, t, '💰 Dana masuk — pesanan diproses');
+    logOrder(guild, t, '💰 Payment received — order is being processed');
     await channel.send(v2(V.buildDanaMasuk(guild, cfg, t, { amount: nominal, note, by }))).catch(() => {});
   }
   // Premium App: dana masuk (mode manual) → akun dikirim otomatis pakai saldo Waroengkuy.
@@ -2232,7 +2232,7 @@ async function onTestimonyModal(interaction, ticketId) {
   save();
 
   await postTestimony(interaction.guild, t);
-  logOrder(interaction.guild, t, `⭐ Pembeli memberi rating ${rating}/5`);
+  logOrder(interaction.guild, t, `⭐ Buyer rated ${rating}/5`);
   await stripRows(interaction.message);
   await interaction.channel
     .send(V.toV2(V.buildTestimonyThanks(interaction.guild, cfg, t, rating, Number(cfg.ticket?.deleteAfterSeconds) || 15)))
@@ -2272,7 +2272,7 @@ async function housekeeping() {
         t.deleteAt = now;
         save();
         if (cfg?.ticket?.postWithoutReview !== false && guild) await postTestimony(guild, t).catch((e) => console.warn(`[store] testimoni otomatis ${t.id}:`, e.message));
-        logOrder(guild, t, `⏰ Tidak ada ulasan — otomatis rating ${rating}/5`);
+        logOrder(guild, t, `⏰ No review — automatically rated ${rating}/5`);
         refreshPanel();
         refreshLeaderboard();
       }
@@ -2326,7 +2326,7 @@ async function onChannelDelete(channel) {
     t.closedAt = Date.now();
     t.closedBy = client.user.id;
     t.note = 'Channel ticket dihapus manual';
-    logOrder(channel.guild, t, kindOf(t) === 'rekber' ? '❌ Transaksi dibatalkan' : '❌ Order dibatalkan');
+    logOrder(channel.guild, t, kindOf(t) === 'rekber' ? '❌ Transaction cancelled' : '❌ Order cancelled');
     if (!['robux', 'canva', 'boost'].includes(kindOf(t))) {
       save();
     } else {
