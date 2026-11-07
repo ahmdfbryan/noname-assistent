@@ -761,7 +761,7 @@ async function onConfirm(interaction, yes) {
     await msg.pin().catch(() => {});
     t.messageId = msg.id;
     save();
-    ctx.logOrder(guild, t, '🆕 Order Premium App masuk & menunggu pembayaran');
+    ctx.logOrder(guild, t, '🆕 Premium App order received — awaiting payment');
 
     const url = channelUrl(guild.id, channel.id);
     const dmOk = await interaction.user
@@ -1041,7 +1041,7 @@ async function checkTicket(t, { manual = false } = {}) {
       if (['expired', 'cancelled'].includes(dep.status) || Date.now() > pay.expiresAt + 3 * 60000) {
         pay.status = 'expired';
         save();
-        if (t.status === 'open') await cancelTicket(t, 'Pembayaran QRIS kedaluwarsa', '⌛ Pembayaran kedaluwarsa');
+        if (t.status === 'open') await cancelTicket(t, 'Pembayaran QRIS kedaluwarsa', '⌛ Payment expired');
         return '⌛ Pembayaran kedaluwarsa.';
       }
       return manual ? `⏳ Belum ada pembayaran masuk. Bayar **tepat ${rupiah(pay.amount)}** sebelum ${ts(pay.expiresAt, 't')}.` : null;
@@ -1054,7 +1054,7 @@ async function checkTicket(t, { manual = false } = {}) {
         if (Date.now() > pay.expiresAt + 3 * 60000) {
           pay.status = 'expired';
           save();
-          if (t.status === 'open') await cancelTicket(t, 'Pembayaran QRIS kedaluwarsa', '⌛ Pembayaran kedaluwarsa');
+          if (t.status === 'open') await cancelTicket(t, 'Pembayaran QRIS kedaluwarsa', '⌛ Payment expired');
           return '⌛ Pembayaran kedaluwarsa.';
         }
         return manual ? `⏳ Belum ada pembayaran masuk. Bayar **tepat ${rupiah(pay.amount)}** sebelum ${ts(pay.expiresAt, 't')}.` : null;
@@ -1062,7 +1062,7 @@ async function checkTicket(t, { manual = false } = {}) {
       if (['expired', 'cancelled'].includes(o.status)) {
         pay.status = o.status;
         save();
-        if (t.status === 'open') await cancelTicket(t, o.status === 'expired' ? 'Pembayaran QRIS kedaluwarsa' : 'Pesanan dibatalkan', o.status === 'expired' ? '⌛ Pembayaran kedaluwarsa' : '❌ Order dibatalkan');
+        if (t.status === 'open') await cancelTicket(t, o.status === 'expired' ? 'Pembayaran QRIS kedaluwarsa' : 'Pesanan dibatalkan', o.status === 'expired' ? '⌛ Payment expired' : '❌ Order cancelled');
         return '⌛ Pesanan tidak aktif lagi.';
       }
       pay.status = 'paid';
@@ -1073,7 +1073,7 @@ async function checkTicket(t, { manual = false } = {}) {
         await alert(await guildOf(t), t, { title: 'Dibayar Setelah Dibatalkan', text: `Order QRIS \`${o.ref || o.id}\` dibayar setelah ticket ditutup. Akun ada di riwayat Waroeng — kirim manual ke <@${t.userId}>.` });
         return '⚠️ Pesanan sudah ditutup.';
       }
-      ctx.logOrder(await guildOf(t), t, '💰 Pembayaran QRIS diterima otomatis');
+      ctx.logOrder(await guildOf(t), t, '💰 QRIS payment received automatically');
       await handleOrderState(t, o);
       return '✅ Pembayaran diterima!';
     }
@@ -1115,7 +1115,7 @@ async function onPaid(t) {
   if (own) busy.add(t.id);
   try {
     const guild = await guildOf(t);
-    if (t.ins.mode !== 'manual') ctx.logOrder(guild, t, '💰 Pembayaran QRIS diterima otomatis');
+    if (t.ins.mode !== 'manual') ctx.logOrder(guild, t, '💰 QRIS payment received automatically');
     await refreshTicket(t);
     await fulfill(t);
   } finally {
@@ -1152,7 +1152,7 @@ async function fulfill(t) {
     save();
     await refreshTicket(t);
     const guild = await guildOf(t);
-    ctx.logOrder(guild, t, '🛠️ Pengiriman otomatis terkendala — dibantu admin');
+    ctx.logOrder(guild, t, '🛠️ Automatic delivery hit a problem — an admin is helping');
     await alert(guild, t, { title: 'Pesanan Butuh Bantuan', err });
     return;
   }
@@ -1190,7 +1190,7 @@ async function handleOrderState(t, o) {
     i.stage = 'need_help';
     save();
     await refreshTicket(t);
-    ctx.logOrder(guild, t, '🛠️ Pesanan ditolak pusat — dibantu admin');
+    ctx.logOrder(guild, t, '🛠️ Order rejected by the supplier — an admin is helping');
     return alert(guild, t, { title: 'Pesanan Ditolak Pusat (Dana Kembali ke Saldo)', text: `Alasan pusat: ${clip(o.note || '-', 300)}\nModal sudah kembali ke saldo Waroeng. **Kembalikan dana pembeli** (${rupiah(t.payment?.amount || t.price)}) lalu tutup ticket sebagai Refund.` });
   }
   if (['processing', 'need_data'].includes(o.status) || o.status === 'pending') {
@@ -1199,7 +1199,7 @@ async function handleOrderState(t, o) {
       i.processingSince = Date.now();
       save();
       await refreshTicket(t);
-      ctx.logOrder(guild, t, '🔄 Pesanan diproses pusat');
+      ctx.logOrder(guild, t, '🔄 Order is being processed by the supplier');
     }
     // Terlalu lama diproses → beri tahu admin (sekali).
     if (Date.now() - (i.processingSince || Date.now()) > 3 * 3600000) await alertOnce(t, 'slow', { title: 'Pesanan Diproses Lebih dari 3 Jam', text: `Status pusat: \`${o.status}\` • No. pesanan \`${o.ref || o.id}\`.` });
@@ -1264,7 +1264,7 @@ async function complete(guild, channel, t) {
     await ctx.editTicketMsg(channel, guild, cfg, t).catch(() => {});
     await channel.send(V.toV2(V.buildTestimonyPrompt(guild, cfg, t))).catch(() => {});
   }
-  ctx.logOrder(guild, t, t.ins.type === 'manual' ? '✅ Pesanan selesai diproses' : '✅ Akun terkirim otomatis');
+  ctx.logOrder(guild, t, t.ins.type === 'manual' ? '✅ Order processed' : '✅ Account delivered automatically');
   ctx.refreshPanel();
   ctx.refreshLeaderboard();
 }
@@ -1398,7 +1398,7 @@ async function onCancel(interaction, ticketId) {
     }
   }
   // Mode deposit: QRIS tetap dipantau sampai kedaluwarsa (kalau terlanjur dibayar → admin diberi tahu).
-  await cancelTicket(t, 'Dibatalkan oleh pembeli', '❌ Order dibatalkan pembeli');
+  await cancelTicket(t, 'Dibatalkan oleh pembeli', '❌ Order cancelled by the buyer');
   return interaction.editReply('✖️ Pesanan dibatalkan. **Jangan membayar QRIS lama** ya.');
 }
 
