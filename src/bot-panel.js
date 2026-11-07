@@ -206,7 +206,9 @@ async function publishResult(i, commandName, payload) {
   if (!sent) return i.editReply(payload);
   const box = UI.accent(new ContainerBuilder(),
     0x2ecc71)
-    .addTextDisplayComponents(text(`## ✅ Pengecekan Selesai!\nHasil **${KIND[commandName] || 'pengecekan'}** sudah dikirim ke <#${ch.id}>.\nSilakan cek hasilnya di channel tersebut 👇`))
+    .addTextDisplayComponents(
+      text(`## ✅ Pengecekan Selesai!\nHasil **${KIND[commandName] || 'pengecekan'}** sudah dikirim ke ${ch.isThread?.() ? 'thread' : 'channel'} <#${ch.id}>.\nKlik tombol di bawah untuk melihat hasilnya 👇`),
+    )
     .addActionRowComponents(
       new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Lihat Hasil').setEmoji('📬').setURL(sent.url)),
     );
