@@ -143,10 +143,61 @@ function isResult(p) {
   return Boolean(json?.type === 17 && json.components?.some((c) => c.type === 1));
 }
 
-/** Kirim hasil ke channel publik, lalu beri tahu pemakai (hanya terlihat olehnya). */
+// Semua hasil masuk ke 1 thread tetap di channel Command Center (id thread disimpan di data/bot-panel-thread.json).
+const THREAD_FILE = path.join(__dirname, '..', 'data', 'bot-panel-thread.json');
+const THREAD_NAME = '📬 Hasil Pengecekan';
+let threadLock = Promise.resolve();
+function readThreadId() {
+  try {
+    return JSON.parse(fs.readFileSync(THREAD_FILE, 'utf8')).threadId || null;
+  } catch {
+    return null;
+  }
+}
+/** Cadangan kalau thread tidak bisa dibuat: kirim langsung ke channel hasil lama. */
+const fallbackTarget = async (client) => {
+  const f = await client.channels.fetch(RESULT_CHANNEL).catch(() => null);
+  return f?.isTextBased() ? f : null;
+};
+async function resolveResultTarget(client) {
+  // Thread dibuat di channel Command Center (tempat panel berada), bukan di channel hasil.
+  const ch = await client.channels.fetch(panel?.channelId || DEFAULT_CHANNEL).catch(() => null);
+  if (!ch?.isTextBased() || ch.isThread?.() || !ch.threads?.create) return fallbackTarget(client);
+  const savedId = readThreadId();
+  let thread = savedId ? await client.channels.fetch(savedId).catch(() => null) : null;
+  if (thread && thread.parentId !== ch.id) thread = null;
+  if (!thread) {
+    // Cari thread bernama sama yang sudah ada (jaga-jaga file id hilang) sebelum membuat yang baru.
+    const active = await ch.threads.fetchActive().catch(() => null);
+    thread = active?.threads?.find((t) => t.name === THREAD_NAME) || null;
+  }
+  if (!thread) {
+    thread = await ch.threads
+      .create({ name: THREAD_NAME, autoArchiveDuration: 10080, reason: 'Thread hasil pengecekan Command Center' })
+      .catch((e) => {
+        console.warn('[bot-panel] gagal membuat thread hasil:', e.message);
+        return null;
+      });
+  }
+  if (!thread) return fallbackTarget(client); // gagal membuat thread → kirim ke channel hasil lama
+  if (thread.archived) await thread.setArchived(false).catch(() => {});
+  if (savedId !== thread.id) {
+    fs.mkdirSync(path.dirname(THREAD_FILE), { recursive: true });
+    fs.writeFileSync(THREAD_FILE, JSON.stringify({ threadId: thread.id }));
+  }
+  return thread;
+}
+/** Satu per satu supaya dua hasil bersamaan tidak membuat thread dobel. */
+function getResultTarget(client) {
+  const run = threadLock.then(() => resolveResultTarget(client));
+  threadLock = run.catch(() => {});
+  return run;
+}
+
+/** Kirim hasil ke thread hasil (di channel Command Center), lalu beri tahu pemakai (hanya terlihat olehnya). */
 async function publishResult(i, commandName, payload) {
-  const ch = await i.client.channels.fetch(RESULT_CHANNEL).catch(() => null);
-  if (!ch?.isTextBased()) return i.editReply(payload); // channel hasil tidak bisa diakses → tampilkan langsung ke pemakai
+  const ch = await getResultTarget(i.client);
+  if (!ch) return i.editReply(payload); // channel hasil tidak bisa diakses → tampilkan langsung ke pemakai
   const top = new TextDisplayBuilder().setContent(`-# ${KIND[commandName] || '🔎 Hasil Pengecekan'} • diminta oleh <@${i.user.id}>`);
   const sent = await ch.send({ components: [top, ...payload.components], flags: V2, allowedMentions: { parse: [] } }).catch((e) => {
     console.warn('[bot-panel] gagal kirim hasil:', e.message);
@@ -155,7 +206,7 @@ async function publishResult(i, commandName, payload) {
   if (!sent) return i.editReply(payload);
   const box = UI.accent(new ContainerBuilder(),
     0x2ecc71)
-    .addTextDisplayComponents(text(`## ✅ Pengecekan Selesai!\nHasil **${KIND[commandName] || 'pengecekan'}** sudah dikirim ke <#${RESULT_CHANNEL}>.\nSilakan cek hasilnya di channel tersebut 👇`))
+    .addTextDisplayComponents(text(`## ✅ Pengecekan Selesai!\nHasil **${KIND[commandName] || 'pengecekan'}** sudah dikirim ke <#${ch.id}>.\nSilakan cek hasilnya di channel tersebut 👇`))
     .addActionRowComponents(
       new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Lihat Hasil').setEmoji('📬').setURL(sent.url)),
     );
