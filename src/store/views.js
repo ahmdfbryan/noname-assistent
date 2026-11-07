@@ -2058,7 +2058,7 @@ function paidWith(cfg, t) {
 /** Isi komentar aman di dalam kotak code block. */
 const boxed = (s) => '```\n' + String(s || '-').replace(/`/g, 'ˋ').slice(0, 900) + '\n```';
 
-function v2Card({ color: accent, header, lines, thumb, after = [], image, footer }) {
+function v2Card({ color: accent, header, lines, thumb, after = [], image, afterImage = [], footer }) {
   const box = new ContainerBuilder().setAccentColor(accent);
   box.addTextDisplayComponents(v2Text(header));
   box.addSeparatorComponents(v2Line());
@@ -2070,6 +2070,10 @@ function v2Card({ color: accent, header, lines, thumb, after = [], image, footer
     box.addTextDisplayComponents(v2Text(block));
   }
   if (image) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image)));
+  for (const block of afterImage.filter(Boolean)) {
+    box.addSeparatorComponents(v2Line());
+    box.addTextDisplayComponents(v2Text(block));
+  }
   if (footer) {
     box.addSeparatorComponents(v2Line());
     box.addTextDisplayComponents(v2Text(`-# ${footer}`));
@@ -2125,11 +2129,9 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
   lines.push(row('Order ID', `\`${t.id}\``));
   // Total belanja pembeli di toko (semua order Completed) + tier spender.
   const sp = state.spenders?.[buyerId];
-  const tier = sp ? SP.tierFor(sp.revenue, cfg) : null;
   const after = [
     r ? row('Rating', `${STARS(r.rating)}  **${r.rating}/5**`) : row('Status', '`✅ Transaksi Berhasil`'),
     `**💬 Komentar**\n${boxed(r ? r.comment : 'Pembeli tidak memberikan ulasan.')}`,
-    sp?.revenue ? row('Total Spend', `\`${rupiah(sp.revenue)}\` • ${num(sp.orders)} order${tier ? ` • ${SP.tierLabel(tier)}` : ''}`) : null,
   ];
   return v2Card({
     color: color(cfg, 'brand', 0x3498db),
@@ -2138,6 +2140,8 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
     thumb: buyer?.displayAvatarURL({ extension: 'png', size: 256 }) || guild.iconURL({ extension: 'png', size: 256 }) || null,
     after,
     image: t.proofUrl || null,
+    // Total Spend pembeli ditaruh di bawah gambar testimoni (hanya total belanja, tanpa jumlah order / tier).
+    afterImage: [sp?.revenue ? row('Total Spend', `\`${rupiah(sp.revenue)}\``) : null],
     footer: `🛒 ${storeName(cfg, guild)} • ${ts(at, 'f')}`,
   });
 }
