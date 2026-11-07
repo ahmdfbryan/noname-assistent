@@ -17,7 +17,7 @@ const DATA = path.join(__dirname, '..', 'data', 'server-stats.json');
 const KEYS = ['tickets', 'orders', 'robux', 'gamepass', 'digital', 'premium'];
 const STATUS_KEYS = ['robux', 'gamepass', 'digital', 'premium']; // nilainya buka/tutup, bukan angka
 const DEFAULTS = {
-  categoryName: '—・✦ Noname Studios Creative ✦・—',
+  categoryName: '🟢 STORE STATUS',
   channels: {
     tickets: '🎫 Active Tickets: {count}',
     orders: '✅ Total Orders: {count}',
