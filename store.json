@@ -375,8 +375,8 @@
       "type": "boost",
       "group": "digital",
       "label": "Server Boost",
-      "emoji": "🚀",
-      "description": "Tingkatkan server Discord kamu ke level berikutnya dengan **Server Boost premium** — dilengkapi **garansi penuh** selama masa aktif boost! 🚀\n\nSemua boost kami **dibeli secara resmi & legal**, dan langsung diterapkan ke server kamu sesuai paket & jumlah boost yang dipilih. 💎\n\nCukup kirim **link server Discord** kamu — sisanya biar admin **{server}** yang urus. ⚡",
+      "emoji": "<:serverboost:1568984090387152896>",
+      "description": "Tingkatkan server Discord kamu ke level berikutnya dengan **Server Boost premium** — dilengkapi **garansi penuh** selama masa aktif boost! <:serverboost:1568984090387152896>\n\nSemua boost kami **dibeli secara resmi & legal**, dan langsung diterapkan ke server kamu sesuai paket & jumlah boost yang dipilih. 💎\n\nCukup kirim **link server Discord** kamu — sisanya biar admin **{server}** yang urus. ⚡",
       "plans": [
         {
           "id": "1m",
@@ -425,7 +425,7 @@
       "howItWorks": [
         "Pilih **paket** & **jumlah boost**, lalu kirim **link server** kamu",
         "Bayar sesuai **Total Bayar** di ticket",
-        "Admin mem-boost server kamu (estimasi **1x24 jam**) 🚀",
+        "Admin mem-boost server kamu (estimasi **1x24 jam**) <:serverboost:1568984090387152896>",
         "Cek server kamu, lalu klik **✅ Boost Sudah Masuk** di ticket"
       ],
       "terms": {
@@ -440,17 +440,17 @@
         "idPrefix": "SB"
       },
       "howTo": {
-        "intro": "Boost server Discord kamu cukup dengan **link server** — legal, aman, dan bergaransi selama masa aktif. 🚀",
+        "intro": "Boost server Discord kamu cukup dengan **link server** — legal, aman, dan bergaransi selama masa aktif. <:serverboost:1568984090387152896>",
         "requirements": [
           "**Link undangan server** Discord yang aktif (atur *Never Expire*)",
           "Pilih paket **1 Bulan** atau **3 Bulan** & **jumlah boost**"
         ],
         "steps": [
-          "Buka channel **Produk Digital**, klik **🚀 Server Boost** ➜ **🛒 Order Sekarang**",
+          "Buka channel **Produk Digital**, klik **<:serverboost:1568984090387152896> Server Boost** ➜ **🛒 Order Sekarang**",
           "Pilih **paket**, isi **jumlah boost** & **link server**",
           "Cek ringkasan (nama server & total bayar), lalu klik **Ya, Buat Ticket**",
           "Bayar sesuai **Total Bayar** di ticket & kirim bukti",
-          "Admin mem-boost server kamu — estimasi **1x24 jam** 🚀",
+          "Admin mem-boost server kamu — estimasi **1x24 jam** <:serverboost:1568984090387152896>",
           "Cek server, lalu klik **✅ Boost Sudah Masuk**",
           "Admin menutup ticket — boost **aktif & bergaransi** ✨"
         ],
@@ -459,7 +459,7 @@
         ]
       },
       "catalog": {
-        "tagline": "Boost server Discord **legal & bergaransi** — cukup kirim **link server**, boost langsung masuk! 🚀",
+        "tagline": "Boost server Discord **legal & bergaransi** — cukup kirim **link server**, boost langsung masuk! <:serverboost:1568984090387152896>",
         "highlights": [
           "**Garansi penuh** selama masa aktif",
           "Boost **legal** & dibeli resmi",
