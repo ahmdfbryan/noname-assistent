@@ -4,9 +4,10 @@
  */
 const ROBUX = '<:robux:1566126953147273488>';
 const CANVA = '<:canva:1566139381616746607>';
+const BOOST = '<:serverboost:1568984090387152896>';
 
 /** Cadangan emoji biasa untuk tiap emoji custom (dipakai di tempat yang tidak bisa menampilkan emoji custom). */
-const FALLBACK = { [ROBUX]: '💎', [CANVA]: '🎨' };
+const FALLBACK = { [ROBUX]: '💎', [CANVA]: '🎨', [BOOST]: '🚀' };
 
 /**
  * Teks polos untuk tempat yang TIDAK bisa menampilkan emoji custom
@@ -54,4 +55,4 @@ function appEmoji(productName) {
   return null;
 }
 
-module.exports = { ROBUX, CANVA, plain, appEmoji };
+module.exports = { ROBUX, CANVA, BOOST, plain, appEmoji };
