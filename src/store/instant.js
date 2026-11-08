@@ -23,6 +23,7 @@ const {
 const UI = require('../ui');
 const W = require('./waroengkuy');
 const { ensureOpen } = require('../ticket-thread');
+const { appEmoji } = require('../emojis');
 const { loadConfig, isId, rupiah, num, fill, ts } = require('./config');
 const { state, save, productStatsOf, isProductOpen, kindOf, activeTicketOf, nextTicketId } = require('./state');
 const V = require('./views');
@@ -258,7 +259,7 @@ function categoryView(guild, cfg, p, items, cat, page = 0) {
   const pages = Math.max(1, Math.ceil(prods.length / PAGE));
   const pg = Math.min(Math.max(page, 0), pages - 1);
   const slice = prods.slice(pg * PAGE, pg * PAGE + PAGE);
-  const lines = slice.map((x) => `${x.sum.available ? '🟢' : '🔴'} **${clip(x.name, 60)}** — mulai \`${rupiah(x.sum.min)}\`${x.sum.available ? '' : ' • _habis_'}`);
+  const lines = slice.map((x) => `${appEmoji(x.name)?.text || (x.sum.available ? '🟢' : '🔴')} **${clip(x.name, 60)}** — mulai \`${rupiah(x.sum.min)}\`${x.sum.available ? '' : ' • _habis_'}`);
   const rows = [];
   if (slice.length) {
     rows.push(
@@ -271,7 +272,7 @@ function categoryView(guild, cfg, p, items, cat, page = 0) {
               label: clip(x.name, 100),
               value: x.id,
               description: clip(x.sum.available ? `Mulai ${rupiah(x.sum.min)}${x.sum.stock != null ? ` • Stok ${num(x.sum.stock)}` : ''}` : 'Stok habis', 100),
-              emoji: x.sum.available ? '🛍️' : '⛔',
+              emoji: x.sum.available ? (appEmoji(x.name) ? { id: appEmoji(x.name).id, name: appEmoji(x.name).name } : '🛍️') : '⛔',
             })),
           ),
       ),
