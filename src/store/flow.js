@@ -1554,8 +1554,8 @@ async function onBoostStart(interaction, product) {
         ),
       new LabelBuilder()
         .setLabel('Jumlah Boost')
-        .setDescription(`Minimal ${num(product.minBoost || 1)} boost, maksimal sesuai stock paket (maks. ${num(max)}).`.slice(0, 100))
-        .setTextInputComponent(textInput('qty', { placeholder: 'contoh: 2, 4, 6, 8, 14', min: 1, max: 3 })),
+        .setDescription(`Minimal ${num(boostMin(product))} boost${boostStep(product) > 1 ? `, kelipatan ${num(boostStep(product))}` : ''} (maks. ${num(max)}).`.slice(0, 100))
+        .setTextInputComponent(textInput('qty', { placeholder: boostStep(product) > 1 ? `contoh: ${[1, 2, 3, 4, 5].map((n) => n * boostStep(product)).join(', ')}` : 'contoh: 2, 4, 6, 8, 14', min: 1, max: 3 })),
       new LabelBuilder()
         .setLabel('Link Server Discord')
         .setDescription('Link undangan server kamu (atur Never Expire supaya tidak kedaluwarsa).')
@@ -1563,6 +1563,13 @@ async function onBoostStart(interaction, product) {
     );
   return interaction.showModal(modal);
 }
+
+/** Minimal & kelipatan jumlah boost (store.json → minBoost, boostStep). Minimal selalu kelipatan. */
+const boostStep = (product) => Math.max(1, Math.floor(Number(product?.boostStep) || 1));
+const boostMin = (product) => {
+  const step = boostStep(product);
+  return Math.max(step, Math.ceil((Number(product?.minBoost) || 1) / step) * step);
+};
 
 async function onBoostModal(interaction, productId) {
   await interaction.deferReply({ flags: EPH });
@@ -1573,12 +1580,15 @@ async function onBoostModal(interaction, productId) {
   const plan = V.canvaPlans(product).find((x) => x.id === interaction.fields.getStringSelectValues('plan')?.[0]);
   if (!plan) return interaction.editReply('❌ Pilih paket terlebih dahulu.');
   const qty = Number(String(interaction.fields.getTextInputValue('qty')).replace(/[^\d]/g, ''));
-  const min = Number(product.minBoost) || 1;
+  const min = boostMin(product);
+  const step = boostStep(product);
   const left = planStockOf(product, plan.id);
   const max = Math.min(Number(product.maxBoost) || 30, left);
   if (!left) return interaction.editReply(`🔴 Stock paket **${plan.label}** sedang **HABIS**. Pilih paket lain ya.`);
-  if (!qty || qty < min) return interaction.editReply(`❌ Jumlah boost minimal **${num(min)}**.`);
-  if (qty > max) return interaction.editReply(`❌ Jumlah boost maksimal **${num(max)}** untuk paket **${plan.label}** (sisa stock **${num(left)} boost**).`);
+  if (left < min) return interaction.editReply(`🔴 Stock paket **${plan.label}** tinggal **${num(left)} boost** — kurang dari minimal order (**${num(min)} boost**). Pilih paket lain ya.`);
+  if (!qty || qty < min) return interaction.editReply(`❌ Jumlah boost minimal **${num(min)}**${step > 1 ? ` dan harus **kelipatan ${num(step)}** (${[1, 2, 3, 4, 5].map((n) => n * step).join(', ')}, dst)` : ''}.`);
+  if (qty % step !== 0) return interaction.editReply(`❌ Jumlah boost harus **kelipatan ${num(step)}** (contoh: ${[1, 2, 3, 4, 5].map((n) => n * step).join(', ')}). Kamu mengisi **${num(qty)}**.`);
+  if (qty > max) return interaction.editReply(`❌ Jumlah boost maksimal **${num(Math.floor(max / step) * step)}** untuk paket **${plan.label}** (sisa stock **${num(left)} boost**).`);
   const raw = interaction.fields.getTextInputValue('invite').trim();
   const m = raw.match(INVITE_RE) || raw.match(/^([a-z0-9-]{2,32})$/i); // link lengkap atau kode undangan saja
   if (!m) return interaction.editReply('❌ Link server tidak valid. Contoh: `https://discord.gg/namaserver`');
