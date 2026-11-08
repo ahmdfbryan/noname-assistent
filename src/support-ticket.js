@@ -29,6 +29,7 @@ const { ROBUX } = require('./emojis');
 const { bannerOf, editPanelMessage } = require('./store/banner');
 const giveaway = require('./giveaway');
 const { archiveNcsTicket } = require('./ticket-archive');
+const { openTicketThread, ensureOpen } = require('./ticket-thread');
 
 /**
  * NCS Ticket Center — ticket layanan (Support, Claim Giveaway, ...), terpisah dari ticket jualan.
@@ -524,11 +525,27 @@ async function createTicket(interaction, type, answers, extra = {}) {
     createdAt: Date.now(),
   };
 
-  // Kategori: tickets.json → categoryId, atau kategori channel panel (Customer Service).
-  let parent = isId(cfg.categoryId) ? cfg.categoryId : null;
-  if (!parent) {
-    const panelCh = await guild.channels.fetch(cfg.panelChannelId || data.panel?.channelId || interaction.channelId).catch(() => null);
-    parent = panelCh?.parentId || null;
+  const slug = interaction.user.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
+  const ticketName = `${type.emoji || '🎫'}・${id.toLowerCase()}-${slug}`;
+  const ticketTopic = `${id} • ${type.label} • ${interaction.user.tag}`;
+  // Utama: PRIVATE THREAD di channel panel ticket (tickets.json → useThreads: false = pakai channel seperti dulu).
+  let channel =
+    cfg.useThreads === false
+      ? null
+      : await openTicketThread(guild, interaction, {
+          name: ticketName,
+          userIds: [interaction.user.id],
+          reason: ticketTopic,
+          fallbackIds: [cfg.panelChannelId, data.panel?.channelId],
+        });
+  // Cadangan (cara lama): channel baru — kategori dari tickets.json → categoryId, atau kategori channel panel (Customer Service).
+  let parent = null;
+  if (!channel) {
+    parent = isId(cfg.categoryId) ? cfg.categoryId : null;
+    if (!parent) {
+      const panelCh = await guild.channels.fetch(cfg.panelChannelId || data.panel?.channelId || interaction.channelId).catch(() => null);
+      parent = panelCh?.parentId || null;
+    }
   }
   const member = [
     PermissionFlagsBits.ViewChannel,
@@ -543,14 +560,15 @@ async function createTicket(interaction, type, answers, extra = {}) {
     { id: guild.members.me.id, allow: [...member, PermissionFlagsBits.ManageChannels] },
   ];
   if (staffRole(cfg)) overwrites.push({ id: staffRole(cfg), allow: member });
-  const slug = interaction.user.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
-  const channel = await guild.channels.create({
-    name: `${type.emoji || '🎫'}・${id.toLowerCase()}-${slug}`,
-    type: ChannelType.GuildText,
-    parent: parent || undefined,
-    topic: `${id} • ${type.label} • ${interaction.user.tag}`,
-    permissionOverwrites: overwrites,
-  });
+  if (!channel) {
+    channel = await guild.channels.create({
+      name: ticketName,
+      type: ChannelType.GuildText,
+      parent: parent || undefined,
+      topic: ticketTopic,
+      permissionOverwrites: overwrites,
+    });
+  }
   t.channelId = channel.id;
   const msg = await channel.send({
     ...buildTicketMessage(guild, cfg, t),
@@ -718,7 +736,7 @@ async function closeTicket(interaction, t, reason) {
   t.closedBy = interaction.user.id;
   t.closeReason = reason || null;
   save();
-  const channel = await guild.channels.fetch(t.channelId).catch(() => null);
+  const channel = await ensureOpen(await guild.channels.fetch(t.channelId).catch(() => null));
   const secs = Number(cfg.deleteAfterSeconds) || 10;
   if (channel) {
     await editTicketMsg(channel, guild, cfg, t);
@@ -1056,6 +1074,11 @@ const ticketCommand = {
 
     if (sub === 'tambah' || sub === 'keluarkan') {
       const user = interaction.options.getUser('member');
+      const inThread = Boolean(interaction.channel?.isThread?.());
+      if (sub === 'tambah' && inThread) {
+        await interaction.channel.members.add(user.id).catch((e) => console.warn(`[ticket] tambah ${user.id}:`, e.message));
+        return interaction.reply({ content: `➕ ${user} ditambahkan ke ticket ini.`, allowedMentions: { parse: [] } });
+      }
       if (sub === 'tambah') {
         await interaction.channel.permissionOverwrites.edit(user.id, {
           ViewChannel: true,
@@ -1067,7 +1090,8 @@ const ticketCommand = {
         return interaction.reply({ content: `➕ ${user} ditambahkan ke ticket ini.`, allowedMentions: { parse: [] } });
       }
       if (user.id === t.userId) return interaction.reply({ content: '❌ Pembuka ticket tidak bisa dikeluarkan.', flags: EPH });
-      await interaction.channel.permissionOverwrites.delete(user.id).catch(() => {});
+      if (inThread) await interaction.channel.members.remove(user.id).catch(() => {});
+      else await interaction.channel.permissionOverwrites.delete(user.id).catch(() => {});
       return interaction.reply({ content: `➖ ${user} dikeluarkan dari ticket ini.`, allowedMentions: { parse: [] } });
     }
 
@@ -1082,8 +1106,8 @@ const ticketCommand = {
 function registerSupportTickets(c) {
   client = c;
   c.once(Events.ClientReady, () => refreshPanel().catch(() => {}));
-  // Channel ticket dihapus manual → tandai ditutup.
-  c.on(Events.ChannelDelete, (ch) => {
+  // Channel / thread ticket dihapus manual → tandai ditutup.
+  const onTicketGone = (ch) => {
     const t = Object.values(data.tickets).find((x) => x.channelId === ch.id && x.status === 'open');
     if (!t) return;
     t.status = 'closed';
@@ -1095,7 +1119,12 @@ function registerSupportTickets(c) {
       .then(() => save())
       .catch((e) => console.error(`[ticket] arsip ${t.id}:`, e.message));
     refreshPanel().catch(() => {});
-  });
+  };
+  c.on(Events.ChannelDelete, onTicketGone);
+  c.on(Events.ThreadDelete, onTicketGone);
 }
 
-module.exports = { ticketCommand, registerSupportTickets, handleInteraction };
+/** Jumlah ticket NCS yang sedang aktif (dipakai Server Stats & System). */
+const openCount = () => Object.values(data.tickets || {}).filter((t) => t.status === 'open').length;
+
+module.exports = { ticketCommand, registerSupportTickets, handleInteraction, openCount };
