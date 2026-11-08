@@ -18,7 +18,7 @@ const {
   Events,
 } = require('discord.js');
 const { loadConfig, isId, rupiah, num, getProduct, GROUPS, productsOf } = require('./config');
-const { CANVA } = require('../emojis');
+const { CANVA, BOOST } = require('../emojis');
 const { archiveStoreTicket } = require('../ticket-archive');
 const { openTicketThread, ensureOpen } = require('../ticket-thread');
 const REP = require('./reputation');
@@ -1709,7 +1709,7 @@ async function onBoostConfirm(interaction, yes) {
     return;
   }
   refreshPanel();
-  await closeIfSoldOut(guild, `🚀 **Stock ${product.label} sudah HABIS!** ${product.label} otomatis ditutup.`, product);
+  await closeIfSoldOut(guild, `${BOOST} **Stock ${product.label} sudah HABIS!** ${product.label} otomatis ditutup.`, product);
 }
 
 function boostTicketFor(interaction, ticketId) {
@@ -1736,7 +1736,7 @@ async function onBoostSent(interaction, ticketId) {
   if (!V.isPaid(t)) return interaction.reply({ content: '⚠️ Pembayaran ticket ini **belum diverifikasi**. Konfirmasi dana masuk dulu ya.', flags: EPH });
   t.stage.sent = true;
   t.stage.sentAt = Date.now();
-  return advanceBoost(interaction, t, 'sent', `🚀 ${num(t.qty)} boost sent to server ${t.server?.name || ''}`.trim());
+  return advanceBoost(interaction, t, 'sent', `${BOOST} ${num(t.qty)} boost sent to server ${t.server?.name || ''}`.trim());
 }
 /** Pembeli: boost sudah masuk ke server. */
 async function onBoostReceived(interaction, ticketId) {
