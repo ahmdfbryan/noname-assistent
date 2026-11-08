@@ -16,7 +16,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const UI = require('../ui');
-const { ROBUX: RBX, CANVA } = require('../emojis');
+const { ROBUX: RBX, CANVA, BOOST } = require('../emojis');
 const { color, rupiah, num, fill, ts, loadConfig, GROUPS, groupOf, productsOf, groupText } = require('./config');
 const SP = require('./spender');
 const { bannerOf } = require('./banner');
@@ -329,7 +329,7 @@ function buildDmClosed(guild, cfg, t) {
         `Data akun ada di ticket & DM kamu — simpan baik-baik ya.\n\n` +
         `Terima kasih sudah berbelanja di **${storeName(cfg, guild)}**! 💜 Jangan lupa beri testimoni di ticket kamu ya ⭐`
       : boost
-      ? `**${num(t.qty)} Server Boost (${t.plan.label})** untuk server **${t.server?.name || '-'}** sudah **AKTIF**! 🚀\n` +
+      ? `**${num(t.qty)} Server Boost (${t.plan.label})** untuk server **${t.server?.name || '-'}** sudah **AKTIF**! ${BOOST}\n` +
         `Masa aktif sekitar **${t.plan.duration || `${num(t.plan.days)} hari`}** dengan **garansi penuh** selama masa aktif boost. 🛡️\n\n` +
         `Terima kasih sudah berbelanja di **${storeName(cfg, guild)}**! 💜 Jangan lupa beri testimoni di ticket kamu ya ⭐`
       : canva
@@ -502,7 +502,7 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
         { name: sp?.type === 'boost' ? '📦 Total Stock' : '📦 Stock Sekarang', value: `\`${num(stockOf(sp))} ${unit}\``, inline: true },
         { name: '🏪 Status', value: sp && isProductOpen(sp) ? '`🟢 BUKA`' : '`🔴 TUTUP`', inline: true },
       );
-    if (sp?.type === 'boost') e.addFields({ name: '🚀 Stock per Paket', value: boostStockLines(sp) || '-' });
+    if (sp?.type === 'boost') e.addFields({ name: `${BOOST} Stock per Paket`, value: boostStockLines(sp) || '-' });
   } else if (kind === 'sold') {
     // extra.product = produk Robux yang terjual, extra.amount = jumlah terjual, extra.count = jumlah order
     const sp = extra.product || robux;
@@ -665,7 +665,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     const sp = extra.product || robux;
     const unit = stockUnit(sp);
     const lines = [
-      `**${sp?.type === 'boost' ? '🚀 Total Stock' : '📦 Stock Sekarang'}:** \`${num(stockOf(sp))} ${unit}\``,
+      `**${sp?.type === 'boost' ? `${BOOST} Total Stock` : '📦 Stock Sekarang'}:** \`${num(stockOf(sp))} ${unit}\``,
       `**🏪 Status:** ${statusBadge(sp)}`,
       sp?.type === 'robux' ? `**💱 Rate:** \`${rupiah(rateOf(cfg, sp))} / Robux\`` : null,
     ].filter(Boolean);
@@ -677,7 +677,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
       blocks: [
         extra.text ? `${extra.text}\n${sp && isProductOpen(sp) ? 'Stock sudah siap — yuk langsung order! 🛒' : 'Order dibuka kembali segera, pantau terus ya! 🔔'}` : null,
         `### 📊 Detail Stock\n${lines.join('\n')}`,
-        sp?.type === 'boost' ? `### 🚀 Stock per Paket\n${boostStockLines(sp) || '-'}` : null,
+        sp?.type === 'boost' ? `### ${BOOST} Stock per Paket\n${boostStockLines(sp) || '-'}` : null,
       ],
       footer: `${name} • Diperbarui ${now}`,
       rows: [sp && isProductOpen(sp) ? orderBtn(groupOf(sp)) : null],
@@ -1891,7 +1891,7 @@ function nextStepText(t) {
     return `Admin akan segera **membeli gamepass** [${t.gamepass?.name || t.gamepass?.id}](${gpUrl(t.gamepass?.id)}). Robux masuk ke akunmu setelah masa pending Roblox (± **${num(t.pendingDays || 5)} hari**).`;
   }
   if (k === 'canva') return `Admin akan segera mengirim **undangan Team Canva Pro** ke \`${t.email}\`. Pantau inbox email kamu ya! 📨`;
-  if (k === 'boost') return `Admin akan segera mem-boost server **${t.server?.name || 'kamu'}** dengan **${num(t.qty)} boost** 🚀 (estimasi ${t.estimate || '1x24 jam'}).`;
+  if (k === 'boost') return `Admin akan segera mem-boost server **${t.server?.name || 'kamu'}** dengan **${num(t.qty)} boost** ${BOOST} (estimasi ${t.estimate || '1x24 jam'}).`;
   if (k === 'instant') return 'Akun sedang **dikirim otomatis** ke ticket ini & DM kamu. ⚡';
   if (k === 'rekber') return `<@${t.sellerId}>, silakan kirim barang / jasa ke pembeli. Pembeli klik **📦 Barang Sudah Diterima** setelah barang sesuai.`;
   return `Admin sedang memproses pengiriman **${num(t.amount)} Robux** ke akun Roblox \`@${t.roblox?.name}\`. 🚀`;
@@ -2246,7 +2246,7 @@ function buildBoostInfo(guild, cfg, product) {
   return pcard({
     accent: color(cfg, 'brand', 0x3498db),
     thumb: product.thumbnail || icon256(guild),
-    header: `## ${product.emoji || '🚀'} ${product.label}\n${fill(product.description || '', name)}`,
+    header: `## ${product.emoji || BOOST} ${product.label}\n${fill(product.description || '', name)}`,
     blocks: [
       table ? `### 🗓️ Pilihan Paket\n${table}\n-# 💡 ${product.priceNote || 'Harga per 1 boost'} • tanpa minimum order` : null,
       canvaPlans(product).some((x) => x.notes?.length)
@@ -2254,7 +2254,7 @@ function buildBoostInfo(guild, cfg, product) {
             .map((x) => `**${x.emoji || '🗓️'} ${x.label.toUpperCase()}**\n${(x.notes || []).map((n) => `▸ ${n}`).join('\n')}`)
             .join('\n\n')
         : null,
-      `### 🚀 Stock Boost\n${boostStockLines(product)}`,
+      `### ${BOOST} Stock Boost\n${boostStockLines(product)}`,
       [
         `⏱️ **Estimasi Proses:** \`${product.estimate || '1x24 jam'}\``,
         `🏪 **Status:** ${openBadge(open)}`,
@@ -2262,7 +2262,7 @@ function buildBoostInfo(guild, cfg, product) {
       ].join('\n'),
       product.features?.length ? `### ✨ Keunggulan Produk\n${product.features.map((x) => `▸ ${x}`).join('\n')}` : null,
       product.howItWorks?.length ? `### 🔄 Cara Kerja\n${product.howItWorks.map((x, i) => `${KEYCAPS[i] || `\`${i + 1}\``} ${x}`).join('\n')}` : null,
-      [`✅ **Order Selesai:** \`${num(ps.orders)} order\``, `🚀 **Boost Aktif:** \`${num(boostActiveCount(product.id))} boost\``, ratingLine()].join('\n'),
+      [`✅ **Order Selesai:** \`${num(ps.orders)} order\``, `${BOOST} **Boost Aktif:** \`${num(boostActiveCount(product.id))} boost\``, ratingLine()].join('\n'),
     ],
     footer: `${name.name} • ${nowTs()}`,
     rows: [
@@ -2299,7 +2299,7 @@ function buildBoostConfirm(guild, cfg, product, d) {
     .setDescription('Periksa kembali detail di bawah. Pastikan **link server** sudah benar & **tidak kedaluwarsa**.')
     .addFields(
       { name: '🗓️ Paket', value: `\`${d.plan.label}\``, inline: true },
-      { name: '🚀 Jumlah Boost', value: `\`${num(d.qty)} boost\``, inline: true },
+      { name: `${BOOST} Jumlah Boost`, value: `\`${num(d.qty)} boost\``, inline: true },
       { name: '⏳ Masa Aktif', value: `\`${planDuration(d.plan)}\``, inline: true },
       { name: '📦 Sisa Stock Paket', value: `\`${num(planStockOf(product, d.plan.id))} boost\``, inline: true },
       { name: '🏠 Server', value: serverLine(d.server) },
@@ -2346,7 +2346,7 @@ function buildBoostTicket(guild, cfg, t) {
     .addFields(
       { name: '👤 Pembeli', value: `<@${t.userId}>`, inline: true },
       { name: '🗓️ Paket', value: `\`${t.plan.label}\` • ${planDuration(t.plan)}`, inline: true },
-      { name: '🚀 Jumlah Boost', value: `\`${num(t.qty)} boost\``, inline: true },
+      { name: `${BOOST} Jumlah Boost`, value: `\`${num(t.qty)} boost\``, inline: true },
       { name: '⏱️ Estimasi', value: `\`${t.estimate || '1x24 jam'}\``, inline: true },
       { name: '🏠 Server Tujuan', value: `${serverLine(t.server)}\n🔗 ${t.invite}` },
       { name: '💰 Total Bayar', value: `## ${rupiah(t.price)}\n-# ${num(t.qty)} boost × ${rupiah(t.plan.price)}` },
@@ -2375,7 +2375,7 @@ function buildBoostTicket(guild, cfg, t) {
             new ButtonBuilder()
               .setCustomId(`store:bssent:${t.id}`)
               .setLabel(st.sent ? 'Boost Terkirim' : 'Boost Terkirim (Admin)')
-              .setEmoji('🚀')
+              .setEmoji(BOOST)
               .setStyle(ButtonStyle.Primary)
               .setDisabled(Boolean(st.sent)),
             new ButtonBuilder()
@@ -2403,7 +2403,7 @@ function buildBoostStep(guild, cfg, t, step) {
   let ping = [];
   if (step === 'sent') {
     ping = [t.userId];
-    e.setTitle('🚀 Server Kamu Sudah Di-Boost!')
+    e.setTitle(`${BOOST} Server Kamu Sudah Di-Boost!`)
       .setDescription(`<@${t.userId}>, admin telah mem-boost server **${t.server?.name || 'kamu'}** dengan **${num(t.qty)} boost**. 🎉`)
       .addFields(
         { name: '📍 Progress', value: '`✅ Boost Dikirim` ➜ `⏳ Konfirmasi Pembeli` ➜ `▫️ Boost Aktif`' },
@@ -2440,7 +2440,7 @@ function buildBoostExpiry(guild, cfg, t, who) {
       .setTitle('⏰ Server Boost Kamu Segera Berakhir')
       .setDescription(
         `Masa aktif **${num(t.qty)} Server Boost (${t.plan.label})** untuk server **${t.server?.name || '-'}** akan berakhir **${ts(t.expiresAt, 'R')}** (${ts(t.expiresAt, 'D')}).\n\n` +
-          `Perpanjang sekarang di **${name}** supaya level server kamu tidak turun! 🚀` +
+          `Perpanjang sekarang di **${name}** supaya level server kamu tidak turun! ${BOOST}` +
           (url ? `\n\n🛒 ${url}` : ''),
       );
   } else {
@@ -2449,7 +2449,7 @@ function buildBoostExpiry(guild, cfg, t, who) {
       .setDescription(`Masa aktif ticket **${t.id}** sudah berakhir.`)
       .addFields(
         { name: '👤 Pembeli', value: `<@${t.userId}>`, inline: true },
-        { name: '🚀 Paket', value: `\`${num(t.qty)} Boost • ${t.plan.label}\``, inline: true },
+        { name: `${BOOST} Paket`, value: `\`${num(t.qty)} Boost • ${t.plan.label}\``, inline: true },
         { name: '🏠 Server', value: `${t.server?.name || '-'}\n${t.invite}` },
       );
   }
