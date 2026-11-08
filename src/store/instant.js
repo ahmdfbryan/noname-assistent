@@ -22,6 +22,7 @@ const {
 } = require('discord.js');
 const UI = require('../ui');
 const W = require('./waroengkuy');
+const { ensureOpen } = require('../ticket-thread');
 const { loadConfig, isId, rupiah, num, fill, ts } = require('./config');
 const { state, save, productStatsOf, isProductOpen, kindOf, activeTicketOf, nextTicketId } = require('./state');
 const V = require('./views');
@@ -739,7 +740,6 @@ async function onConfirm(interaction, yes) {
   save();
 
   try {
-    const category = await ctx.getTicketCategory(guild, cfg, tc.categoryName || '👑 TICKET PREMIUM APP');
     const perms = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks];
     const overwrites = [
       { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
@@ -749,12 +749,12 @@ async function onConfirm(interaction, yes) {
     const staff = isId(cfg.ticket?.staffRoleId) ? cfg.ticket.staffRoleId : null;
     if (staff) overwrites.push({ id: staff, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
     const slug = interaction.user.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
-    const channel = await guild.channels.create({
+    const channel = await ctx.createTicketChannel(guild, interaction, cfg, {
       name: `👑・${id.toLowerCase()}-${slug}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
       topic: `${id} • ${t.productLabel} x${t.qty} • ${interaction.user.tag}`,
-      permissionOverwrites: overwrites,
+      overwrites,
+      userIds: [interaction.user.id],
+      categoryName: tc.categoryName || '👑 TICKET PREMIUM APP',
     });
     t.channelId = channel.id;
     const msg = await channel.send(V.toV2({ content: `<@${t.userId}>`, ...buildTicket(guild, cfg, t), allowedMentions: { users: [t.userId] } }));
@@ -1007,7 +1007,7 @@ async function guildOf(t) {
   return client?.guilds.cache.get(t.guildId) || (await client?.guilds.fetch(t.guildId).catch(() => null)) || null;
 }
 async function channelOf(t) {
-  return t.channelId ? ctx.getClient()?.channels.fetch(t.channelId).catch(() => null) : null;
+  return t.channelId ? ensureOpen(await ctx.getClient()?.channels.fetch(t.channelId).catch(() => null)) : null;
 }
 async function refreshTicket(t) {
   const guild = await guildOf(t);
