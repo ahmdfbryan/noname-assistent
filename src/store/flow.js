@@ -20,6 +20,7 @@ const {
 const { loadConfig, isId, rupiah, num, getProduct, GROUPS, productsOf } = require('./config');
 const { CANVA } = require('../emojis');
 const { archiveStoreTicket } = require('../ticket-archive');
+const { openTicketThread, ensureOpen } = require('../ticket-thread');
 const REP = require('./reputation');
 const { state, save, productState, productStatsOf, hasStock, stockOf, setStock, stockUnit, isProductOpen, kindOf, activeTicketOf, nextTicketId, planStockOf, setPlanStock } = require('./state');
 const { lookupRobloxUser, lookupGamepass, parseGamepassId } = require('./roblox');
@@ -331,6 +332,31 @@ async function getTicketCategory(guild, cfg, base = cfg.ticket?.categoryName || 
   });
 }
 
+/**
+ * Buat tempat ticket: PRIVATE THREAD di channel tempat tombol ditekan (channel panel produk),
+ * atau cara lama (channel baru di kategori ticket) kalau thread tidak bisa dibuat / dimatikan (store.json → ticket.useThreads: false).
+ * opts: { name, topic, overwrites, userIds, categoryName }
+ */
+async function createTicketChannel(guild, interaction, cfg, opts) {
+  if (cfg.ticket?.useThreads !== false) {
+    const thread = await openTicketThread(guild, interaction, {
+      name: opts.name,
+      userIds: opts.userIds,
+      reason: opts.topic,
+      fallbackIds: [cfg.channels?.panel, cfg.channels?.instantPanel],
+    });
+    if (thread) return thread;
+  }
+  const category = await getTicketCategory(guild, cfg, opts.categoryName);
+  return guild.channels.create({
+    name: opts.name,
+    type: ChannelType.GuildText,
+    parent: category.id,
+    topic: opts.topic,
+    permissionOverwrites: opts.overwrites,
+  });
+}
+
 // ══════════════════════ Langkah 1: klik produk di panel → info produk ══════════════════════
 async function onProductInfo(interaction, productId) {
   const cfg = loadConfig();
@@ -538,7 +564,6 @@ async function createOrder(interaction, productId, amount) {
   await interaction.update({ content: '⏳ Sedang membuat ticket kamu...', embeds: [], components: [] });
 
   try {
-    const category = await getTicketCategory(guild, cfg);
     const overwrites = [
       { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
       {
@@ -570,12 +595,11 @@ async function createOrder(interaction, productId, amount) {
       });
     }
     const slug = session.roblox.name.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
-    const channel = await guild.channels.create({
+    const channel = await createTicketChannel(guild, interaction, cfg, {
       name: `🎫・${id.toLowerCase()}-${slug}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
       topic: `${id} • ${product.label} ${num(amount)} Robux • ${interaction.user.tag} • Roblox @${session.roblox.name}`,
-      permissionOverwrites: overwrites,
+      overwrites,
+      userIds: [interaction.user.id],
     });
     ticket.channelId = channel.id;
 
@@ -809,7 +833,6 @@ async function onRekberConfirm(interaction, yes) {
   await interaction.update({ content: '⏳ Sedang membuat ticket rekber...', embeds: [], components: [] });
 
   try {
-    const category = await getTicketCategory(guild, cfg, rc.categoryName || '🤝 TICKET REKBER');
     const member = [
       PermissionFlagsBits.ViewChannel,
       PermissionFlagsBits.SendMessages,
@@ -827,12 +850,12 @@ async function onRekberConfirm(interaction, yes) {
       overwrites.push({ id: cfg.ticket.staffRoleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
     }
     const slug = interaction.user.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
-    const channel = await guild.channels.create({
+    const channel = await createTicketChannel(guild, interaction, cfg, {
       name: `🤝・${id.toLowerCase()}-${slug}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
       topic: `Rekber ${id} • ${d.item} • ${rupiah(d.nominal)}`,
-      permissionOverwrites: overwrites,
+      overwrites,
+      userIds: [ticket.buyerId, ticket.sellerId],
+      categoryName: rc.categoryName || '🤝 TICKET REKBER',
     });
     ticket.channelId = channel.id;
 
@@ -1176,7 +1199,6 @@ async function onGamepassConfirm(interaction, yes) {
   await interaction.update({ content: '⏳ Sedang membuat ticket kamu...', embeds: [], components: [] });
 
   try {
-    const category = await getTicketCategory(guild, cfg, tc.categoryName || '🎟️ TICKET GAMEPASS');
     const member = [
       PermissionFlagsBits.ViewChannel,
       PermissionFlagsBits.SendMessages,
@@ -1192,12 +1214,12 @@ async function onGamepassConfirm(interaction, yes) {
     const staff = isId(cfg.ticket?.staffRoleId) ? cfg.ticket.staffRoleId : null;
     if (staff) overwrites.push({ id: staff, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
     const slug = d.roblox.name.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
-    const channel = await guild.channels.create({
+    const channel = await createTicketChannel(guild, interaction, cfg, {
       name: `🎟️・${id.toLowerCase()}-${slug}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
       topic: `${id} • ${product.label} ${num(d.after)} Robux (gamepass ${num(d.before)}) • ${interaction.user.tag} • Roblox @${d.roblox.name}`,
-      permissionOverwrites: overwrites,
+      overwrites,
+      userIds: [interaction.user.id],
+      categoryName: tc.categoryName || '🎟️ TICKET GAMEPASS',
     });
     ticket.channelId = channel.id;
 
@@ -1376,7 +1398,6 @@ async function onCanvaConfirm(interaction, yes) {
   await interaction.update({ content: '⏳ Sedang membuat ticket kamu...', embeds: [], components: [] });
 
   try {
-    const category = await getTicketCategory(guild, cfg, tc.categoryName || '🎨 TICKET CANVA');
     const member = [
       PermissionFlagsBits.ViewChannel,
       PermissionFlagsBits.SendMessages,
@@ -1392,12 +1413,12 @@ async function onCanvaConfirm(interaction, yes) {
     const staff = isId(cfg.ticket?.staffRoleId) ? cfg.ticket.staffRoleId : null;
     if (staff) overwrites.push({ id: staff, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
     const slug = interaction.user.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
-    const channel = await guild.channels.create({
+    const channel = await createTicketChannel(guild, interaction, cfg, {
       name: `🎨・${id.toLowerCase()}-${slug}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
       topic: `${id} • ${product.label} ${d.plan.label} • ${interaction.user.tag}`,
-      permissionOverwrites: overwrites,
+      overwrites,
+      userIds: [interaction.user.id],
+      categoryName: tc.categoryName || '🎨 TICKET CANVA',
     });
     ticket.channelId = channel.id;
 
@@ -1623,7 +1644,6 @@ async function onBoostConfirm(interaction, yes) {
   await interaction.update({ content: '⏳ Sedang membuat ticket kamu...', embeds: [], components: [] });
 
   try {
-    const category = await getTicketCategory(guild, cfg, tc.categoryName || '🚀 TICKET BOOST');
     const member = [
       PermissionFlagsBits.ViewChannel,
       PermissionFlagsBits.SendMessages,
@@ -1639,12 +1659,12 @@ async function onBoostConfirm(interaction, yes) {
     const staff = isId(cfg.ticket?.staffRoleId) ? cfg.ticket.staffRoleId : null;
     if (staff) overwrites.push({ id: staff, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
     const slug = interaction.user.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
-    const channel = await guild.channels.create({
+    const channel = await createTicketChannel(guild, interaction, cfg, {
       name: `🚀・${id.toLowerCase()}-${slug}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
       topic: `${id} • ${product.label} ${d.qty}x ${d.plan.label} • ${interaction.user.tag}`,
-      permissionOverwrites: overwrites,
+      overwrites,
+      userIds: [interaction.user.id],
+      categoryName: tc.categoryName || '🚀 TICKET BOOST',
     });
     ticket.channelId = channel.id;
     const msg = await channel.send(
@@ -1725,7 +1745,7 @@ const buyerOf = (t) => (kindOf(t) === 'rekber' ? t.buyerId : t.userId);
 /** Perbarui pesan detail ticket (status, tombol, info pembayaran). */
 async function refreshTicketMessage(guild, t) {
   if (!t.channelId || !t.messageId) return;
-  const ch = await guild.channels.fetch(t.channelId).catch(() => null);
+  const ch = await ensureOpen(await guild.channels.fetch(t.channelId).catch(() => null));
   await editTicketMsg(ch, guild, loadConfig(), t);
 }
 
@@ -2298,7 +2318,7 @@ async function housekeeping() {
       if (t.deleteAt && !t.deleted && t.deleteAt <= now) {
         t.deleted = true;
         save();
-        const ch = await client.channels.fetch(t.channelId).catch(() => null);
+        const ch = await ensureOpen(await client.channels.fetch(t.channelId).catch(() => null));
         const guild = client.guilds.cache.get(t.guildId) || ch?.guild;
         // Arsip ticket (info lengkap + transkrip chat) ke channel arsip private sebelum channel dihapus.
         if (guild && !t.archived) {
@@ -2514,6 +2534,7 @@ function registerStore(c) {
   client = c;
   F.register(c);
   c.on('channelDelete', (ch) => onChannelDelete(ch).catch((e) => console.error('[store] channelDelete:', e.message)));
+  c.on('threadDelete', (th) => onChannelDelete(th).catch((e) => console.error('[store] threadDelete:', e.message)));
   c.once(Events.ClientReady, () => {
     housekeeping();
     setInterval(housekeeping, 30 * 1000);
@@ -2526,7 +2547,7 @@ function registerStore(c) {
 }
 
 // Premium App memakai fungsi bersama dari file ini.
-I.init({ getClient: () => client, logOrder, refreshPanel, refreshLeaderboard, getTicketCategory, editTicketMsg, testimonyTimeoutMs });
+I.init({ getClient: () => client, logOrder, refreshPanel, refreshLeaderboard, getTicketCategory, createTicketChannel, editTicketMsg, testimonyTimeoutMs });
 CP.init({ getClient: () => client, setProductsOpen, announce, closeIfSoldOut, reopenIfAutoClosed, refreshPanel, markPaid });
 
 module.exports = {
