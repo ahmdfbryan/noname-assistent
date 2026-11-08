@@ -20,6 +20,7 @@ const UI = require('../ui');
 const { loadConfig, isId, rupiah, num, getProduct } = require('./config');
 const { state, save, hasStock, stockOf, stockUnit, planStockOf, isProductOpen, kindOf, productState } = require('./state');
 const V = require('./views');
+const { ensureOpen } = require('../ticket-thread');
 
 /**
  * Alat tambahan Store Control Center:
@@ -131,7 +132,7 @@ async function onPaid(interaction, ticketId) {
   const cfg = loadConfig();
   if (!t || t.status !== 'open') return interaction.update(queueView(interaction.guild, cfg, `⚠️ \`${ticketId}\` sudah ditutup.`));
   await interaction.deferUpdate();
-  const ch = t.channelId ? await interaction.guild.channels.fetch(t.channelId).catch(() => null) : null;
+  const ch = t.channelId ? await ensureOpen(await interaction.guild.channels.fetch(t.channelId).catch(() => null)) : null;
   if (!ch) return interaction.editReply(queueView(interaction.guild, cfg, `⚠️ Channel ticket \`${ticketId}\` tidak ditemukan.`));
   const err = await h.ctx.markPaid(interaction.guild, ch, t, { by: interaction.user.id });
   if (!err) h.logAction(`✅ <@${interaction.user.id}> dana masuk \`${t.id}\` (${rupiah(V.payAmount(t))})`);
