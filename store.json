@@ -408,7 +408,8 @@
         }
       ],
       "priceNote": "Harga per 1 boost",
-      "minBoost": 1,
+      "minBoost": 2,
+      "boostStep": 2,
       "maxBoost": 30,
       "estimate": "1x24 jam",
       "stockUnit": "boost",
@@ -416,7 +417,7 @@
       "features": [
         "**Kualitas Terjamin** — boost stabil & terjaga kualitasnya",
         "**Legal & Aman** — boost dibeli melalui pembelian resmi",
-        "**Tanpa Minimum Order** — pesan sesuai kebutuhan, mulai 1 boost",
+        "**Minimal 2 Boost** — pesan kelipatan 2 (2, 4, 6, 8, 10, dst)",
         "**Semua Jenis Server** — bisa untuk server publik maupun privat",
         "**Proses Cepat** — pesanan diproses maksimal 1x24 jam",
         "**Garansi Penuh** — berlaku selama masa aktif boost"
@@ -462,7 +463,7 @@
         "highlights": [
           "**Garansi penuh** selama masa aktif",
           "Boost **legal** & dibeli resmi",
-          "Tanpa minimum order • proses **1x24 jam**"
+          "Min. 2 boost (kelipatan 2) • proses **1x24 jam**"
         ],
         "thumbnail": "",
         "image": ""
