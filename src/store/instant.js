@@ -329,7 +329,6 @@ function buildPanel(guild, cfg) {
       return { c, ready: ready.length, total: list.length, min: ready.length ? Math.min(...ready.map((x) => x.sum.min)) : 0 };
     })
     .sort((a, b) => b.ready - a.ready || a.c.localeCompare(b.c));
-  const s = summaryOf(p);
   const ps = productStatsOf(p.id);
   const st = state.stats;
   const avg = st.ratingCount ? (st.ratingSum / st.ratingCount).toFixed(1) : '-';
@@ -340,19 +339,6 @@ function buildPanel(guild, cfg) {
     .slice(0, 12)
     .map((x) => `📂 **${clip(x.c, 40)}** — \`${num(x.ready)} produk\` • mulai \`${rupiah(x.min)}\``);
   const moreCats = cats.filter((x) => x.ready).length - catLines.length;
-  const features = pt.features || [
-    '⚡ **Kirim Otomatis** — akun masuk ke ticket & DM dalam hitungan detik',
-    '💳 **QRIS Semua E-Wallet** — DANA, OVO, GoPay, ShopeePay & m-banking',
-    '📦 **Stok & Harga Real-time** — yang tampil = yang tersedia',
-    '🕐 **Buka 24 Jam** — tanpa menunggu admin online',
-  ];
-  const steps = pt.steps || [
-    'Pilih **kategori** di menu bawah',
-    'Pilih **produk** & **varian** yang kamu mau',
-    'Bayar lewat **QRIS** di ticket pribadimu',
-    'Akun **terkirim otomatis** — simpan & selamat menikmati! ✨',
-  ];
-
   const options = cats.slice(0, 25).map((x) => ({
     label: clip(x.c, 100),
     value: clip(x.c, 100),
@@ -367,26 +353,15 @@ function buildPanel(guild, cfg) {
   const payload = card(cfg, {
     thumb: pt.thumbnail || p.thumbnail || guild.iconURL({ extension: 'png', size: 256 }),
     header: `# ${fill(pt.title || '👑 Premium App', name)}\n-# ${fill(pt.subtitle || 'Auto Delivery 24 Jam • {server}', name)}`,
-    bottomImage: banner?.url || null, // banner tepat di bawah "Cara Order"
+    bottomImage: banner?.url || null, // banner di bagian bawah panel
     blocks: [
       fill(
         pt.description ||
           'Belanja **akun premium siap pakai** tanpa ribet! 💎\nPilih produk, bayar via **QRIS**, dan akun **langsung dikirim otomatis** ke ticket & DM kamu — kapan pun, **24 jam nonstop**. ⚡',
         name,
       ),
-      `### ✨ Kenapa Belanja di Sini?\n${features.join('\n')}`,
       catLines.length ? `### 🛍️ Kategori Tersedia\n${catLines.join('\n')}${moreCats > 0 ? `\n-# +${moreCats} kategori lainnya di menu bawah` : ''}` : open ? '### 🛍️ Kategori Tersedia\n_Produk sedang dimuat..._' : null,
-      [
-        `🏪 **Status:** ${open ? '`🟢 BUKA 24 JAM`' : '`🔴 TUTUP`'}`,
-        `📦 **Tersedia:** \`${num(s.products)} produk • ${num(s.variants)} varian\``,
-        s.min ? `💱 **Harga:** \`Mulai ${rupiah(s.min)}\`` : null,
-        `💳 **Pembayaran:** \`${PAY_LABEL[payMode(p)]}\`${minTotal(p) ? ` • min. \`${rupiah(minTotal(p))}\`` : ''}`,
-        `✅ **Order Selesai:** \`${num(ps.orders)} order\``,
-        `⭐ **Rating Toko:** ${stars} \`${avg} / 5\` (${num(st.ratingCount)} ulasan)`,
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      `### 🔄 Cara Order\n${steps.map((x, i) => `${KEYCAPS[i] || `\`${i + 1}\``} ${x}`).join('\n')}`,
+      [`🧾 **Total Transaksi:** \`${num(ps.orders)} transaksi\``, `⭐ **Rating Toko:** ${stars} \`${avg} / 5\` (${num(st.ratingCount)} ulasan)`].join('\n'),
     ],
     footer: `${name.name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
     rows: [
