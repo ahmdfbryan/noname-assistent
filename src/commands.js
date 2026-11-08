@@ -19,6 +19,7 @@ const { membersCommand } = require('./member-list');
 const { serverCheckCommand } = require('./server-check');
 const { botPanelCommand } = require('./bot-panel');
 const { canvaCommand } = require('./canva-manager');
+const { pesanCommand } = require('./pesan');
 
 const TEXT_CHANNELS = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 
@@ -74,6 +75,7 @@ const commands = [
   serverCheckCommand,
   botPanelCommand,
   canvaCommand,
+  pesanCommand,
 ];
 
 module.exports = { commands };
