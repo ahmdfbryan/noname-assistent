@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { ROBUX: RBX } = require('./emojis');
+const { ROBUX: RBX, BOOST } = require('./emojis');
 const {
   MessageFlags,
   ContainerBuilder,
@@ -514,7 +514,7 @@ async function archiveStoreTicket(guild, t, source) {
   if (kind === 'canva') det.push(`**📅 Paket:** \`${t.plan?.label || '-'}\``, `**📧 Email:** \`${t.email || '-'}\``, t.expiresAt ? `**⌛ Aktif Sampai:** ${ts(t.expiresAt, 'D')}` : null);
   if (kind === 'boost') {
     det.push(
-      `**📅 Paket:** \`${t.plan?.label || '-'}\` • **🚀 Jumlah:** \`${num(t.qty)} boost\``,
+      `**📅 Paket:** \`${t.plan?.label || '-'}\` • **${BOOST} Jumlah:** \`${num(t.qty)} boost\``,
       t.server ? `**🌐 Server:** \`${t.server.name}\` • \`${t.server.id}\`` : null,
       t.invite ? `**🔗 Invite:** ${t.invite}` : null,
       t.expiresAt ? `**⌛ Aktif Sampai:** ${ts(t.expiresAt, 'D')}` : null,
