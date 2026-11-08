@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder } = require('discord.js');
 const { loadConfig, isId, rupiah, num, color, channelOf, GROUPS } = require('./config');
 const REP = require('./reputation');
-const { plain, CANVA } = require('../emojis');
+const { plain, CANVA, BOOST } = require('../emojis');
 const { state, save, productState, isProductOpen, hasStock, stockOf, setStock, stockUnit, planStockOf, setPlanStock } = require('./state');
 const V = require('./views');
 const SP = require('./spender');
@@ -245,7 +245,7 @@ const storeCommand = {
       // Update stock mengikuti kondisi produk — TIDAK membuka produk yang sedang tutup. Buka/tutup hanya lewat panel / `/store buka`.
       return interaction.editReply(
         `📦 Stock **${label}**: **${num(before)} → ${num(after)} ${unit}**.` +
-          (plan ? `\n🚀 Total stock ${target.label}: **${num(stockOf(target))} ${unit}**` : '') +
+          (plan ? `\n${BOOST} Total stock ${target.label}: **${num(stockOf(target))} ${unit}**` : '') +
           (!isProductOpen(target) && stockOf(target) > 0 ? `\nℹ️ **${target.label}** masih **TUTUP** — buka lewat panel / \`/store buka\` kalau mau dijual.` : ''),
       );
     }
@@ -345,7 +345,7 @@ const storeCommand = {
                 : t.kind === 'canva'
                 ? `\`${t.id}\` <#${t.channelId}> • ${CANVA} ${t.plan.label} • <@${t.userId}>`
                 : t.kind === 'boost'
-                ? `\`${t.id}\` <#${t.channelId}> • 🚀 ${num(t.qty)} boost ${t.plan.label} • <@${t.userId}>`
+                ? `\`${t.id}\` <#${t.channelId}> • ${BOOST} ${num(t.qty)} boost ${t.plan.label} • <@${t.userId}>`
                 : t.kind === 'gamepass'
                 ? `\`${t.id}\` <#${t.channelId}> • 🎟️ ${num(t.amount)} Robux (gamepass ${num(t.before)}) • <@${t.userId}>`
                 : t.kind === 'rekber'
