@@ -22,6 +22,7 @@ const botPanel = require('./bot-panel');
 const canvaManager = require('./canva-manager');
 const { registerPrefix } = require('./prefix');
 const aiCs = require('./ai-cs');
+const pesan = require('./pesan');
 
 const byName = new Map(commands.map((c) => [c.data.name, c]));
 // GuildMembers wajib untuk fitur welcome → aktifkan "Server Members Intent" di Discord Developer Portal.
@@ -76,6 +77,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (await booster.handleInteraction(interaction)) return;
   // System Operational: tombol Refresh Status ("sys:refresh")
   if (await system.handleInteraction(interaction)) return;
+  // /pesan: form kirim / edit pesan lewat bot ("pesan:m:...")
+  if (await pesan.handleInteraction(interaction)) return;
   // Bot Command Center: tombol & form panel ("bp:...") — ditangani di bot-panel.js
   if (typeof interaction.customId === 'string' && interaction.customId.startsWith('bp:')) return;
   // Canva Manager: dashboard, form & tombol pengingat ("cv:...") — ditangani di canva-manager.js
