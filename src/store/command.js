@@ -77,6 +77,7 @@ async function deleteOrder(guild, cfg, t) {
   r.log = await delMsg(cfg.channels?.log, t.logMessageId);
   r.testi = await delMsg(cfg.channels?.testimoni, t.testimonyMessageId);
   if (t.archived?.channelId) r.archive = await delMsg(t.archived.channelId, t.archived.messageId);
+  if (t.logImageFile) require('fs').rm(t.logImageFile, { force: true }, () => {});
   if (t.channelId) {
     const ch = await guild.channels.fetch(t.channelId).catch(() => null);
     if (ch) await ch.delete('Order dihapus admin').catch(() => {});
