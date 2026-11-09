@@ -634,74 +634,75 @@
     }
   ],
   "payment": {
-    "title": "💳 Pembayaran",
+    "title": "Pembayaran",
     "accountName": "Ahmad Febrian Sembiring",
     "methods": [
       {
         "bank": "BRI",
         "number": "222401016335506",
-        "emoji": "🏦"
+        "emoji": "<:bri:1569173082067828826>"
       },
       {
         "bank": "BCA",
         "number": "7985504946",
-        "emoji": "🏦"
+        "emoji": "<:bca:1569173251865706497>"
       },
       {
         "bank": "BNI",
         "number": "1236190154",
-        "emoji": "🏦"
+        "emoji": "<:bni:1569173109561630741>"
       },
       {
         "bank": "BSI",
         "number": "7178340349",
-        "emoji": "🏦"
+        "emoji": "<:bsi:1569173329628241952>"
       },
       {
         "bank": "JAGO",
         "number": "104684248297",
-        "emoji": "🏦"
+        "emoji": "<:jago:1569173401614942358>"
       },
       {
         "bank": "MANDIRI",
         "number": "1050017422167",
-        "emoji": "🏦"
+        "emoji": "<:mandiri:1569173480132448416>"
       },
       {
         "bank": "SEA BANK",
         "number": "901591266000",
-        "emoji": "🏦"
+        "emoji": "<:seabank:1569173764594335815>"
       },
       {
         "bank": "ShopeePay",
         "type": "ewallet",
         "number": "085156954950",
-        "emoji": "🧡"
+        "emoji": "<:shopeepay:1569174150130442311>"
       },
       {
         "bank": "DANA",
         "type": "ewallet",
         "number": "085156954950",
-        "emoji": "💙"
+        "emoji": "<:dana:1569174301645602826>"
       },
       {
         "bank": "OVO",
         "type": "ewallet",
         "number": "085156954950",
-        "emoji": "💜"
+        "emoji": "<:ovo:1569174585956630670>"
       },
       {
         "bank": "GoPay",
         "type": "ewallet",
         "number": "085156954950",
-        "emoji": "💚"
+        "emoji": "<:gopay:1569174664004239480>"
       }
     ],
     "qris": {
       "image": "assets/qris.jpg",
-      "merchant": "TOKO AHMAD"
+      "merchant": "TOKO AHMAD",
+      "emoji": "<:qris:1569174857273315429>"
     },
-    "description": "`1` Bayar **tepat** sesuai nominal di atas — via transfer bank, e-wallet, atau scan **QRIS**.\n`2` Klik **💳 Konfirmasi Pembayaran** & upload **bukti pembayaran**.\n`3` Tunggu admin memverifikasi — kamu akan dapat notifikasi **💰 Dana Masuk**.\n\n⚠️ Jangan melakukan pembayaran di luar ticket ini.",
+    "description": "Transfer **tepat** sesuai nominal → klik **Konfirmasi Pembayaran** & upload bukti → tunggu verifikasi admin.\n-# Jangan membayar di luar ticket ini.",
     "image": ""
   },
   "spenderRoles": {
