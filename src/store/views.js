@@ -1744,16 +1744,21 @@ const qrisOf = (cfg) => bannerOf(cfg.payment?.qris?.image, 'qris');
 function payGroups(cfg, { code = true } = {}) {
   const methods = payMethods(cfg);
   const fmt = (n) => (code ? `\`${n}\`` : n);
-  const banks = methods.filter((m) => !isWallet(m)).map((m) => `${m.emoji || '🏦'} **${m.bank}** — ${fmt(m.number)}${m.holder ? ` • a.n. ${m.holder}` : ''}`);
+  const banks = methods.filter((m) => !isWallet(m)).map((m) => `${m.emoji || '🏦'} **${m.bank}** ${fmt(m.number)}${m.holder ? ` • a.n. ${m.holder}` : ''}`);
   const byNum = new Map();
   for (const m of methods.filter(isWallet)) {
     const k = `${m.number}|${m.holder || ''}`;
     if (!byNum.has(k)) byNum.set(k, { number: m.number, holder: m.holder, list: [] });
-    byNum.get(k).list.push(`${m.emoji ? `${m.emoji} ` : ''}**${m.bank}**`);
+    byNum.get(k).list.push(m);
   }
-  const wallets = [...byNum.values()].map((g) => `${g.list.join(' • ')}\n┗ 📱 ${fmt(g.number)}${g.holder ? ` • a.n. ${g.holder}` : ''}`);
+  // E-wallet dengan nomor sama digabung: baris ikon + nomor, lalu nama-namanya kecil di bawah.
+  const wallets = [...byNum.values()].map(
+    (g) =>
+      `${g.list.map((m) => m.emoji || '📱').join(' ')} ${fmt(g.number)}${g.holder ? ` • a.n. ${g.holder}` : ''}\n-# ${g.list.map((m) => m.bank).join(' • ')}`,
+  );
   return { banks, wallets };
 }
+const qrisEmoji = (cfg) => cfg.payment?.qris?.emoji || '🔳';
 
 function payStatusText(t) {
   if (isPaid(t)) return '`✅ Lunas`';
@@ -1767,7 +1772,7 @@ function ticketStatusText(t) {
   return STATUS_LABEL[t.status];
 }
 
-/** Metode pembayaran (hanya tampil selama belum lunas): Bank • E-Wallet • QRIS, rapi per kelompok. */
+/** Metode pembayaran (hanya tampil selama belum lunas) — minimalis: total, lalu Bank • E-Wallet • QRIS. */
 function paymentEmbeds(guild, cfg, t) {
   if (t.status !== 'open' || isPaid(t)) return [];
   const pay = cfg.payment || {};
@@ -1776,25 +1781,19 @@ function paymentEmbeds(guild, cfg, t) {
   const qris = qrisOf(cfg);
   const e = new EmbedBuilder()
     .setColor(color(cfg, 'brand', 0x3498db))
-    .setTitle(pay.title || '💳 Pembayaran')
+    .setAuthor({ name: String(pay.title || 'Pembayaran').toUpperCase() })
     .setDescription(
-      [
-        `Bayar **tepat** sebesar:\n## ${rupiah(payAmount(t))}`,
-        pay.accountName ? `👤 Semua rekening & e-wallet **a.n. ${pay.accountName}**` : null,
-        '-# Pilih salah satu metode di bawah 👇',
-      ]
-        .filter(Boolean)
-        .join('\n'),
+      [`-# TOTAL BAYAR`, `## ${rupiah(payAmount(t))}`, pay.accountName ? `-# Semua rekening a.n. **${pay.accountName}**` : null].filter(Boolean).join('\n'),
     );
-  if (banks.length) e.addFields({ name: '🏦 Transfer Bank', value: banks.join('\n').slice(0, 1024) });
-  if (wallets.length) e.addFields({ name: '📱 E-Wallet', value: wallets.join('\n').slice(0, 1024) });
+  if (banks.length) e.addFields({ name: 'Transfer Bank', value: banks.join('\n').slice(0, 1024) });
+  if (wallets.length) e.addFields({ name: 'E-Wallet', value: wallets.join('\n').slice(0, 1024) });
   if (qris) {
     e.addFields({
-      name: '🔳 QRIS',
-      value: `Bisa dibayar dari **semua m-banking & e-wallet**${pay.qris?.merchant ? ` • merchant **${pay.qris.merchant}**` : ''}\nKlik **🔳 Tampilkan QRIS** di bawah, lalu scan.`,
+      name: 'QRIS',
+      value: `${qrisEmoji(cfg)} Semua m-banking & e-wallet${pay.qris?.merchant ? ` • ${pay.qris.merchant}` : ''}\n-# Klik **Tampilkan QRIS** di bawah, lalu scan.`,
     });
   }
-  if (pay.description) e.addFields({ name: '🧾 Langkah Pembayaran', value: fill(pay.description, name).slice(0, 1024) });
+  if (pay.description) e.addFields({ name: '\u200b', value: fill(pay.description, name).slice(0, 1024) });
   if (pay.image && /^https?:\/\//i.test(pay.image)) e.setImage(pay.image);
   return [e];
 }
@@ -1812,7 +1811,7 @@ function paymentRows(t) {
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`store:copyacc:${t.id}`).setLabel('Salin Nomor').setEmoji('📋').setStyle(ButtonStyle.Secondary),
   ];
-  if (cfg && qrisOf(cfg)) buttons.push(new ButtonBuilder().setCustomId(`store:qris:${t.id}`).setLabel('Tampilkan QRIS').setEmoji('🔳').setStyle(ButtonStyle.Secondary));
+  if (cfg && qrisOf(cfg)) buttons.push(new ButtonBuilder().setCustomId(`store:qris:${t.id}`).setLabel('Tampilkan QRIS').setEmoji(qrisEmoji(cfg)).setStyle(ButtonStyle.Secondary));
   return [new ActionRowBuilder().addComponents(buttons)];
 }
 
@@ -1823,14 +1822,14 @@ function buildCopyAccounts(cfg, t) {
   const byNum = new Map();
   for (const m of methods.filter(isWallet)) {
     if (!byNum.has(m.number)) byNum.set(m.number, []);
-    byNum.get(m.number).push(m.bank);
+    byNum.get(m.number).push(m);
   }
-  const wallets = [...byNum.entries()].map(([n, list]) => `📱 **${list.join(' • ')}**\n${n}`);
+  const wallets = [...byNum.entries()].map(([n, list]) => `${list.map((m) => m.emoji || '📱').join(' ')} **${list.map((m) => m.bank).join(' • ')}**\n${n}`);
   const parts = [
     `💰 **Total bayar: ${rupiah(payAmount(t))}**${cfg.payment?.accountName ? `\n👤 a.n. **${cfg.payment.accountName}**` : ''}`,
-    banks.length ? `### 🏦 Transfer Bank\n${banks.join('\n\n')}` : null,
-    wallets.length ? `### 📱 E-Wallet\n${wallets.join('\n\n')}` : null,
-    qrisOf(cfg) ? '-# 🔳 Mau scan QRIS? Klik **Tampilkan QRIS** di ticket.' : null,
+    banks.length ? `### Transfer Bank\n${banks.join('\n\n')}` : null,
+    wallets.length ? `### E-Wallet\n${wallets.join('\n\n')}` : null,
+    qrisOf(cfg) ? `-# ${qrisEmoji(cfg)} Mau scan QRIS? Klik **Tampilkan QRIS** di ticket.` : null,
     '_Tekan lama nomor untuk menyalin._',
   ];
   return { content: parts.filter(Boolean).join('\n\n') };
@@ -1844,7 +1843,7 @@ function buildQris(guild, cfg, t) {
   const amount = t ? rupiah(payAmount(t)) : null;
   const box = pcard({
     accent: color(cfg, 'brand', 0x3498db),
-    header: `## 🔳 Bayar dengan QRIS\n-# ${storeName(cfg, guild)}${pay.qris?.merchant ? ` • merchant ${pay.qris.merchant}` : ''}`,
+    header: `## ${qrisEmoji(cfg)} Bayar dengan QRIS\n-# ${storeName(cfg, guild)}${pay.qris?.merchant ? ` • merchant ${pay.qris.merchant}` : ''}`,
     images: [q.url],
     blocks: [
       amount ? `💰 **Total bayar:** \`${amount}\`\n-# Masukkan nominal **tepat** sesuai total di atas.` : null,
@@ -2816,6 +2815,7 @@ module.exports = {
   buildCopyAccounts,
   buildQris,
   payGroups,
+  qrisEmoji,
   qrisOf,
   isWallet,
   buildPaymentProof,
