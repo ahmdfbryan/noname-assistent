@@ -1789,7 +1789,7 @@ async function onPayButton(interaction, ticketId) {
     value: m.bank.slice(0, 100),
     emoji: m.emoji || (V.isWallet(m) ? '📱' : '🏦'),
   }));
-  if (V.qrisOf(cfg)) options.push({ label: 'QRIS', description: 'Scan QRIS (m-banking / e-wallet)', value: 'QRIS', emoji: '🔳' });
+  if (V.qrisOf(cfg)) options.push({ label: 'QRIS', description: 'Scan QRIS (m-banking / e-wallet)', value: 'QRIS', emoji: V.qrisEmoji(cfg) });
   if (options.length) {
     labels.push(
       new LabelBuilder()
