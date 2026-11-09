@@ -33,6 +33,7 @@ const { editPanelMessage } = require('./banner');
 const F = require('./forum');
 const CP = require('./control');
 
+const { robuxSentProof } = require('./proof-card');
 const PROOF_DIR = path.join(__dirname, '..', '..', 'data', 'proofs');
 const SESSION_MS = 10 * 60 * 1000;
 const sessions = new Map(); // userId → { productId, roblox, expires }
@@ -290,11 +291,13 @@ function logOrder(guild, t, text) {
           save();
         }
       }
-      const payload = V.buildOrderLog(guild, cfg, t); // tanpa gambar — gambar bukti hanya di testimoni
+      const payload = V.buildOrderLog(guild, cfg, t);
+      // Gambar bukti pengiriman (bagian Progress). File sudah tidak ada tapi lampiran lama masih di pesan → biarkan.
+      const imgFiles = t.logImageFile && fs.existsSync(t.logImageFile) ? [{ attachment: t.logImageFile, name: t.logImageName }] : [];
 
       if (t.logMessageId) {
         try {
-          await channel.messages.edit(t.logMessageId, { ...payload, attachments: [] });
+          await channel.messages.edit(t.logMessageId, imgFiles.length ? { ...payload, files: imgFiles, attachments: [] } : t.logImageName ? payload : { ...payload, attachments: [] });
           return;
         } catch (err) {
           // Pesan log lama (format embed) tidak bisa diubah ke Components V2 → kirim baru & hapus yang lama.
@@ -303,7 +306,7 @@ function logOrder(guild, t, text) {
           }
         }
       }
-      const msg = await channel.send(payload);
+      const msg = await channel.send(imgFiles.length ? { ...payload, files: imgFiles } : payload);
       t.logMessageId = msg.id;
       save();
     })
@@ -2046,6 +2049,37 @@ async function saveProof(attachment, ticketId) {
   throw new Error(`download bukti gagal: ${lastErr?.cause?.code || lastErr?.message}`);
 }
 
+/**
+ * Gambar bukti pengiriman untuk kartu history (bagian Progress).
+ *  • Robux Visend (Completed): digambar bot — foto profil, "Sent Robux to" + username di-blur, jumlah Robux, latar putih.
+ *  • Produk lain: gambar bukti yang di-upload admin saat menutup ticket.
+ * File disalin ke data/proofs/log-<id>.* (tetap ada walau file bukti ticket dihapus).
+ */
+async function prepareLogImage(t, status) {
+  try {
+    let buf = null;
+    let ext = '.png';
+    if (kindOf(t) === 'robux' && status === 'completed') {
+      buf = await robuxSentProof({ avatarUrl: t.roblox?.avatar, username: t.roblox?.name, amount: t.amount });
+    }
+    if (!buf && t.proofFile && fs.existsSync(t.proofFile)) {
+      buf = fs.readFileSync(t.proofFile);
+      ext = path.extname(t.proofFile) || '.png';
+    }
+    if (buf) {
+      fs.mkdirSync(PROOF_DIR, { recursive: true });
+      t.logImageFile = path.join(PROOF_DIR, `log-${t.id}${ext}`);
+      t.logImageName = `progress-${t.id}${ext}`;
+      fs.writeFileSync(t.logImageFile, buf);
+    } else if (t.proofRemoteUrl) {
+      t.logImageUrl = t.proofRemoteUrl;
+    }
+    save();
+  } catch (e) {
+    console.warn(`[store] gambar log ${t.id}:`, e.message);
+  }
+}
+
 /** Lampiran bukti (dari disk) untuk dikirim bersama embed. */
 function proofAttachment(t) {
   // Fallback: file gagal di-download ke VPS → pakai link gambar asli dari Discord.
@@ -2093,6 +2127,7 @@ async function onCloseModal(interaction, ticketId) {
   const channel = interaction.channel;
   const proof = proofAttachment(t);
   t.proofUrl = proof.url;
+  await prepareLogImage(t, status);
   const rekber = kindOf(t) === 'rekber';
 
   if (rekber) {
