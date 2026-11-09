@@ -2202,14 +2202,16 @@ function buildOrderLogV2(guild, cfg, t) {
     status.push(row(t.status === 'completed' ? 'Completed At' : 'Closed At', ts(t.closedAt, 'f')), row('Processing Time', `\`${duration(t.closedAt - t.createdAt)}\``));
   }
   if (t.testimony) status.push(row('Rating', `${STARS(t.testimony.rating)}  **${t.testimony.rating}/5**`));
-  const timeline = (t.log || []).slice(-10).map((x) => `${ts(x.at, 't')} ┃ ${x.text}`).join('\n');
+  // Progress = gambar bukti pengiriman (bukan lagi daftar langkah).
+  const progressImg = t.logImageName ? `attachment://${t.logImageName}` : t.logImageUrl || null;
   return v2Card({
     color: statusColor,
     header: `## ${rekber ? '🤝' : '🧾'} ${t.id} • ${pub}\n-# ${rekber ? 'Escrow Log' : 'Order Log'}`,
     lines,
     // Foto profil pembeli (disimpan saat log dibuat); fallback ke logo server.
     thumb: t.buyerAvatar || guild.client?.users?.cache?.get(rekber ? t.buyerId : t.userId)?.displayAvatarURL({ extension: 'png', size: 256 }) || guild.iconURL({ extension: 'png', size: 256 }) || null,
-    after: [status.join('\n'), timeline ? `**🗂️ Progress**\n${timeline}` : null],
+    after: [status.join('\n'), progressImg ? '**🗂️ Progress**' : null],
+    image: progressImg,
     footer: `🛒 ${storeName(cfg, guild)} • ${ts(t.closedAt || t.createdAt, 'f')}`,
   });
 }
