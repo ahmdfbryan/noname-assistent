@@ -2,14 +2,14 @@ const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, Emb
 const { loadConfig, isId, rupiah, num, color, channelOf, GROUPS } = require('./config');
 const REP = require('./reputation');
 const { plain, CANVA, BOOST } = require('../emojis');
-const { state, save, productState, isProductOpen, hasStock, stockOf, setStock, stockUnit, planStockOf, setPlanStock } = require('./state');
+const { state, save, productStatsOf, kindOf, productState, isProductOpen, hasStock, stockOf, setStock, stockUnit, planStockOf, setPlanStock } = require('./state');
 const V = require('./views');
 const SP = require('./spender');
 const H = require('./howto');
 const C = require('./catalog');
 const I = require('./instant');
 const F = require('./forum');
-const { setProductsOpen, closeIfSoldOut, announce, refreshPanel, onDanaMasukCommand, migrateToV2, postCatalog } = require('./flow');
+const { setProductsOpen, closeIfSoldOut, announce, refreshPanel, refreshLeaderboard, onDanaMasukCommand, migrateToV2, postCatalog } = require('./flow');
 
 const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 
@@ -35,6 +35,60 @@ function stockChoices() {
   }
   return out.slice(0, 25);
 }
+/** Hapus order dari data bot + semua jejaknya, dan koreksi statistik kalau order sudah sempat Completed. */
+async function deleteOrder(guild, cfg, t) {
+  const r = { id: t.id, status: t.status, price: Number(t.price) || 0, log: false, testi: false, archive: false, reversed: false, rating: false };
+  t.deleted = true; // supaya listener hapus channel/thread tidak memproses ulang
+  if (t.status === 'completed') {
+    const kind = kindOf(t);
+    if (kind === 'rekber') {
+      state.stats.rekber = Math.max(0, state.stats.rekber - 1);
+      state.stats.rekberVolume = Math.max(0, state.stats.rekberVolume - (Number(t.nominal) || 0));
+    } else {
+      const amount = kind === 'instant' ? 0 : Number(t.amount) || 0;
+      state.stats.transactions = Math.max(0, state.stats.transactions - 1);
+      state.stats.revenue = Math.max(0, state.stats.revenue - r.price);
+      state.stats.robux = Math.max(0, state.stats.robux - amount);
+      const sp = state.spenders[t.userId];
+      if (sp) {
+        sp.robux = Math.max(0, sp.robux - amount);
+        sp.revenue = Math.max(0, sp.revenue - r.price);
+        sp.orders = Math.max(0, sp.orders - 1);
+        if (!sp.orders && !sp.revenue) delete state.spenders[t.userId];
+      }
+      const ps = productStatsOf(t.productId);
+      ps.orders = Math.max(0, ps.orders - 1);
+      ps.robux = Math.max(0, ps.robux - amount);
+      ps.revenue = Math.max(0, ps.revenue - r.price);
+    }
+    r.reversed = true;
+  }
+  if (t.testimony) {
+    state.stats.ratingSum = Math.max(0, state.stats.ratingSum - (Number(t.testimony.rating) || 0));
+    state.stats.ratingCount = Math.max(0, state.stats.ratingCount - 1);
+    r.rating = true;
+  }
+  const delMsg = async (channelId, messageId) => {
+    if (!isId(channelId) || !messageId) return false;
+    const ch = await guild.channels.fetch(channelId).catch(() => null);
+    if (!ch?.messages) return false;
+    return ch.messages.delete(messageId).then(() => true).catch(() => false);
+  };
+  r.log = await delMsg(cfg.channels?.log, t.logMessageId);
+  r.testi = await delMsg(cfg.channels?.testimoni, t.testimonyMessageId);
+  if (t.archived?.channelId) r.archive = await delMsg(t.archived.channelId, t.archived.messageId);
+  if (t.channelId) {
+    const ch = await guild.channels.fetch(t.channelId).catch(() => null);
+    if (ch) await ch.delete('Order dihapus admin').catch(() => {});
+  }
+  for (const k of Object.keys(state.tickets)) if (state.tickets[k] === t) delete state.tickets[k];
+  save();
+  if (r.reversed) await SP.applySpenderRoles(guild, t.userId, cfg).catch(() => {});
+  refreshPanel();
+  refreshLeaderboard();
+  return r;
+}
+
 const stockProductOption = (o) => {
   o.setName('produk').setDescription('Produk yang diatur stock-nya (default: Robux Visend)');
   const choices = stockChoices();
@@ -149,7 +203,14 @@ const storeCommand = {
     .addSubcommand((s) => s.setName('premium-forum').setDescription('Buat / sinkronkan katalog Premium App di forum channel (1 post per produk)'))
     .addSubcommand((s) => s.setName('premium-app').setDescription('Status Premium App: koneksi API Waroeng, saldo, pesanan bermasalah'))
     .addSubcommand((s) => s.setName('sinkron-role').setDescription('Pasang ulang role Buyer & tier spender ke semua pembeli'))
-    .addSubcommand((s) => s.setName('perbarui-tampilan').setDescription('Ubah history order & testimoni lama ke tampilan baru (Components V2)')),
+    .addSubcommand((s) => s.setName('perbarui-tampilan').setDescription('Ubah history order & testimoni lama ke tampilan baru (Components V2)'))
+    .addSubcommand((s) =>
+      s
+        .setName('hapus-order')
+        .setDescription('Hapus order (mis. order tes) dari data bot: history, testimoni, arsip & statistiknya')
+        .addStringOption((o) => o.setName('id').setDescription('ID order, contoh: RB-0001').setRequired(true))
+        .addBooleanOption((o) => o.setName('yakin').setDescription('True = benar-benar hapus (tidak bisa dibatalkan)').setRequired(true)),
+    ),
 
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -268,6 +329,21 @@ const storeCommand = {
           : `100 Robux = ${rupiah(rate * 100)}`;
       return interaction.editReply(
         `💱 Harga **${target.label}** sekarang **${rupiah(rate)} / Robux** (${example}).\nTicket yang sudah berjalan tetap memakai harga lama.`,
+      );
+    }
+
+    if (sub === 'hapus-order') {
+      const id = interaction.options.getString('id').trim();
+      const t = Object.values(state.tickets).find((x) => String(x.id).toLowerCase() === id.toLowerCase());
+      if (!t) return interaction.editReply(`❌ Order \`${id}\` tidak ditemukan.`);
+      if (t.status === 'open') return interaction.editReply(`❌ Order \`${t.id}\` masih **berjalan**. Batalkan / selesaikan dulu, baru dihapus.`);
+      if (!interaction.options.getBoolean('yakin')) return interaction.editReply('ℹ️ Dibatalkan — pilih **yakin: True** kalau memang mau menghapus.');
+      const r = await deleteOrder(guild, cfg, t);
+      return interaction.editReply(
+        `🗑️ Order \`${r.id}\` (status **${r.status}**) sudah dihapus dari data bot.\n` +
+          `• Pesan history: ${r.log ? '✅' : '—'} • Testimoni: ${r.testi ? '✅' : '—'} • Arsip ticket: ${r.archive ? '✅' : '—'}\n` +
+          (r.reversed ? `• Statistik dikoreksi: transaksi −1, omzet −${rupiah(r.price)}${r.rating ? ', rating −1' : ''}\n` : '') +
+          `-# Tingkat Keberhasilan & angka toko ikut diperbarui.`,
       );
     }
 
