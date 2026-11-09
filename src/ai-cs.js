@@ -177,6 +177,7 @@ function buildKnowledge(guild, includePremium) {
       const info = [`### ${p.label} — ${open ? 'BUKA' : 'TUTUP'}`];
       if (p.type === 'robux') info.push(`Harga: Rp${V.rateOf(cfg, p)} per 1 Robux. Stok: ${stockOf(p)} Robux. Min ${V.minAmountOf(p)}, maks ${p.maxAmount || 5000} Robux${V.stepOf(p) > 1 ? `, harus kelipatan ${V.stepOf(p)}` : ''}.`);
       if (p.type === 'gamepass') info.push(`Rate: Rp${V.rateOf(cfg, p)} per 1 Robux harga gamepass (before tax). Pajak Roblox ${p.taxPercent ?? 30}%. Robux masuk ± ${p.pendingDays || 5} hari (masa pending Roblox).`);
+      if (p.type === 'gift') info.push(`Rate: Rp${V.rateOf(cfg, p)} per 1 Robux harga item. Item in-game (gamepass, skin, crate, server boost, dll) dibeli pakai Robux dan dikirim lewat sistem gift. Isi nama item, jumlah, dan server di awal order.`);
       if (p.type === 'canva' || p.type === 'boost') {
         info.push(`Paket: ${(p.plans || []).map((x) => `${x.label} Rp${Number(x.price).toLocaleString('id-ID')}${p.type === 'boost' ? '/boost' : ''} (${x.duration || `${x.days} hari`}${p.type === 'boost' ? `, stok ${planStockOf(p, x.id)}` : ''})`).join('; ')}.`);
         if (hasStock(p) && p.type !== 'boost') info.push(`Sisa slot: ${stockOf(p)} ${stockUnit(p)}.`);
