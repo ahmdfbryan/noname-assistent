@@ -128,9 +128,9 @@ function buildHowToGuide(guild, cfg, value) {
       header: `## 💳 Metode Pembayaran\n${fill(h.paymentIntro || 'Semua pembayaran dilakukan **di dalam ticket** setelah ticket order dibuat.', name)}`,
       blocks: [
         pay.accountName ? `👤 Semua rekening & e-wallet **a.n. ${pay.accountName}**` : null,
-        banks.length ? `### 🏦 Transfer Bank\n${banks.join('\n')}` : null,
-        wallets.length ? `### 📱 E-Wallet\n${wallets.join('\n')}` : null,
-        qris ? `### 🔳 QRIS\nScan dari **semua m-banking & e-wallet**${pay.qris?.merchant ? ` • merchant **${pay.qris.merchant}**` : ''} 👇` : null,
+        banks.length ? `### Transfer Bank\n${banks.join('\n')}` : null,
+        wallets.length ? `### E-Wallet\n${wallets.join('\n\n')}` : null,
+        qris ? `### QRIS\nScan dari **semua m-banking & e-wallet**${pay.qris?.merchant ? ` • merchant **${pay.qris.merchant}**` : ''} 👇` : null,
         fallback ? `### 🏦 Rekening Tersedia\n${fallback}` : null,
         `### 🧾 Langkah Pembayaran\n${h.paymentSteps?.length ? steps(h.paymentSteps) : fill(pay.description || '-', name)}`,
       ],
