@@ -902,7 +902,7 @@ function buildTicket(guild, cfg, t) {
     embeds.push(new EmbedBuilder().setTitle('⚙️ Sedang Diproses').setDescription(i.type === 'manual' ? 'Pesananmu sedang **diproses oleh pusat**. Kamu akan dikabari di ticket ini begitu selesai.' : 'Pembayaran diterima! Akun sedang **dikirim otomatis** — tunggu sebentar ya.'));
   }
   if (t.status === 'open') {
-    rows.push(row(btn(`store:close:${t.id}`, 'Tutup Ticket (Admin)', '🔒', ButtonStyle.Danger), t.payment?.status === 'paid' && i.stage === 'need_help' ? btn(`store:insretry:${t.id}`, 'Kirim Ulang Otomatis (Admin)', '🔁') : null));
+    rows.push(row(t.payment?.status === 'paid' && i.stage === 'need_help' ? btn(`store:insretry:${t.id}`, 'Kirim Ulang Otomatis (Admin)', '🔁') : null, btn(`store:close:${t.id}`, 'Tutup Ticket (Admin)', '🔒', ButtonStyle.Danger)));
   }
   if (t.closedAt) info.addFields({ name: '🔒 Selesai', value: ts(t.closedAt, 'f'), inline: true });
   return { embeds, components: rows };
