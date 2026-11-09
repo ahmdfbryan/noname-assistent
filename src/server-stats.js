@@ -14,8 +14,8 @@ const { loadConfig: loadStoreConfig, groupOf } = require('./store/config');
  */
 const FILE = path.join(__dirname, '..', 'server-stats.json');
 const DATA = path.join(__dirname, '..', 'data', 'server-stats.json');
-const KEYS = ['tickets', 'orders', 'robux', 'gamepass', 'digital', 'premium'];
-const STATUS_KEYS = ['robux', 'gamepass', 'digital', 'premium']; // nilainya buka/tutup, bukan angka
+const KEYS = ['tickets', 'orders', 'robux', 'gamepass', 'gift', 'digital', 'premium'];
+const STATUS_KEYS = ['robux', 'gamepass', 'gift', 'digital', 'premium']; // nilainya buka/tutup, bukan angka
 const DEFAULTS = {
   categoryName: '🟢 STORE STATUS',
   channels: {
@@ -23,6 +23,7 @@ const DEFAULTS = {
     orders: '✅ Total Orders: {count}',
     robux: '{status} Robux Visend',
     gamepass: '{status} Robux Gamepass',
+    gift: '{status} Gift In-Game',
     digital: '{status} Produk Digital',
     premium: '{status} Premium App',
   },
@@ -83,6 +84,7 @@ function productStatus() {
   return {
     robux: anyOpen(products.filter((p) => p.id === 'robux-visend')),
     gamepass: anyOpen(products.filter((p) => p.id === 'robux-gamepass')),
+    gift: anyOpen(products.filter((p) => p.id === 'gift-ingame')),
     digital: anyOpen(products.filter((p) => groupOf(p) === 'digital')),
     premium: anyOpen(products.filter((p) => p.type === 'instant')),
   };
@@ -98,7 +100,7 @@ function nameFor(key, value, cfg) {
   const n = cfg.formatNumber ? Number(value).toLocaleString('id-ID') : String(value);
   return String(cfg.channels[key] || `${key}: {count}`).replace(/\{count\}/g, n).slice(0, 100);
 }
-const summary = (v) => `🎫 ${v.tickets} • ✅ ${v.orders} • ${v.robux ? '🟢' : '🔴'} Robux • ${v.gamepass ? '🟢' : '🔴'} Gamepass • ${v.digital ? '🟢' : '🔴'} Digital • ${v.premium ? '🟢' : '🔴'} Premium`;
+const summary = (v) => `🎫 ${v.tickets} • ✅ ${v.orders} • ${v.robux ? '🟢' : '🔴'} Robux • ${v.gamepass ? '🟢' : '🔴'} Gamepass • ${v.gift ? '🟢' : '🔴'} Gift • ${v.digital ? '🟢' : '🔴'} Digital • ${v.premium ? '🟢' : '🔴'} Premium`;
 
 /** Izin: semua bisa melihat tapi tidak bisa masuk (gembok 🔒). */
 function lockedOverwrites(guild) {
@@ -142,6 +144,10 @@ async function update(client, { force = false } = {}) {
           data.channels[key] = made.id;
           lastRename[key] = Date.now();
           save();
+          // Channel baru diletakkan tepat di bawah channel sebelumnya pada urutan KEYS (mis. Gift In-Game di bawah Gamepass).
+          const prevKey = KEYS[KEYS.indexOf(key) - 1];
+          const prev = prevKey && data.channels[prevKey] ? guild.channels.cache.get(data.channels[prevKey]) : null;
+          if (prev) await made.setPosition(prev.position + 1).catch((e) => console.warn(`[server-stats] gagal mengatur posisi ${key}:`, e.message));
         }
       }
     }
