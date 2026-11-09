@@ -42,31 +42,40 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/** Ikon Robux: segi enam gelap dengan cincin di tengah. cx, cy, r dalam px (sebelum skala). */
-function robuxIcon(ctx, cx, cy, r) {
-  ctx.save();
-  ctx.translate(cx * S, cy * S);
-  ctx.scale(S, S);
+/**
+ * Ikon Robux — meniru ikon asli: cincin segi enam tebal di luar, celah putih, segi enam gelap terisi,
+ * dan kotak putih di tengah. Ujung runcing di atas, sudut sedikit membulat.
+ * cx, cy = pusat, A = apotema (jarak pusat ke sisi) segi enam luar, dalam px sebelum skala.
+ */
+function hexFill(ctx, apothem, color, round) {
+  const rc = (apothem - round) / Math.cos(Math.PI / 6); // jari-jari sudut jalur
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI / 3) * i - Math.PI / 2;
-    const x = Math.cos(a) * r;
-    const y = Math.sin(a) * r;
+    const x = Math.cos(a) * rc;
+    const y = Math.sin(a) * rc;
     if (i) ctx.lineTo(x, y);
     else ctx.moveTo(x, y);
   }
   ctx.closePath();
   ctx.lineJoin = 'round';
-  ctx.lineWidth = r * 0.28;
-  ctx.strokeStyle = '#393b3d';
-  ctx.fillStyle = '#393b3d';
+  ctx.lineWidth = round * 2;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
   ctx.fill();
   ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.52, 0, Math.PI * 2);
-  ctx.lineWidth = r * 0.2;
-  ctx.strokeStyle = '#ffffff';
-  ctx.stroke();
+}
+function robuxIcon(ctx, cx, cy, A) {
+  const DARK = '#393b3d';
+  ctx.save();
+  ctx.translate(cx * S, cy * S);
+  ctx.scale(S, S);
+  hexFill(ctx, A, DARK, A * 0.12); // cincin luar
+  hexFill(ctx, A * 0.81, '#ffffff', A * 0.08); // celah putih
+  hexFill(ctx, A * 0.675, DARK, A * 0.08); // segi enam dalam
+  const q = A * 0.5; // kotak putih di tengah
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(-q / 2, -q / 2, q, q);
   ctx.restore();
 }
 
@@ -123,7 +132,7 @@ async function robuxSentProof({ avatarUrl, username, amount }) {
   ctx.drawImage(name.img, (tx + leadW - name.pad) * S, (cy - px / 2 - name.pad) * S);
   ctx.fillText('.', (tx + leadW + name.w) * S, cy * S);
 
-  // "- ⬡ 200" di ujung kanan
+  // "- ⬡ 200" di ujung kanan (tanda minus pendek, ikon, jumlah — rapat seperti contoh)
   const amt = Math.round(Number(amount) || 0).toLocaleString('en-US');
   ctx.font = FONT(24);
   const amtW = ctx.measureText(amt).width / S;
@@ -131,8 +140,11 @@ async function robuxSentProof({ avatarUrl, username, amount }) {
   ctx.fillStyle = INK;
   ctx.textBaseline = 'middle';
   ctx.fillText(amt, (right - amtW) * S, cy * S);
-  robuxIcon(ctx, right - amtW - 18, cy, 11);
-  ctx.fillText('-', (right - amtW - 18 - 11 - 18) * S, cy * S);
+  const A = 12.5;
+  const iconCx = right - amtW - 7 - A;
+  robuxIcon(ctx, iconCx, cy, A);
+  const dashRight = iconCx - A - 6;
+  ctx.fillRect((dashRight - 8) * S, (cy - 1) * S, 8 * S, 2 * S);
 
   // garis tepi tipis supaya kartu putih tetap terlihat di tema gelap
   ctx.strokeStyle = '#e3e5e8';
