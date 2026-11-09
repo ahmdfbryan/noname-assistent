@@ -367,6 +367,7 @@ async function onProductInfo(interaction, productId) {
   const eph = (p) => ({ ...p, flags: (p.flags || 0) | EPH });
   if (product?.type === 'rekber') return interaction.reply(eph(V.buildRekberInfo(interaction.guild, cfg, product)));
   if (product?.type === 'gamepass') return interaction.reply(eph(V.buildGamepassInfo(interaction.guild, cfg, product)));
+  if (product?.type === 'gift') return interaction.reply(eph(V.buildGiftInfo(interaction.guild, cfg, product)));
   if (product?.type === 'canva') return interaction.reply(eph(V.buildCanvaInfo(interaction.guild, cfg, product)));
   if (product?.type === 'boost') return interaction.reply(eph(V.buildBoostInfo(interaction.guild, cfg, product)));
   if (product?.type === 'instant') return I.onInfo(interaction, product);
@@ -391,6 +392,7 @@ async function onBuy(interaction, productId) {
   const product = getProduct(cfg, productId);
   if (product?.type === 'rekber') return onRekberStart(interaction, product);
   if (product?.type === 'gamepass') return onGamepassStart(interaction, product);
+  if (product?.type === 'gift') return onGiftStart(interaction, product);
   if (product?.type === 'canva') return onCanvaStart(interaction, product);
   if (product?.type === 'boost') return onBoostStart(interaction, product);
   if (product?.type === 'instant') return I.onInfo(interaction, product);
@@ -910,6 +912,7 @@ const CLOSE_LOG = {
   canva: { completed: '✅ Canva Pro activated', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
   instant: { completed: '✅ Account delivered', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
   boost: { completed: '✅ Server Boost activated', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
+  gift: { completed: '✅ Item gifted in-game successfully', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
   gamepass: { completed: '✅ Gamepass purchased — Robux arrive after the pending period', cancelled: '❌ Order cancelled', refund: '💸 Funds returned to the buyer' },
   rekber: { completed: '✅ Funds released to the seller', cancelled: '❌ Transaction cancelled', refund: '💸 Funds returned to the buyer' },
 };
@@ -1256,6 +1259,221 @@ async function onGamepassConfirm(interaction, yes) {
     await interaction
       .editReply('❌ Gagal membuat ticket. Pastikan bot punya izin **Manage Channels** & **Manage Roles**, lalu coba lagi.')
       .catch(() => {});
+  }
+}
+
+// ══════════════════════ GIFT IN-GAME ══════════════════════
+const gfSessions = new Map(); // userId → { draft, expires }
+const giftMax = (product) => Number(product?.maxAmount) || 100000; // batas total Robux per order
+const giftMin = (product) => Math.max(1, Number(product?.minAmount) || 1);
+
+/** Tombol "Kalkulator Biaya" → form harga item & jumlah. */
+async function onGiftCalcButton(interaction, productId) {
+  const product = getProduct(loadConfig(), productId);
+  if (!product || product.type !== 'gift') return interaction.reply({ content: 'Produk tidak ditemukan.', flags: EPH });
+  const modal = new ModalBuilder()
+    .setCustomId(`store:gfcalcm:${product.id}`)
+    .setTitle(`Kalkulator ${product.label}`.slice(0, 45))
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel('Harga Item (Robux)')
+        .setDescription('Harga 1 item di game, dalam Robux.')
+        .setTextInputComponent(textInput('each', { placeholder: 'contoh: 399', min: 1, max: 9 })),
+      new LabelBuilder()
+        .setLabel('Jumlah Item')
+        .setDescription('Kosongkan = 1.')
+        .setTextInputComponent(textInput('qty', { placeholder: 'contoh: 3', max: 4, required: false })),
+    );
+  return interaction.showModal(modal);
+}
+
+async function onGiftCalcModal(interaction, productId) {
+  const cfg = loadConfig();
+  const product = getProduct(cfg, productId);
+  if (!product || product.type !== 'gift') return interaction.reply({ content: 'Produk tidak ditemukan.', flags: EPH });
+  const each = parseAmount(interaction.fields.getTextInputValue('each'));
+  const qty = interaction.fields.getTextInputValue('qty')?.trim() ? parseAmount(interaction.fields.getTextInputValue('qty')) : 1;
+  if (!Number.isInteger(each) || each < 1 || !Number.isInteger(qty) || qty < 1 || each * qty > 10_000_000) {
+    return interaction.reply({ content: '❌ Isi harga item & jumlah dengan angka, contoh **399** dan **3**.', flags: EPH });
+  }
+  return interaction.reply({ ...V.buildGiftCalc(interaction.guild, cfg, product, each, qty), flags: EPH });
+}
+
+/** "Order Sekarang" → form order Gift In-Game (detail kebutuhan di awal: item, jumlah, server). */
+async function onGiftStart(interaction, product) {
+  if (!isProductOpen(product)) {
+    refreshPanel();
+    return interaction.reply({ content: `🔴 **${product.label}** sedang **TUTUP**. Pantau channel stock untuk info buka berikutnya.`, flags: EPH });
+  }
+  const active = activeTicketOf({ userId: interaction.user.id, kind: 'gift' });
+  if (active) {
+    return interaction.reply({
+      content: `⚠️ Kamu masih punya ticket ${product.label} yang sedang berjalan: <#${active.channelId}> (\`${active.id}\`).\nTunggu ticket itu ditutup admin sebelum membuat pesanan baru.`,
+      flags: EPH,
+    });
+  }
+  const modal = new ModalBuilder()
+    .setCustomId(`store:gfmodal:${product.id}`)
+    .setTitle(`Order ${product.label}`.slice(0, 45))
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel('Username Roblox')
+        .setDescription('Username (bukan display name) akun penerima gift.')
+        .setTextInputComponent(textInput('username', { placeholder: 'contoh: Builderman', min: 3, max: 20 })),
+      new LabelBuilder()
+        .setLabel('Nama Item')
+        .setDescription('Contoh: Gamepass VIP, Skin Dragon, Crate Legendary, Server Boost.')
+        .setTextInputComponent(textInput('item', { placeholder: 'nama item yang ingin dibeli', min: 2, max: 80 })),
+      new LabelBuilder()
+        .setLabel('Harga Item (Robux)')
+        .setDescription('Harga 1 item di game, dalam Robux.')
+        .setTextInputComponent(textInput('each', { placeholder: 'contoh: 399', min: 1, max: 9 })),
+      new LabelBuilder()
+        .setLabel('Jumlah Item')
+        .setDescription('Kosongkan = 1.')
+        .setTextInputComponent(textInput('qty', { placeholder: 'contoh: 1', max: 4, required: false })),
+      new LabelBuilder()
+        .setLabel('Server / Game')
+        .setDescription('Nama game atau link private server / server tempat item dikirim.')
+        .setTextInputComponent(textInput('server', { placeholder: 'contoh: Blox Fruits — server publik / link private server', min: 2, max: 150 })),
+    );
+  return interaction.showModal(modal);
+}
+
+async function onGiftModal(interaction, productId) {
+  await interaction.deferReply({ flags: EPH });
+  const cfg = loadConfig();
+  const product = getProduct(cfg, productId);
+  if (!product || product.type !== 'gift') return interaction.editReply('❌ Produk tidak ditemukan.');
+  if (!isProductOpen(product)) return interaction.editReply(`🔴 **${product.label}** sedang **TUTUP**.`);
+
+  const username = interaction.fields.getTextInputValue('username').trim();
+  const item = interaction.fields.getTextInputValue('item').trim().replace(/[`\n]/g, ' ');
+  const server = interaction.fields.getTextInputValue('server').trim().replace(/[`\n]/g, ' ');
+  const each = parseAmount(interaction.fields.getTextInputValue('each'));
+  const rawQty = interaction.fields.getTextInputValue('qty')?.trim();
+  const qty = rawQty ? parseAmount(rawQty) : 1;
+  if (!Number.isInteger(each) || each < 1) return interaction.editReply('❌ Harga item harus berupa angka (Robux), contoh **399**.');
+  if (!Number.isInteger(qty) || qty < 1) return interaction.editReply('❌ Jumlah item harus berupa angka, contoh **1**.');
+  const q = V.giftQuote(cfg, product, each, qty);
+  const min = giftMin(product);
+  const max = giftMax(product);
+  if (q.robux < min || q.robux > max) {
+    return interaction.editReply(`❌ Total order **${num(q.robux)} Robux** di luar batas. Order ${product.label} hanya untuk **${num(min)} – ${num(max)} Robux** per ticket.`);
+  }
+  if (!q.rate) return interaction.editReply('⚠️ Rate produk ini belum diatur. Hubungi admin.');
+  if (activeTicketOf({ userId: interaction.user.id, kind: 'gift' })) {
+    return interaction.editReply('⚠️ Kamu masih punya ticket Gift In-Game yang sedang berjalan. Tunggu ticket itu ditutup dulu.');
+  }
+
+  let roblox;
+  try {
+    roblox = await lookupRobloxUser(username);
+  } catch (err) {
+    console.error('[store] cek Roblox gagal:', err.message);
+    return interaction.editReply('⚠️ Gagal menghubungi server Roblox. Coba lagi beberapa saat lagi.');
+  }
+  if (!roblox) {
+    return interaction.editReply(`❌ Username Roblox \`${username}\` tidak ditemukan. Pastikan ejaannya benar (pakai **username**, bukan display name).`);
+  }
+  const draft = { productId: product.id, roblox, item, server, each, qty, amount: q.robux, rate: q.rate, price: q.price };
+  gfSessions.set(interaction.user.id, { draft, expires: Date.now() + SESSION_MS });
+  return interaction.editReply(V.buildGiftConfirm(interaction.guild, cfg, product, draft));
+}
+
+async function onGiftConfirm(interaction, yes) {
+  const sess = gfSessions.get(interaction.user.id);
+  gfSessions.delete(interaction.user.id);
+  if (!yes) return interaction.update({ content: '✖️ Pesanan dibatalkan.', embeds: [], components: [] });
+  if (!sess || sess.expires < Date.now()) {
+    return interaction.update({ content: '⌛ Sesi sudah berakhir. Silakan klik Order Sekarang lagi.', embeds: [], components: [] });
+  }
+  const cfg = loadConfig();
+  const guild = interaction.guild;
+  const d = sess.draft;
+  const product = getProduct(cfg, d.productId);
+  if (!product || !isProductOpen(product)) return interaction.update({ content: `🔴 Maaf, **${product?.label || 'produk ini'}** baru saja **TUTUP**.`, embeds: [], components: [] });
+  if (activeTicketOf({ userId: interaction.user.id, kind: 'gift' })) {
+    return interaction.update({ content: '⚠️ Kamu masih punya ticket Gift In-Game yang sedang berjalan.', embeds: [], components: [] });
+  }
+
+  const tc = product.ticket || {};
+  const id = nextTicketId(tc.idPrefix || 'GF', 'giftSeq');
+  const ticket = {
+    id,
+    kind: 'gift',
+    guildId: guild.id,
+    userId: interaction.user.id,
+    channelId: null,
+    messageId: null,
+    roblox: d.roblox,
+    productId: product.id,
+    productLabel: product.label,
+    item: d.item,
+    server: d.server,
+    each: d.each,
+    qty: d.qty,
+    amount: d.amount, // total Robux item
+    rate: d.rate,
+    price: d.price,
+    status: 'open',
+    createdAt: Date.now(),
+  };
+  state.tickets[id] = ticket;
+  save();
+  await interaction.update({ content: '⏳ Sedang membuat ticket kamu...', embeds: [], components: [] });
+
+  try {
+    const member = [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.AttachFiles,
+      PermissionFlagsBits.EmbedLinks,
+    ];
+    const overwrites = [
+      { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+      { id: interaction.user.id, allow: member },
+      { id: guild.members.me.id, allow: [...member, PermissionFlagsBits.ManageChannels] },
+    ];
+    const staff = isId(cfg.ticket?.staffRoleId) ? cfg.ticket.staffRoleId : null;
+    if (staff) overwrites.push({ id: staff, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
+    const slug = d.roblox.name.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
+    const channel = await createTicketChannel(guild, interaction, cfg, {
+      name: `🎁・${id.toLowerCase()}-${slug}`,
+      topic: `${id} • ${product.label} ${d.item} ×${d.qty} (${num(d.amount)} Robux) • ${interaction.user.tag} • Roblox @${d.roblox.name}`,
+      overwrites,
+      userIds: [interaction.user.id],
+      categoryName: tc.categoryName || '🎁 TICKET GIFT',
+    });
+    ticket.channelId = channel.id;
+    const msg = await channel.send(
+      v2({
+        content: `<@${interaction.user.id}>${staff ? ` <@&${staff}>` : ''}`,
+        ...V.buildTicketMessage(guild, cfg, ticket),
+        allowedMentions: { users: [interaction.user.id], roles: staff ? [staff] : [] },
+      }),
+    );
+    await msg.pin().catch(() => {});
+    ticket.messageId = msg.id;
+    save();
+    logOrder(guild, ticket, '🆕 Order received — awaiting payment');
+
+    const url = channelUrl(guild.id, channel.id);
+    const dmOk = await interaction.user
+      .send(V.dm(V.buildDmCreated(guild, cfg, ticket, url)))
+      .then(() => true)
+      .catch(() => false);
+    if (!dmOk) channel.send('ℹ️ Bot tidak bisa mengirim DM ke kamu (DM tertutup). Semua info pesanan ada di ticket ini.').catch(() => {});
+    await interaction.editReply({
+      content: `✅ **Ticket berhasil dibuat!** Lanjutkan pembayaran di ${channel}.`,
+      components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Buka Ticket').setEmoji('🎫').setURL(url))],
+    });
+  } catch (err) {
+    console.error('[store] gagal membuat ticket gift:', err);
+    delete state.tickets[id];
+    save();
+    await interaction.editReply('❌ Gagal membuat ticket. Pastikan bot punya izin **Manage Channels** & **Manage Roles**, lalu coba lagi.').catch(() => {});
   }
 }
 
@@ -2553,6 +2771,8 @@ async function handleInteraction(interaction) {
       else if (action === 'gptutor') await onGamepassTutorial(interaction, arg);
       else if (action === 'gpconfirm') await onGamepassConfirm(interaction, arg === 'yes');
       else if (action === 'gpcheck') await onGamepassCheck(interaction, arg);
+      else if (action === 'gfcalc') await onGiftCalcButton(interaction, arg);
+      else if (action === 'gfconfirm') await onGiftConfirm(interaction, arg === 'yes');
       else if (action === 'paybtn') await onPayButton(interaction, arg);
       else if (action === 'copyacc') await onCopyAccounts(interaction, arg);
       else if (action === 'qris') await onShowQris(interaction, arg);
@@ -2579,6 +2799,8 @@ async function handleInteraction(interaction) {
       else if (action === 'testimodal') await onTestimonyModal(interaction, arg);
       else if (action === 'rbmodal') await onRekberModal(interaction, arg);
       else if (action === 'gpmodal') await onGamepassModal(interaction, arg);
+      else if (action === 'gfmodal') await onGiftModal(interaction, arg);
+      else if (action === 'gfcalcm') await onGiftCalcModal(interaction, arg);
       else if (action === 'cvmodal') await onCanvaModal(interaction, arg);
       else if (action === 'bsmodal') await onBoostModal(interaction, arg);
       else if (action === 'paymodal') await onPayModal(interaction, arg);
