@@ -68,7 +68,9 @@ function computeReputation(cfg) {
   const sum = state.stats.ratingCount ? state.stats.ratingSum : reviews.reduce((a, t) => a + t.testimony.rating, 0);
   const avg = count ? sum / count : 0;
   const positive = reviews.length ? Math.round(((dist[4] + dist[5]) / reviews.length) * 100) : 0;
-  const closed = tickets.filter((t) => ['completed', 'cancelled', 'refund'].includes(t.status));
+  // Tingkat Keberhasilan: order yang dibatalkan SEBELUM dibayar tidak dihitung gagal.
+  // Yang dihitung: selesai, refund, dan batal setelah pembayaran diterima.
+  const closed = tickets.filter((t) => t.status === 'completed' || t.status === 'refund' || (t.status === 'cancelled' && t.payment?.status === 'paid'));
   const completed = closed.filter((t) => t.status === 'completed');
   const success = closed.length ? Math.round((completed.length / closed.length) * 100) : 100;
   const last30 = completed.filter((t) => t.closedAt > Date.now() - 30 * 86400000).length;
