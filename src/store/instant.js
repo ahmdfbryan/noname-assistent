@@ -335,6 +335,24 @@ function buildPanel(guild, cfg) {
   const avg = st.ratingCount ? (st.ratingSum / st.ratingCount).toFixed(1) : '-';
   const stars = st.ratingCount ? '⭐'.repeat(Math.round(st.ratingSum / st.ratingCount)) + '☆'.repeat(5 - Math.round(st.ratingSum / st.ratingCount)) : '☆☆☆☆☆';
 
+  // Produk langsung dipilih dari panel (maks. 25 opsi dropdown); kalau lebih banyak → pakai pilih kategori seperti biasa.
+  const allProds = [...groupCatalog(p, items).values()]
+    .flatMap((m) => [...m.values()])
+    .map((x) => ({ ...x, sum: productSummary(p, x) }))
+    .sort((a, b) => Number(b.sum.available) - Number(a.sum.available) || a.name.localeCompare(b.name));
+  const direct = allProds.length > 0 && allProds.length <= 25;
+  const prodLines = allProds
+    .filter((x) => x.sum.available)
+    .slice(0, 12)
+    .map((x) => `${appEmoji(x.name)?.text || '🛍️'} **${clip(x.name, 40)}** — mulai \`${rupiah(x.sum.min)}\``);
+  const moreProds = allProds.filter((x) => x.sum.available).length - prodLines.length;
+  const prodOptions = allProds.map((x) => ({
+    label: clip(x.name, 100),
+    value: x.id,
+    description: clip(x.sum.available ? `Mulai ${rupiah(x.sum.min)}${x.sum.stock != null ? ` • Stok ${num(x.sum.stock)}` : ''}` : 'Stok habis', 100),
+    emoji: x.sum.available ? (appEmoji(x.name) ? { id: appEmoji(x.name).id, name: appEmoji(x.name).name } : '🛍️') : '⛔',
+  }));
+
   const catLines = cats
     .filter((x) => x.ready)
     .slice(0, 12)
@@ -346,8 +364,9 @@ function buildPanel(guild, cfg) {
     description: clip(x.ready ? `${x.ready} produk tersedia • mulai ${rupiah(x.min)}` : 'Stok sedang habis', 100),
     emoji: x.ready ? '📂' : '⛔',
   }));
-  const select = new StringSelectMenuBuilder().setCustomId(`store:inscat:${p.id}`);
-  if (open && options.length) select.setPlaceholder('📂 Pilih kategori untuk mulai belanja...').addOptions(options);
+  const select = new StringSelectMenuBuilder().setCustomId(direct ? `store:insprod:${p.id}` : `store:inscat:${p.id}`);
+  if (open && direct) select.setPlaceholder('🛍️ Pilih produk untuk mulai belanja...').addOptions(prodOptions);
+  else if (open && options.length) select.setPlaceholder('📂 Pilih kategori untuk mulai belanja...').addOptions(options);
   else select.setPlaceholder(open ? '⏳ Produk sedang dimuat...' : '🔴 Premium App sedang tutup').addOptions({ label: '-', value: '-' }).setDisabled(true);
 
   const banner = bannerOf(pt.bannerImage, 'premium-app-banner');
@@ -361,7 +380,15 @@ function buildPanel(guild, cfg) {
           'Belanja **akun premium siap pakai** tanpa ribet! 💎\nPilih produk, bayar via **QRIS**, dan akun **langsung dikirim otomatis** ke ticket & DM kamu — kapan pun, **24 jam nonstop**. ⚡',
         name,
       ),
-      catLines.length ? `### 🛍️ Kategori Tersedia\n${catLines.join('\n')}${moreCats > 0 ? `\n-# +${moreCats} kategori lainnya di menu bawah` : ''}` : open ? '### 🛍️ Kategori Tersedia\n_Produk sedang dimuat..._' : null,
+      direct
+        ? prodLines.length
+          ? `### 🛍️ Produk Tersedia\n${prodLines.join('\n')}${moreProds > 0 ? `\n-# +${moreProds} produk lainnya di menu bawah` : ''}`
+          : '### 🛍️ Produk Tersedia\n_Semua produk sedang habis._'
+        : catLines.length
+          ? `### 🛍️ Kategori Tersedia\n${catLines.join('\n')}${moreCats > 0 ? `\n-# +${moreCats} kategori lainnya di menu bawah` : ''}`
+          : open
+            ? '### 🛍️ Kategori Tersedia\n_Produk sedang dimuat..._'
+            : null,
       [`🧾 **Total Transaksi:** \`${num(ps.orders)} transaksi\``, `⭐ **Rating Toko:** ${stars} \`${avg} / 5\` (${num(st.ratingCount)} ulasan)`].join('\n'),
     ],
     footer: `${name.name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
@@ -413,7 +440,7 @@ async function onRefresh(interaction, p) {
 }
 
 // ═════════════════════════════ Langkah 3: detail produk + pilih varian ═════════════════════════════
-function productView(guild, cfg, p, prod, notice) {
+function productView(guild, cfg, p, prod, notice, { direct = false } = {}) {
   const vars = prod.variants;
   const groups = new Set(vars.map((v) => v.variant_group).filter(Boolean));
   const vline = (v) =>
@@ -439,7 +466,7 @@ function productView(guild, cfg, p, prod, notice) {
     footer: `${V.storeName(cfg, guild)} • Harga & stok real-time`,
     rows: [
       row(new StringSelectMenuBuilder().setCustomId(`store:insvar:${p.id}`).setPlaceholder('🛒 Pilih varian untuk dibeli...').addOptions(options)),
-      row(btn(`store:inscatback:${p.id}`, 'Kembali', '◀️')),
+      ...(direct ? [] : [row(btn(`store:inscatback:${p.id}`, 'Kembali', '◀️'))]),
     ],
   });
 }
@@ -451,11 +478,20 @@ function findProduct(p, items, wrkProductId) {
 
 async function onProduct(interaction, p) {
   const cfg = loadConfig();
+  // Dipilih dari panel publik → detail produk dikirim sebagai pesan pribadi & pilihan di panel direset.
+  const fromPanel = interaction.message && !interaction.message.flags?.has?.(MessageFlags.Ephemeral);
+  if (fromPanel) await interaction.deferReply({ flags: EPH });
   const { items } = await loadItems();
   const prod = findProduct(p, items, interaction.values[0]);
-  if (!prod) return interaction.update(card(cfg, { header: '❌ Produk tidak ditemukan / sudah tidak dijual.', rows: [row(btn(`store:insback:${p.id}`, 'Kategori', '◀️'))] }));
-  setSession(interaction.user.id, { wrkProductId: prod.id, pid: p.id, cat: prod.category });
-  return interaction.update(productView(interaction.guild, cfg, p, prod));
+  if (!prod) {
+    const gone = card(cfg, { header: '❌ Produk tidak ditemukan / sudah tidak dijual.', rows: fromPanel ? [] : [row(btn(`store:insback:${p.id}`, 'Kategori', '◀️'))] });
+    return fromPanel ? interaction.editReply(gone) : interaction.update(gone);
+  }
+  setSession(interaction.user.id, { wrkProductId: prod.id, pid: p.id, cat: prod.category, direct: fromPanel });
+  const view = productView(interaction.guild, cfg, p, prod, null, { direct: fromPanel });
+  if (!fromPanel) return interaction.update(view);
+  await interaction.editReply(view);
+  editPanelMessage(interaction.message, buildPanel(interaction.guild, cfg)).catch(() => {});
 }
 
 /** Tombol "Beli Sekarang" di post forum katalog → detail & varian produk (pesan pribadi). */
@@ -468,8 +504,8 @@ async function onForumBuy(interaction, wrkProductId) {
   const { items } = await loadItems();
   const prod = findProduct(p, items, wrkProductId);
   if (!prod) return interaction.editReply('❌ Produk ini sudah tidak dijual. Cek produk lain di katalog ya.');
-  setSession(interaction.user.id, { wrkProductId: prod.id, pid: p.id, cat: prod.category, page: 0 });
-  return interaction.editReply(productView(interaction.guild, cfg, p, prod));
+  setSession(interaction.user.id, { wrkProductId: prod.id, pid: p.id, cat: prod.category, page: 0, direct: true });
+  return interaction.editReply(productView(interaction.guild, cfg, p, prod, null, { direct: true }));
 }
 
 async function onCategoryBack(interaction, p) {
