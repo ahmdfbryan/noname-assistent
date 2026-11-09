@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  EmbedBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -34,6 +35,7 @@ const F = require('./forum');
 const CP = require('./control');
 
 const { robuxSentProof } = require('./proof-card');
+const { blurPaymentProof } = require('./pay-blur');
 const PROOF_DIR = path.join(__dirname, '..', '..', 'data', 'proofs');
 const SESSION_MS = 10 * 60 * 1000;
 const sessions = new Map(); // userId → { productId, roblox, expires }
@@ -2064,6 +2066,7 @@ async function onPayModal(interaction, ticketId) {
   }
   t.payProofRemoteUrl = kindOf(t) === 'instant' ? null : upload.url;
   save();
+  startPayBlur(t, cfg); // OCR + blur nama/no. rekening di latar belakang (dipakai untuk gambar testimoni)
 
   const staff = isId(cfg.ticket?.staffRoleId) ? cfg.ticket.staffRoleId : null;
   const ext = (path.extname((upload.name || '').split('?')[0]) || '.png').toLowerCase();
@@ -2307,6 +2310,160 @@ async function prepareLogImage(t, status) {
   }
 }
 
+// ══════════════════════ Blur otomatis bukti pembayaran + cek admin sebelum testimoni terkirim ══════════════════════
+const blurJobs = new Map(); // ticketId → Promise
+/** Jalankan OCR + blur di latar belakang. Hasil: data/proofs/pay-<id>-blur.png (t.payProofBlurFile). */
+function startPayBlur(t, cfg) {
+  if (kindOf(t) === 'instant' || !t.payProofFile || cfg?.ticket?.blurPaymentProof === false) return;
+  const out = path.join(PROOF_DIR, `pay-${t.id}-blur.png`);
+  const names = [t.payment?.sender, cfg?.payment?.accountName].filter(Boolean);
+  const numbers = (cfg?.payment?.methods || []).map((m) => m.number).filter(Boolean);
+  const job = blurPaymentProof(t.payProofFile, out, { names, numbers })
+    .then((r) => {
+      t.payProofBlurFile = r.ok ? out : null;
+      t.payBlurBoxes = r.ok ? r.boxes : 0;
+      t.payBlurError = r.ok ? null : r.error || 'gagal';
+      if (!r.ok) console.warn(`[store] blur bukti ${t.id}: ${r.error}`);
+      save();
+    })
+    .catch((e) => console.warn(`[store] blur bukti ${t.id}:`, e.message))
+    .finally(() => blurJobs.delete(t.id));
+  blurJobs.set(t.id, job);
+}
+
+/** Lampiran hasil blur (kalau ada). */
+function payBlurAttachment(t) {
+  if (!t.payProofBlurFile || !fs.existsSync(t.payProofBlurFile)) return { files: [], url: null };
+  const name = `bukti-bayar-${t.id}.png`;
+  return { files: [{ attachment: t.payProofBlurFile, name }], url: `attachment://${name}` };
+}
+
+/** Gambar untuk testimoni sesuai pilihan admin: blur (default) | raw | custom | none. */
+function testimonyImage(t) {
+  if (kindOf(t) === 'instant' || t.testiImageMode === 'none') return { files: [], url: null };
+  if (t.testiImageMode === 'custom' && t.testiImageFile && fs.existsSync(t.testiImageFile)) {
+    const name = `bukti-bayar-${t.id}${path.extname(t.testiImageFile)}`;
+    return { files: [{ attachment: t.testiImageFile, name }], url: `attachment://${name}` };
+  }
+  if (t.testiImageMode === 'raw') return payProofAttachment(t).url ? payProofAttachment(t) : proofAttachment(t);
+  const b = payBlurAttachment(t);
+  if (b.url) return b;
+  return payProofAttachment(t).url ? payProofAttachment(t) : proofAttachment(t); // OCR gagal → asli (hanya lewat review / tanpa review)
+}
+
+/** Channel admin untuk cek testimoni: channels.testiReview, kalau kosong pakai Command Center. */
+const reviewChannelId = (cfg) => (isId(cfg?.channels?.testiReview) ? cfg.channels.testiReview : isId(cfg?.channels?.controlPanel) ? cfg.channels.controlPanel : null);
+
+function buildTestiReview(guild, cfg, t) {
+  const blur = payBlurAttachment(t);
+  const raw = payProofAttachment(t);
+  const rawName = `asli-${t.id}${path.extname(t.payProofFile || '.png')}`;
+  const files = [];
+  const embeds = [];
+  const status = blur.url
+    ? `✅ Blur otomatis selesai — **${t.payBlurBoxes || 0}** area disamarkan.`
+    : `⚠️ Blur otomatis **gagal / tidak ada hasil**${t.payBlurError ? ` (\`${String(t.payBlurError).slice(0, 80)}\`)` : ''} — pilih **Pakai Asli**, **Ganti Gambar**, atau **Tanpa Gambar**.`;
+  const stars = t.testimony ? `${'⭐'.repeat(t.testimony.rating)} **${t.testimony.rating}/5**${t.testimony.auto ? ' _(otomatis)_' : ''}` : '-';
+  const head = new EmbedBuilder()
+    .setTitle('🔎 Cek Gambar Testimoni')
+    .setDescription(
+      `Testimoni untuk ticket **${t.id}** menunggu persetujuanmu sebelum dikirim ke <#${cfg.channels?.testimoni}>.\n\n` +
+        `👤 <@${t.userId}> • 📦 ${t.productLabel || '-'} • ${stars}\n${t.testimony?.comment ? `>>> ${String(t.testimony.comment).slice(0, 400)}\n\n` : '\n'}${status}`,
+    );
+  if (blur.url) {
+    head.setImage(blur.url);
+    files.push(...blur.files);
+  }
+  embeds.push(head);
+  if (raw.files.length) {
+    files.push({ attachment: raw.files[0].attachment, name: rawName });
+    embeds.push(new EmbedBuilder().setTitle('🖼️ Gambar Asli (pembanding)').setDescription('-# Hanya terlihat admin. Yang dikirim ke testimoni adalah hasil blur di atas.').setImage(`attachment://${rawName}`));
+  }
+  const b = (id, label, emoji, style = ButtonStyle.Secondary, disabled = false) =>
+    new ButtonBuilder().setCustomId(`store:${id}:${t.id}`).setLabel(label).setEmoji(emoji).setStyle(style).setDisabled(disabled);
+  const rows = [
+    new ActionRowBuilder().addComponents(b('trvok', 'Kirim Testimoni', '✅', ButtonStyle.Success, !blur.url), b('trvraw', 'Pakai Asli', '🖼️'), b('trvrep', 'Ganti Gambar', '📎'), b('trvnone', 'Tanpa Gambar', '🚫')),
+  ];
+  return { embeds, components: rows, files };
+}
+
+/** Kirim pesan cek ke admin. true = pesan review terkirim (testimoni ditahan). */
+async function sendTestiReview(guild, t) {
+  const cfg = loadConfig();
+  const chId = reviewChannelId(cfg);
+  if (!chId) return false;
+  const channel = await guild.channels.fetch(chId).catch(() => null);
+  if (!channel?.isTextBased()) return false;
+  // Tunggu OCR selesai (maks 90 detik) supaya hasil blur sudah ada.
+  const job = blurJobs.get(t.id);
+  if (job) await Promise.race([job, new Promise((r) => setTimeout(r, 90000))]);
+  const msg = await channel.send(v2(buildTestiReview(guild, cfg, t))).catch((e) => {
+    console.warn(`[store] kirim review testimoni ${t.id}:`, e.message);
+    return null;
+  });
+  if (!msg) return false;
+  t.testiReview = { channelId: channel.id, messageId: msg.id, at: Date.now() };
+  save();
+  return true;
+}
+
+/** Tombol admin pada pesan review. */
+async function onTestiReviewButton(interaction, action, ticketId) {
+  if (!isAdmin(interaction.member)) return interaction.reply({ content: '⛔ Hanya **Administrator** yang bisa meninjau testimoni.', flags: EPH });
+  const t = state.tickets[ticketId];
+  if (!t || t.testimonyPosted) {
+    await stripRows(interaction.message);
+    return interaction.reply({ content: 'ℹ️ Testimoni ini sudah dikirim / tidak ditemukan.', flags: EPH });
+  }
+  if (action === 'trvrep') {
+    return interaction.showModal(
+      new ModalBuilder()
+        .setCustomId(`store:trvrepm:${t.id}`)
+        .setTitle('Ganti gambar testimoni')
+        .addLabelComponents(
+          new LabelBuilder()
+            .setLabel('Gambar bukti yang sudah kamu sensor')
+            .setDescription('Upload gambar pengganti (PNG / JPG / WEBP). Ini yang akan dikirim ke channel testimoni.')
+            .setFileUploadComponent(new FileUploadBuilder().setCustomId('img').setMinValues(1).setMaxValues(1).setRequired(true)),
+        ),
+    );
+  }
+  await interaction.deferUpdate();
+  t.testiImageMode = action === 'trvraw' ? 'raw' : action === 'trvnone' ? 'none' : 'blur';
+  await finishTestimonyReview(interaction, t);
+}
+
+async function onTestiReviewModal(interaction, ticketId) {
+  if (!isAdmin(interaction.member)) return interaction.reply({ content: '⛔ Hanya **Administrator**.', flags: EPH });
+  const t = state.tickets[ticketId];
+  if (!t || t.testimonyPosted) return interaction.reply({ content: 'ℹ️ Testimoni ini sudah dikirim / tidak ditemukan.', flags: EPH });
+  const upload = interaction.fields.getUploadedFiles('img')?.first?.() || null;
+  if (!upload || (upload.contentType && !upload.contentType.startsWith('image/'))) return interaction.reply({ content: '❌ Upload sebuah **gambar**.', flags: EPH });
+  await interaction.deferUpdate();
+  try {
+    t.testiImageFile = await saveProof(upload, `testi-${t.id}`);
+    t.testiImageMode = 'custom';
+  } catch (e) {
+    return interaction.followUp({ content: `❌ Gagal menyimpan gambar: ${e.message}`, flags: EPH });
+  }
+  await finishTestimonyReview(interaction, t);
+}
+
+async function finishTestimonyReview(interaction, t) {
+  const guild = interaction.guild;
+  await postTestimony(guild, t, { approved: true });
+  const modeLabel = { blur: 'hasil blur', raw: 'gambar asli', custom: 'gambar pengganti', none: 'tanpa gambar' }[t.testiImageMode] || 'hasil blur';
+  const done = new EmbedBuilder().setTitle('✅ Testimoni Dikirim').setDescription(`Ticket **${t.id}** — testimoni dikirim ke <#${loadConfig()?.channels?.testimoni}> dengan **${modeLabel}**.\n-# Disetujui oleh <@${interaction.user.id}>`);
+  await interaction.message.edit(v2({ embeds: [done], components: [], files: [] })).catch(() => {});
+  if (t.deleted) cleanupProofFiles(t);
+}
+
+/** Hapus file bukti (asli + blur + pengganti) dari disk. */
+function cleanupProofFiles(t) {
+  if (t.testiReview && !t.testimonyPosted) return; // masih menunggu cek admin → file dibutuhkan
+  for (const f of [t.proofFile, t.payProofFile, t.payProofBlurFile, t.testiImageFile]) if (f) fs.rm(f, { force: true }, () => {});
+}
+
 /** Bukti pembayaran yang diunggah pembeli (dari disk, fallback link Discord). */
 function payProofAttachment(t) {
   if (!t.payProofFile || !fs.existsSync(t.payProofFile)) return { files: [], url: t.payProofRemoteUrl || null };
@@ -2496,18 +2653,23 @@ async function onTestimonyButton(interaction, ticketId) {
   return interaction.showModal(modal);
 }
 
-async function postTestimony(guild, t) {
+async function postTestimony(guild, t, opts = {}) {
   const cfg = loadConfig();
   if (!isId(cfg?.channels?.testimoni)) return;
   const channel = await guild.channels.fetch(cfg.channels.testimoni).catch(() => null);
   if (!channel?.isTextBased()) return;
+  // Gambar testimoni berasal dari bukti bayar pembeli → admin cek dulu (hasil blur otomatis) sebelum terkirim.
+  const hasImage = kindOf(t) !== 'instant' && (t.payProofFile || t.payProofRemoteUrl || t.proofFile || t.proofRemoteUrl);
+  if (!opts.approved && hasImage && cfg?.ticket?.reviewTestimonyImage !== false && !t.testiReview) {
+    if (await sendTestiReview(guild, t)) return;
+  }
   state.stats.testimonies += 1;
   t.testimonyNo = state.stats.testimonies; // disimpan supaya bisa dibuat ulang dengan nomor yang sama
   t.testimonyAt = Date.now();
   const buyer = await guild.members.fetch(V.testimonyUserId(t)).catch(() => null);
   // Gambar testimoni = bukti pembayaran yang diunggah pembeli (fallback: bukti dari admin).
   // Premium App (instant): testimoni tanpa gambar.
-  const proof = kindOf(t) === 'instant' ? { files: [], url: null } : payProofAttachment(t).url ? payProofAttachment(t) : proofAttachment(t);
+  const proof = testimonyImage(t);
   t.proofUrl = proof.url;
   const msg = await channel.send({ ...V.buildTestimony(guild, cfg, t, buyer), files: proof.files });
   t.testimonyMessageId = msg?.id || null;
@@ -2609,8 +2771,7 @@ async function housekeeping() {
         if (ch) await ch.delete(`Ticket ${t.id} selesai`).catch(() => {});
         // Tunggu log selesai (gambar bukti sudah ter-upload) sebelum file bukti dihapus.
         if (guild) await (logQueues.get(t.id) || Promise.resolve());
-        if (t.proofFile) fs.rm(t.proofFile, { force: true }, () => {});
-        if (t.payProofFile) fs.rm(t.payProofFile, { force: true }, () => {});
+        cleanupProofFiles(t); // (file ditahan kalau testimoni masih menunggu cek admin)
       }
     } catch (err) {
       console.error(`[store] housekeeping ${t.id}:`, err.message);
@@ -2763,6 +2924,7 @@ async function handleInteraction(interaction) {
       else if (action === 'confirm') await onConfirm(interaction, arg === 'yes');
       else if (action === 'close') await onCloseButton(interaction, arg);
       else if (action === 'testi') await onTestimonyButton(interaction, arg);
+      else if (['trvok', 'trvraw', 'trvrep', 'trvnone'].includes(action)) await onTestiReviewButton(interaction, action, arg);
       else if (action === 'rbconfirm') await onRekberConfirm(interaction, arg === 'yes');
       else if (action === 'rbagree') await onRekberAgree(interaction, arg);
       else if (action === 'rbfund') await onRekberFund(interaction, arg);
@@ -2797,6 +2959,7 @@ async function handleInteraction(interaction) {
       else if (action === 'amountmodal') await onAmountModal(interaction, arg);
       else if (action === 'closemodal') await onCloseModal(interaction, arg);
       else if (action === 'testimodal') await onTestimonyModal(interaction, arg);
+      else if (action === 'trvrepm') await onTestiReviewModal(interaction, arg);
       else if (action === 'rbmodal') await onRekberModal(interaction, arg);
       else if (action === 'gpmodal') await onGamepassModal(interaction, arg);
       else if (action === 'gfmodal') await onGiftModal(interaction, arg);
