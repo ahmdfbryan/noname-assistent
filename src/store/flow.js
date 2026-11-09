@@ -1839,12 +1839,12 @@ async function onPayModal(interaction, ticketId) {
   t.payment = { status: 'pending', bank, sender, note: note || null, at: Date.now(), userId: interaction.user.id };
   // Simpan bukti bayar pembeli — nanti dipakai sebagai gambar di channel testimoni (link Discord bisa kedaluwarsa).
   try {
-    t.payProofFile = (await saveProof(upload, `pay-${t.id}`)) || null;
+    t.payProofFile = kindOf(t) === 'instant' ? null : (await saveProof(upload, `pay-${t.id}`)) || null;
   } catch (e) {
     t.payProofFile = null;
     console.warn(`[store] simpan bukti bayar ${t.id}:`, e.message);
   }
-  t.payProofRemoteUrl = upload.url;
+  t.payProofRemoteUrl = kindOf(t) === 'instant' ? null : upload.url;
   save();
 
   const staff = isId(cfg.ticket?.staffRoleId) ? cfg.ticket.staffRoleId : null;
@@ -2064,6 +2064,7 @@ async function saveProof(attachment, ticketId) {
  * File disalin ke data/proofs/log-<id>.* (tetap ada walau file bukti ticket dihapus).
  */
 async function prepareLogImage(t, status) {
+  if (kindOf(t) === 'instant') return; // Premium App: history tanpa gambar
   try {
     let buf = null;
     let ext = '.png';
@@ -2287,7 +2288,8 @@ async function postTestimony(guild, t) {
   t.testimonyAt = Date.now();
   const buyer = await guild.members.fetch(V.testimonyUserId(t)).catch(() => null);
   // Gambar testimoni = bukti pembayaran yang diunggah pembeli (fallback: bukti dari admin).
-  const proof = payProofAttachment(t).url ? payProofAttachment(t) : proofAttachment(t);
+  // Premium App (instant): testimoni tanpa gambar.
+  const proof = kindOf(t) === 'instant' ? { files: [], url: null } : payProofAttachment(t).url ? payProofAttachment(t) : proofAttachment(t);
   t.proofUrl = proof.url;
   const msg = await channel.send({ ...V.buildTestimony(guild, cfg, t, buyer), files: proof.files });
   t.testimonyMessageId = msg?.id || null;
