@@ -58,7 +58,7 @@ const wib = () => {
 // ───────────────────────── Ringkasan per produk ─────────────────────────
 function priceText(cfg, p) {
   if (p.type === 'robux') return `\`${rupiah(V.rateOf(cfg, p))} / Robux\` • min \`${num(V.minAmountOf(p))}\``;
-  if (p.type === 'gamepass') return `\`${rupiah(V.rateOf(cfg, p))} / Robux\``;
+  if (p.type === 'gamepass' || p.type === 'gift') return `\`${rupiah(V.rateOf(cfg, p))} / Robux\``;
   if (p.type === 'canva' || p.type === 'boost') return plansOf(p).map((x) => `${x.label} \`${rupiah(x.price)}\``).join(' • ') || '`-`';
   if (p.type === 'rekber') {
     const fees = (p.feeTiers || []).map((x) => (x.percent != null ? null : Number(x.fee))).filter((x) => x != null);
@@ -337,7 +337,7 @@ function productView(guild, cfg, p, notice) {
   const edit = [];
   if (hasStock(p)) edit.push(btn(`store:cpstock:${p.id}`, p.type === 'boost' ? 'Atur Stock per Paket' : 'Atur Stock', '📦', ButtonStyle.Primary));
   if (hasStock(p) && p.type !== 'boost') edit.push(btn(`store:cpadd:${p.id}`, 'Tambah Stock', '➕', ButtonStyle.Primary));
-  if (p.type === 'robux' || p.type === 'gamepass') edit.push(btn(`store:cprate:${p.id}`, 'Ubah Rate', '💱', ButtonStyle.Primary));
+  if (p.type === 'robux' || p.type === 'gamepass' || p.type === 'gift') edit.push(btn(`store:cprate:${p.id}`, 'Ubah Rate', '💱', ButtonStyle.Primary));
   if (p.type === 'robux') edit.push(btn(`store:cpmin:${p.id}`, 'Minimal Order', '🔻', ButtonStyle.Primary));
   if (p.type === 'canva' || p.type === 'boost') edit.push(btn(`store:cpprice:${p.id}`, 'Ubah Harga Paket', '💱', ButtonStyle.Primary));
   if (custom) edit.push(btn(`store:cpreset:${p.id}`, 'Reset Harga', '↩️'));
@@ -448,7 +448,7 @@ const savePlanPrices = (productId, prices) => setPlanPrices(productId, prices);
 
 /** Harga produk sedang diatur dari panel (beda dari store.json)? Return teks harga asli, atau null. */
 function customPrice(p) {
-  if (p.type === 'robux' || p.type === 'gamepass') {
+  if (p.type === 'robux' || p.type === 'gamepass' || p.type === 'gift') {
     const r = Number(state.rates?.[p.id]);
     return r && r !== Number(p.rate) ? `${rupiah(p.rate)} / Robux` : null;
   }
@@ -621,7 +621,7 @@ async function handle(interaction, action, arg) {
     if (inPanel) await interaction.deferReply({ flags: EPH });
     else await interaction.deferUpdate();
     const changes = [];
-    if (p.type === 'robux' || p.type === 'gamepass') {
+    if (p.type === 'robux' || p.type === 'gamepass' || p.type === 'gift') {
       const before = V.rateOf(cfg, p);
       delete state.rates[p.id];
       save();
