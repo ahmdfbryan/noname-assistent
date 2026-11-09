@@ -284,6 +284,71 @@
       }
     },
     {
+      "id": "gift-ingame",
+      "type": "gift",
+      "label": "Gift In-Game",
+      "emoji": "🎁",
+      "description": "Order **item in-game** yang menggunakan **Robux** — dikirim langsung lewat **sistem gift**.\n\nContoh item: **Gamepass, Skin, Crates, Server Boost,** dan item Robux lainnya.\n\nGunakan **🧮 Kalkulator Biaya** untuk menghitung total harga sebelum order.",
+      "rate": 100,
+      "minAmount": 1,
+      "maxAmount": 50000,
+      "examples": [
+        100,
+        500,
+        1000,
+        2000,
+        5000
+      ],
+      "notes": [
+        "Cantumkan **detail kebutuhan di awal**: **nama item, jumlah, dan server**.",
+        "Harga item = harga di game (Robux) × jumlah, dikali rate **Rp100 / Robux**.",
+        "Item dikirim lewat **sistem gift** — pastikan akun Roblox penerima benar."
+      ],
+      "howTo": {
+        "intro": "Beli **item in-game** pakai Robux tanpa ribet — kami kirim lewat **sistem gift** ke akun Roblox kamu.",
+        "requirements": [
+          "**Username Roblox** penerima gift (bukan display name)",
+          "**Nama item** & **harga item** (Robux) di game",
+          "**Jumlah item** yang ingin dibeli",
+          "**Server / game** tempat item dikirim"
+        ],
+        "steps": [
+          "Buka channel **Store**, klik **🎁 Gift In-Game**",
+          "Hitung biaya dengan **🧮 Kalkulator Biaya** (opsional)",
+          "Klik **🛒 Order Sekarang**, isi **username, nama item, harga, jumlah, & server**",
+          "Cek ringkasan pesanan, lalu klik **✅ Ya, Buat Ticket**",
+          "**Ticket pribadi** dibuat — bayar sesuai **Total Bayar** & kirim bukti",
+          "Admin mengirim item lewat **sistem gift** 🎁",
+          "Beri **rating & testimoni** ⭐"
+        ],
+        "tips": [
+          "Isi **nama item, jumlah, dan server** dengan lengkap agar pesanan cepat diproses.",
+          "Contoh: item **399 Robux** × **2** = **798 Robux** ➜ **Rp79.800**."
+        ]
+      },
+      "catalog": {
+        "tagline": "Beli **item in-game** pakai Robux — dikirim via **sistem gift**. Rate **Rp100 / Robux**. 🎁",
+        "highlights": [
+          "Gamepass, Skin, Crates, Server Boost & item Robux lainnya",
+          "Tersedia **🧮 Kalkulator Biaya** untuk hitung total",
+          "Dikirim **langsung** lewat sistem gift"
+        ],
+        "priceList": [
+          100,
+          500,
+          1000,
+          2000,
+          5000
+        ],
+        "thumbnail": "",
+        "image": ""
+      },
+      "ticket": {
+        "categoryName": "🎁 TICKET GIFT",
+        "idPrefix": "GF"
+      }
+    },
+    {
       "id": "canva-pro",
       "type": "canva",
       "label": "Canva Pro",
