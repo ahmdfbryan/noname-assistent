@@ -468,7 +468,7 @@ const ORDER_STATUS = {
   refund: { label: '💸 Refund', key: 'refund' },
 };
 const PAY_STATUS = { paid: '✅ Lunas / Dana Masuk', pending: '⏳ Menunggu Konfirmasi', rejected: '⛔ Ditolak' };
-const KIND_LABEL = { robux: 'Robux Visend', gamepass: 'Robux Gamepass', canva: 'Canva Pro', boost: 'Server Boost', rekber: 'Rekber', instant: 'Premium App' };
+const KIND_LABEL = { robux: 'Robux Visend', gamepass: 'Robux Gamepass', canva: 'Canva Pro', boost: 'Server Boost', rekber: 'Rekber', instant: 'Premium App', gift: 'Gift In-Game' };
 
 async function archiveStoreTicket(guild, t, source) {
   if (!guild || !t || t.archived) return null;
@@ -508,6 +508,14 @@ async function archiveStoreTicket(guild, t, source) {
     det.push(
       `**🎟️ Gamepass:** [${t.gamepass?.name || t.gamepass?.id}](https://www.roblox.com/game-pass/${t.gamepass?.id}) • \`${t.gamepass?.id}\``,
       `**${RBX} Harga Gamepass:** \`${num(t.before)} Robux\` • **Diterima:** \`${num(t.amount)} Robux\``,
+      t.rate ? `**💱 Rate:** \`${rupiah(t.rate)} / Robux\`` : null,
+    );
+  }
+  if (kind === 'gift') {
+    det.push(
+      `**🎁 Item:** \`${t.item}\` × \`${num(t.qty)}\``,
+      `**🌐 Server / Game:** \`${t.server || '-'}\``,
+      `**${RBX} Harga Item:** \`${num(t.each)} Robux\` • **Total:** \`${num(t.amount)} Robux\``,
       t.rate ? `**💱 Rate:** \`${rupiah(t.rate)} / Robux\`` : null,
     );
   }
@@ -605,6 +613,7 @@ async function archiveStoreTicket(guild, t, source) {
           rows: [
             ['Produk', product],
             ...(kind === 'robux' ? [['Jumlah', `${num(t.amount)} Robux`]] : []),
+            ...(kind === 'gift' ? [['Item', `${t.item} x${num(t.qty)}`], ['Server / Game', t.server || '-'], ['Harga Item', `${num(t.each)} Robux`], ['Total Robux', `${num(t.amount)} Robux`]] : []),
             ...(kind === 'gamepass' ? [['Gamepass', `${t.gamepass?.name || ''} (${t.gamepass?.id})`], ['Harga Gamepass', `${num(t.before)} Robux`], ['Diterima', `${num(t.amount)} Robux`]] : []),
             ...(t.rate ? [['Rate', `${rupiah(t.rate)} / Robux`]] : []),
             ...(t.plan ? [['Paket', t.plan.label]] : []),
