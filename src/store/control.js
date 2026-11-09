@@ -234,11 +234,12 @@ function buildPanel(guild, cfg) {
   // Klik = balik status & langsung diumumkan ke channel stock.
   const quick = (p) => {
     const on = isProductOpen(p);
-    return btn(on ? `store:cpclose:${p.id}` : `store:cpopen:${p.id}`, p.label.slice(0, 80), on ? '🟢' : '🔴', on ? ButtonStyle.Success : ButtonStyle.Danger);
+    return btn(`store:cpqask:${p.id}`, p.label.slice(0, 80), on ? '🟢' : '🔴', on ? ButtonStyle.Success : ButtonStyle.Danger);
   };
   const toggleRows = [];
   const shown = list.slice(0, 10);
-  for (let i = 0; i < shown.length; i += 5) toggleRows.push(rowOf(...shown.slice(i, i + 5).map(quick)));
+  const perRow = Math.min(5, Math.max(1, Math.ceil(shown.length / 2))); // selalu 2 baris, seimbang
+  for (let i = 0; i < shown.length; i += perRow) toggleRows.push(rowOf(...shown.slice(i, i + perRow).map(quick)));
   const select = rowOf(
     new StringSelectMenuBuilder()
       .setCustomId('store:cpsel')
@@ -279,7 +280,7 @@ function buildPanel(guild, cfg) {
       b.addTextDisplayComponents(text(x));
     }
     b.addSeparatorComponents(line());
-    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# 🟢 hijau = buka • 🔴 merah = tutup. Klik produknya untuk membalik status — langsung diumumkan ke channel stock.'));
+    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# 🟢 hijau = buka • 🔴 merah = tutup. Klik produknya → konfirmasi dulu, lalu status dibalik & diumumkan ke channel stock.'));
     for (const r of toggleRows) b.addActionRowComponents(r);
     b.addActionRowComponents(rowOf(btn('store:cpstatus', 'Umumkan Status & Stock Semua Produk', '📢')));
     b.addTextDisplayComponents(text('### ⚙️ Kelola Produk'));
@@ -540,7 +541,7 @@ async function handle(interaction, action, arg) {
     return true;
   }
   const tool = T.ACTIONS.includes(action);
-  if (!tool && !['cpsel', 'cptog', 'cpopen', 'cpclose', 'cpreset', 'cpstatus', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpmin', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmmin', 'cpmprice', 'cpmreason'].includes(action)) return false;
+  if (!tool && !['cpsel', 'cptog', 'cpqask', 'cpqopen', 'cpqclose', 'cpqno', 'cpopen', 'cpclose', 'cpreset', 'cpstatus', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpmin', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmmin', 'cpmprice', 'cpmreason'].includes(action)) return false;
   if (!isAdmin(interaction.member)) {
     await interaction.reply({ content: '⛔ Panel ini khusus **Administrator**.', flags: EPH }).catch(() => {});
     return true;
@@ -561,6 +562,36 @@ async function handle(interaction, action, arg) {
     if (!inPanel && p && interaction.message) return interaction.editReply ? interaction.editReply(productView(guild, fresh, getProduct(fresh, p.id), content)) : null;
     return interaction.editReply({ content });
   };
+
+  // ── Buka / Tutup Cepat: minta konfirmasi dulu supaya tidak salah pencet.
+  if (action === 'cpqask') {
+    if (!p) return reply('❌ Produk tidak ditemukan.'), true;
+    const on = isProductOpen(p);
+    await interaction.reply({
+      content: on
+        ? `🔴 Yakin mau **MENUTUP ${p.label}**?\nStatus jadi tutup & **diumumkan ke channel stock**.`
+        : `🟢 Yakin mau **MEMBUKA ${p.label}**?\nStatus jadi buka & **diumumkan ke channel stock**.`,
+      components: [
+        rowOf(
+          btn(on ? `store:cpqclose:${p.id}` : `store:cpqopen:${p.id}`, on ? 'Ya, Tutup' : 'Ya, Buka', on ? '🔴' : '🟢', on ? ButtonStyle.Danger : ButtonStyle.Success),
+          btn('store:cpqno', 'Batal', '✖️'),
+        ),
+      ],
+      flags: EPH,
+    });
+    return true;
+  }
+  if (action === 'cpqno') {
+    await interaction.update({ content: '✖️ Dibatalkan — status produk tidak diubah.', components: [] });
+    return true;
+  }
+  if (action === 'cpqopen' || action === 'cpqclose') {
+    if (!p) { await interaction.update({ content: '❌ Produk tidak ditemukan.', components: [] }); return true; }
+    await interaction.update({ content: '⏳ Memproses...', components: [] });
+    const res = await setOpen(guild, [p], action === 'cpqopen', null, by, true);
+    await interaction.editReply({ content: res, components: [] });
+    return true;
+  }
 
   if (action === 'cprefresh') {
     await interaction.deferUpdate();
