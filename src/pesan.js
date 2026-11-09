@@ -16,6 +16,8 @@ const {
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   FileBuilder,
+  FileUploadBuilder,
+  ChannelSelectMenuBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -24,7 +26,7 @@ const UI = require('./ui');
 
 /**
  * /pesan — bot mengirim, mengedit & menghapus pesan atas nama admin (lewat form).
- *   /pesan kirim [gaya] [channel] [gambar] [mention] [balas]  → form: judul, isi, gambar, tombol link
+ *   /pesan kirim [gaya] [mention] [balas]                      → form: channel tujuan, judul, isi, upload gambar, tombol link
  *   /pesan edit link:<link pesan bot>                          → form terisi isi lama
  *   /pesan hapus link:<link pesan bot>
  * Gaya: ✨ Premium (Components V2: judul, isi, gambar, tombol) atau 💬 Biasa (teks biasa).
@@ -127,11 +129,30 @@ function input(id, label, { desc, style = TextInputStyle.Short, value, required 
   if (desc) l.setDescription(desc.slice(0, 100));
   return l;
 }
+const SEND_TYPES = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.PublicThread, ChannelType.PrivateThread];
 function formModal(customId, title, style, v = {}) {
+  const sending = !v.editing;
+  const channelPick = new LabelBuilder()
+    .setLabel('Kirim ke channel')
+    .setDescription('Kosongkan = channel tempat kamu mengetik command.')
+    .setChannelSelectMenuComponent(
+      new ChannelSelectMenuBuilder().setCustomId('tujuan').setChannelTypes(...SEND_TYPES).setMinValues(0).setMaxValues(1).setRequired(false).setPlaceholder('Pilih channel tujuan...'),
+    );
+  const filePick = new LabelBuilder()
+    .setLabel('Gambar / file (opsional)')
+    .setDescription('Unggah langsung dari perangkatmu.')
+    .setFileUploadComponent(new FileUploadBuilder().setCustomId('berkas').setMinValues(0).setMaxValues(1).setRequired(false));
+  const imageLink = input('gambar', 'Link gambar (opsional)', {
+    max: 400,
+    value: v.imageUrl,
+    desc: 'Kosong = tetap • ketik "hapus" = buang gambar • link baru = ganti.',
+    placeholder: 'https://...',
+  });
   return new ModalBuilder()
     .setCustomId(customId)
     .setTitle(title.slice(0, 45))
     .addLabelComponents(
+      ...(sending ? [channelPick] : []),
       input('judul', 'Judul (opsional)', { max: 100, value: v.title, placeholder: 'Contoh: 📢 Pengumuman' }),
       input('isi', 'Isi pesan', {
         style: TextInputStyle.Paragraph,
@@ -140,12 +161,7 @@ function formModal(customId, title, style, v = {}) {
         value: v.body,
         desc: style === 'premium' ? 'Mendukung **tebal**, *miring*, emoji, mention, dan baris baru.' : 'Teks biasa. Mendukung markdown Discord & mention.',
       }),
-      input('gambar', 'Link gambar (opsional)', {
-        max: 400,
-        value: v.imageUrl,
-        desc: v.editing ? 'Kosong = tetap • ketik "hapus" = buang gambar • link baru = ganti.' : 'https://… (atau lampirkan lewat opsi "gambar" di command).',
-        placeholder: 'https://...',
-      }),
+      sending ? filePick : imageLink,
       input('tombol', 'Tombol link (opsional)', {
         style: TextInputStyle.Paragraph,
         max: 600,
@@ -194,13 +210,6 @@ const pesanCommand = {
             .setDescription('Tampilan pesan (default: Premium)')
             .addChoices({ name: '✨ Premium (judul, isi, gambar, tombol)', value: 'premium' }, { name: '💬 Biasa (teks)', value: 'plain' }),
         )
-        .addChannelOption((o) =>
-          o
-            .setName('channel')
-            .setDescription('Channel tujuan (default: channel ini)')
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.PublicThread, ChannelType.PrivateThread),
-        )
-        .addAttachmentOption((o) => o.setName('gambar').setDescription('Gambar / file yang ikut dikirim'))
         .addRoleOption((o) => o.setName('mention').setDescription('Role yang di-mention di atas pesan'))
         .addStringOption((o) => o.setName('balas').setDescription('Link pesan yang mau dibalas (bot membalas pesan itu)')),
     )
@@ -224,16 +233,11 @@ const pesanCommand = {
 
     if (sub === 'kirim') {
       const style = interaction.options.getString('gaya') || 'premium';
-      const target = interaction.options.getChannel('channel') || interaction.channel;
-      const att = interaction.options.getAttachment('gambar');
       const role = interaction.options.getRole('mention');
       const replyLink = interaction.options.getString('balas');
       if (replyLink && !parseLink(replyLink)) return reply(interaction, '❌ Link pesan untuk dibalas tidak valid.');
-      const perms = target.permissionsFor(interaction.guild.members.me);
-      if (!perms?.has(PermissionFlagsBits.ViewChannel) || !perms.has(PermissionFlagsBits.SendMessages)) return reply(interaction, `❌ Bot tidak punya izin kirim pesan di ${target}.`);
-      if (att && !perms.has(PermissionFlagsBits.AttachFiles)) return reply(interaction, `❌ Bot tidak punya izin **Attach Files** di ${target}.`);
       const token = newToken();
-      pending.set(token, { kind: 'kirim', userId: interaction.user.id, style, channelId: target.id, att, roleId: role?.id || null, replyLink, expires: Date.now() + PENDING_TTL });
+      pending.set(token, { kind: 'kirim', userId: interaction.user.id, style, channelId: interaction.channelId, roleId: role?.id || null, replyLink, expires: Date.now() + PENDING_TTL });
       return interaction.showModal(formModal(`pesan:m:kirim:${token}`, style === 'premium' ? '✨ Pesan Premium' : '💬 Pesan Biasa', style));
     }
 
@@ -277,13 +281,16 @@ async function submitKirim(i, token, p) {
   if (!body) return reply(i, '❌ Isi pesan tidak boleh kosong.');
   const buttons = parseButtons(f('tombol'));
   if (buttons.error) return reply(i, `❌ ${buttons.error}`);
-  let image = f('gambar');
-  if (image && !isHttps(image)) return reply(i, '❌ Link gambar harus diawali https://');
   await i.deferReply({ flags: EPH });
 
-  const target = await i.guild.channels.fetch(p.channelId).catch(() => null);
+  const picked = i.fields.getSelectedChannels('tujuan', false)?.first();
+  const target = await i.guild.channels.fetch(picked?.id || p.channelId).catch(() => null);
   if (!target) return i.editReply({ content: '❌ Channel tujuan tidak ditemukan.' });
-  const e = { style: p.style, title: f('judul'), body, image, buttons, roleId: p.roleId };
+  const perms = target.permissionsFor(i.guild.members.me);
+  if (!perms?.has(PermissionFlagsBits.ViewChannel) || !perms.has(PermissionFlagsBits.SendMessages)) return i.editReply({ content: `❌ Bot tidak punya izin kirim pesan di ${target}.` });
+  p.att = i.fields.getUploadedFiles('berkas', false)?.first() || null;
+  if (p.att && !perms.has(PermissionFlagsBits.AttachFiles)) return i.editReply({ content: `❌ Bot tidak punya izin **Attach Files** di ${target}.` });
+  const e = { style: p.style, title: f('judul'), body, image: '', buttons, roleId: p.roleId };
   const files = [];
   if (p.att) {
     const name = `pesan-${Date.now().toString(36)}${imageExt(p.att)}`;
