@@ -238,6 +238,7 @@ function buildTicketMessage(guild, cfg, t) {
   if (kindOf(t) === 'gamepass') return buildGamepassTicket(guild, cfg, t);
   if (kindOf(t) === 'canva') return buildCanvaTicket(guild, cfg, t);
   if (kindOf(t) === 'boost') return buildBoostTicket(guild, cfg, t);
+  if (kindOf(t) === 'gift') return buildGiftTicket(guild, cfg, t);
   if (kindOf(t) === 'instant') return require('./instant').buildTicket(guild, cfg, t);
   const statusColor = {
     open: color(cfg, 'brand', 0x3498db),
@@ -314,8 +315,12 @@ function buildDmClosed(guild, cfg, t) {
   const canva = kindOf(t) === 'canva';
   const boost = kindOf(t) === 'boost';
   const instant = kindOf(t) === 'instant';
+  const gift = kindOf(t) === 'gift';
   const desc = {
-    completed: instant
+    completed: gift
+      ? `Item **${t.item} × ${num(t.qty)}** sudah **dikirim lewat sistem gift** ke akun \`@${t.roblox?.name}\`! 🎁\nCek inventory in-game kamu ya.\n\n` +
+        `Terima kasih sudah berbelanja di **${storeName(cfg, guild)}**! 💜 Jangan lupa beri testimoni di ticket kamu ya ⭐`
+      : instant
       ? `**${t.ins?.product || t.productLabel} — ${t.ins?.variant || ''}** (${num(t.qty || 1)} akun) sudah **dikirim otomatis**! ⚡\n` +
         `Data akun ada di ticket & DM kamu — simpan baik-baik ya.\n\n` +
         `Terima kasih sudah berbelanja di **${storeName(cfg, guild)}**! 💜 Jangan lupa beri testimoni di ticket kamu ya ⭐`
@@ -447,7 +452,7 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
   const label = single ? single.label : name;
   const listText = products.map((p) => `${p.emoji || '•'} **${p.label}**`).join('\n');
   const robuxIncluded = products.some((p) => p.type === 'robux');
-  const gamepassOpened = products.filter((p) => p.type === 'gamepass');
+  const gamepassOpened = products.filter((p) => p.type === 'gamepass' || p.type === 'gift');
   const slotProducts = products.filter((p) => hasStock(p) && p.type !== 'robux');
 
   if (kind === 'open') {
@@ -583,7 +588,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
   const single = products.length === 1 ? products[0] : null;
   const listText = products.map((p) => `▸ ${p.emoji || '🛒'} **${p.label}**`).join('\n');
   const robuxIncluded = products.some((p) => p.type === 'robux');
-  const gamepass = products.filter((p) => p.type === 'gamepass');
+  const gamepass = products.filter((p) => p.type === 'gamepass' || p.type === 'gift');
   const slotProducts = products.filter((p) => hasStock(p) && p.type !== 'robux');
   const now = `<t:${Math.floor(Date.now() / 1000)}:f>`;
   const icon = icon256(guild);
@@ -709,7 +714,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
       return '⬆️';
     };
     const lines = changes.map((c) => `**${c.label}:** ~~${rupiah(c.before)}~~ ➜ **${rupiah(c.after)}${c.suffix || ''}** ${arrow(c)}`);
-    const rate = sp && (sp.type === 'robux' || sp.type === 'gamepass') ? rateOf(cfg, sp) : 0;
+    const rate = sp && (sp.type === 'robux' || sp.type === 'gamepass' || sp.type === 'gift') ? rateOf(cfg, sp) : 0;
     const examples = rate
       ? [100, 500, 1000].map((n) => `\`${num(n).padStart(5)} Robux\` ➜ **${rupiah(sp.type === 'gamepass' ? gpBeforeTax(sp, n) * rate : n * rate)}**`).join('\n')
       : null;
@@ -1441,6 +1446,7 @@ function itemText(t) {
   if (kindOf(t) === 'instant') return `${t.ins?.variant || '-'} × ${num(t.qty || 1)}`;
   if (kindOf(t) === 'canva') return t.plan?.label || '-';
   if (kindOf(t) === 'boost') return `${num(t.qty)} Boost • ${t.plan?.label || '-'}`;
+  if (kindOf(t) === 'gift') return `${t.item} × ${num(t.qty)} (${num(t.amount)} Robux)`;
   return `${num(t.amount)} Robux`;
 }
 
@@ -2117,6 +2123,15 @@ function buildTestimonyV2(guild, cfg, t, buyer, opts = {}) {
       row('Server', `\`${t.server?.name || '-'}\``),
       row('Price', `\`${rupiah(t.price)}\``),
     ];
+  } else if (k === 'gift') {
+    lines = [
+      row('Buyer', `<@${t.userId}>`),
+      row('Product', `\`${t.productLabel}\``),
+      row('Item', `\`${t.item} × ${num(t.qty)}\``),
+      row('Amount', `\`${num(t.amount)} Robux\``),
+      row('Roblox Account', `\`@${maskName(t.roblox?.name)}\``),
+      row('Price', `\`${rupiah(t.price)}\``),
+    ];
   } else if (k === 'instant') {
     lines = [
       row('Buyer', `<@${t.userId}>`),
@@ -2183,6 +2198,12 @@ function buildOrderLogV2(guild, cfg, t) {
     if (pl.showBuyer) lines.push(row('Buyer', `<@${t.userId}>`));
     lines.push(row('Product', `\`${t.productLabel}\``), row('Plan', `\`${num(t.qty)} Boost • ${t.plan.label}\``));
     if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
+  } else if (k === 'gift') {
+    if (pl.showBuyer) lines.push(row('Buyer', `<@${t.userId}>`));
+    lines.push(row('Product', `\`${t.productLabel}\``), row('Item', `\`${t.item} × ${num(t.qty)}\``), row('Amount', `\`${num(t.amount)} Robux\``));
+    lines.push(row('Rate', `\`${rupiah(t.rate)} / Robux\``));
+    if (pl.showPrice) lines.push(row('Total', `\`${rupiah(t.price)}\``));
+    lines.push(row('Roblox Account', `\`@${pl.maskRoblox ? maskName(t.roblox?.name) : t.roblox?.name}\``));
   } else if (k === 'instant') {
     if (pl.showBuyer) lines.push(row('Buyer', `<@${t.userId}>`));
     lines.push(row('Product', `\`${t.ins?.product || t.productLabel}\``), row('Variant', `\`${t.ins?.variant || '-'} × ${num(t.qty || 1)}\``), row('Delivery', '`⚡ Automatic`'));
@@ -2214,6 +2235,137 @@ function buildOrderLogV2(guild, cfg, t) {
     image: progressImg,
     footer: `🛒 ${storeName(cfg, guild)} • ${ts(t.closedAt || t.createdAt, 'f')}`,
   });
+}
+
+// ═════════════════════════════════════ GIFT IN-GAME ═════════════════════════════════════
+/** Hitung biaya Gift In-Game: (harga item Robux × jumlah) × rate. */
+function giftQuote(cfg, product, robuxEach, qty = 1) {
+  const rate = rateOf(cfg, product);
+  const each = Math.round(Number(robuxEach) || 0);
+  const q = Math.round(Number(qty) || 0);
+  const robux = each * q;
+  return { rate, each, qty: q, robux, price: robux * rate };
+}
+
+function giftExamples(cfg, product) {
+  const list = (product.examples || [100, 500, 1000, 2000]).map((n) => [`${num(n)} Robux`, rupiah(Number(n) * rateOf(cfg, product))]);
+  if (!list.length) return null;
+  const w = Math.max(...list.map((r) => r[0].length));
+  return '```\n' + list.map(([a, b]) => `${a.padStart(w)}  ➜  ${b}`).join('\n') + '\n```';
+}
+
+function giftButtons(product, { order = true, calc = true, terms = true } = {}) {
+  const open = isProductOpen(product);
+  const b = [];
+  if (order) b.push(new ButtonBuilder().setCustomId(`store:order:${product.id}`).setLabel(open ? 'Order Sekarang' : 'Sedang Tutup').setEmoji('🛒').setStyle(ButtonStyle.Success).setDisabled(!open));
+  if (calc) b.push(new ButtonBuilder().setCustomId(`store:gfcalc:${product.id}`).setLabel('Kalkulator Biaya').setEmoji('🧮').setStyle(ButtonStyle.Primary));
+  if (terms && product.terms?.description) b.push(new ButtonBuilder().setCustomId(`store:terms:${product.id}`).setLabel(product.terms.button || 'Syarat').setEmoji('📌').setStyle(ButtonStyle.Secondary));
+  return b;
+}
+
+/** Info produk Gift In-Game (hanya terlihat pembeli). */
+function buildGiftInfo(guild, cfg, product) {
+  const open = isProductOpen(product);
+  const s = state.stats;
+  const ps = productStatsOf(product.id);
+  const avg = s.ratingCount ? (s.ratingSum / s.ratingCount).toFixed(1) : '-';
+  const name = { name: storeName(cfg, guild) };
+  const embed = new EmbedBuilder()
+    .setColor(color(cfg, 'brand', 0x3498db))
+    .setTitle(`${product.emoji || '🎁'} ${product.label}`)
+    .setDescription(fill(product.description || '', name) || null)
+    .setThumbnail(guild.iconURL({ extension: 'png', size: 256 }) || null)
+    .addFields(
+      { name: '💱 Rate', value: `\`${rupiah(rateOf(cfg, product))} / Robux\``, inline: true },
+      { name: '🏪 Status', value: open ? '`🟢 BUKA`' : '`🔴 TUTUP`', inline: true },
+      { name: '🎁 Pengiriman', value: '`Sistem Gift`', inline: true },
+    );
+  const ex = giftExamples(cfg, product);
+  if (ex) embed.addFields({ name: '📊 Contoh Harga', value: ex });
+  const notes = (product.notes || []).map((n) => `▸ ${fill(n, name)}`);
+  if (notes.length) embed.addFields({ name: '📝 Catatan', value: notes.join('\n').slice(0, 1024) });
+  embed.addFields(
+    { name: '🧾 Transaksi', value: `\`${num(ps.orders)} transaksi\``, inline: true },
+    { name: `${RBX} Robux Terkirim`, value: `\`${num(ps.robux)} Robux\``, inline: true },
+    { name: '⭐ Rating Pembeli', value: `\`${avg} / 5 (${num(s.ratingCount)} ulasan)\``, inline: true },
+  );
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(giftButtons(product))] };
+}
+
+/** Hasil kalkulator biaya (hanya terlihat pembeli). */
+function buildGiftCalc(guild, cfg, product, robuxEach, qty) {
+  const q = giftQuote(cfg, product, robuxEach, qty);
+  const e = new EmbedBuilder()
+    .setColor(color(cfg, 'brand', 0x3498db))
+    .setTitle(`🧮 Kalkulator ${product.label}`)
+    .setThumbnail(guild.iconURL({ extension: 'png', size: 256 }) || null)
+    .addFields(
+      { name: '🎁 Harga Item', value: `\`${num(q.each)} Robux\``, inline: true },
+      { name: '🔢 Jumlah', value: `\`${num(q.qty)}\``, inline: true },
+      { name: `${RBX} Total Robux`, value: `\`${num(q.robux)} Robux\``, inline: true },
+      { name: '💱 Rate', value: `\`${rupiah(q.rate)} / Robux\``, inline: true },
+      { name: '💰 Total Biaya', value: `## ${rupiah(q.price)}\n\`${num(q.robux)} × ${rupiah(q.rate)}\`` },
+    );
+  return { embeds: [e], components: [new ActionRowBuilder().addComponents(giftButtons(product, { calc: true, terms: false }))] };
+}
+
+function buildGiftConfirm(guild, cfg, product, d) {
+  const e = new EmbedBuilder()
+    .setColor(color(cfg, 'brand', 0x3498db))
+    .setAuthor({ name: `${d.roblox.displayName} (@${d.roblox.name})`, iconURL: d.roblox.avatar || undefined, url: `https://www.roblox.com/users/${d.roblox.id}/profile` })
+    .setTitle(`🔍 Konfirmasi Order ${product.label}`)
+    .setDescription('Periksa kembali detail pesananmu. Pastikan **nama item, jumlah, dan server** sudah benar sebelum membuat ticket.')
+    .addFields(
+      { name: '🎮 Akun Roblox', value: `[${d.roblox.displayName}](https://www.roblox.com/users/${d.roblox.id}/profile)\n\`@${d.roblox.name}\``, inline: true },
+      { name: '🎁 Item', value: `\`${d.item}\``, inline: true },
+      { name: '🌐 Server / Game', value: `\`${d.server}\``, inline: true },
+      { name: '🏷️ Harga Item', value: `\`${num(d.each)} Robux\``, inline: true },
+      { name: '🔢 Jumlah', value: `\`${num(d.qty)}\``, inline: true },
+      { name: `${RBX} Total Robux`, value: `\`${num(d.amount)} Robux\``, inline: true },
+      { name: '💰 Total Bayar', value: `## ${rupiah(d.price)}\n\`${num(d.amount)} × ${rupiah(d.rate)}\`` },
+    );
+  if (d.roblox.avatar) e.setThumbnail(d.roblox.avatar);
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('store:gfconfirm:yes').setLabel('Ya, Buat Ticket').setEmoji('✅').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('store:gfconfirm:no').setLabel('Batalkan').setEmoji('✖️').setStyle(ButtonStyle.Danger),
+  );
+  return { embeds: [e], components: [row] };
+}
+
+/** Isi ticket order Gift In-Game. */
+function buildGiftTicket(guild, cfg, t) {
+  const statusColor = {
+    open: color(cfg, 'brand', 0x3498db),
+    completed: color(cfg, 'open', 0x2ecc71),
+    cancelled: color(cfg, 'closed', 0xe74c3c),
+    refund: color(cfg, 'refund', 0xe67e22),
+  }[t.status];
+  const info = new EmbedBuilder()
+    .setColor(statusColor)
+    .setTitle(`🎁 Detail Pesanan • ${t.id}`)
+    .setDescription(`Halo <@${t.userId}>, terima kasih sudah berbelanja di **${storeName(cfg, guild)}**! 💜`)
+    .addFields(
+      { name: '👤 Pembeli', value: `<@${t.userId}>`, inline: true },
+      { name: '🎮 Akun Roblox', value: `[${t.roblox.displayName}](https://www.roblox.com/users/${t.roblox.id}/profile)\n\`@${t.roblox.name}\``, inline: true },
+      { name: '📦 Produk', value: `\`${t.productLabel}\``, inline: true },
+      { name: '🎁 Item', value: `\`${t.item}\``, inline: true },
+      { name: '🔢 Jumlah', value: `\`${num(t.qty)}\``, inline: true },
+      { name: '🌐 Server / Game', value: `\`${t.server}\``, inline: true },
+      { name: '🏷️ Harga Item', value: `\`${num(t.each)} Robux\``, inline: true },
+      { name: `${RBX} Total Robux`, value: `\`${num(t.amount)} Robux\``, inline: true },
+      { name: '💱 Rate', value: `\`${rupiah(t.rate)} / Robux\``, inline: true },
+      { name: '💰 Total Bayar', value: `## ${rupiah(t.price)}`, inline: false },
+      { name: '📌 Status', value: `**${ticketStatusText(t)}**`, inline: true },
+      { name: '💳 Pembayaran', value: payStatusText(t), inline: true },
+      { name: '🕒 Dibuat', value: ts(t.createdAt, 'f'), inline: true },
+    )
+    .setFooter(serverFooter(guild, `${storeName(cfg, guild)} • Ticket ${t.id}`))
+    .setTimestamp(t.closedAt || t.createdAt);
+  if (t.roblox.avatar) info.setThumbnail(t.roblox.avatar);
+  if (t.closedAt) info.addFields({ name: '🔒 Ditutup', value: `${ts(t.closedAt, 'f')} oleh <@${t.closedBy}>`, inline: true });
+  const embeds = [info, ...paymentEmbeds(guild, cfg, t)];
+  const components = t.status === 'open' ? [...paymentRows(t), closeRow(t)] : [];
+  return { embeds, components };
 }
 
 // ═════════════════════════════════════ SERVER BOOST ═════════════════════════════════════
@@ -2853,6 +3005,10 @@ module.exports = {
   buildGamepassTutorial,
   buildGamepassCalc,
   buildGamepassConfirm,
+  buildGiftInfo,
+  buildGiftCalc,
+  buildGiftConfirm,
+  giftQuote,
   buildGamepassCheck,
   STATUS_LABEL,
   REKBER_STATUS,
