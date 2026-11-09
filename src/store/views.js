@@ -1770,7 +1770,7 @@ function paymentEmbeds(guild, cfg, t) {
   if (t.status !== 'open' || isPaid(t)) return [];
   const pay = cfg.payment || {};
   const name = { name: storeName(cfg, guild) };
-  const { banks, wallets } = payGroups(cfg);
+  const methods = payMethods(cfg);
   const qris = qrisOf(cfg);
   const e = new EmbedBuilder()
     .setColor(color(cfg, 'brand', 0x3498db))
@@ -1778,8 +1778,22 @@ function paymentEmbeds(guild, cfg, t) {
     .setDescription(
       [`-# TOTAL BAYAR`, `## ${rupiah(payAmount(t))}`, pay.accountName ? `-# Semua rekening a.n. **${pay.accountName}**` : null].filter(Boolean).join('\n'),
     );
-  if (banks.length) e.addFields({ name: 'Transfer Bank', value: banks.join('\n').slice(0, 1024) });
-  if (wallets.length) e.addFields({ name: 'E-Wallet', value: wallets.join('\n').slice(0, 1024) });
+  // Nomor dalam blok kode → Discord menampilkan tombol salin di samping nomor.
+  const blk = (n) => `\`\`\`${n}\`\`\``;
+  for (const m of methods.filter((x) => !isWallet(x)).slice(0, 12)) {
+    e.addFields({ name: `${m.emoji || '🏦'} ${m.bank}`.slice(0, 256), value: blk(m.number), inline: true });
+  }
+  const byNum = new Map();
+  for (const m of methods.filter(isWallet)) {
+    if (!byNum.has(m.number)) byNum.set(m.number, []);
+    byNum.get(m.number).push(m);
+  }
+  for (const [num, list] of [...byNum.entries()].slice(0, 6)) {
+    e.addFields({
+      name: `${list.map((m) => m.emoji || '📱').join(' ')} E-Wallet`.slice(0, 256),
+      value: `${blk(num)}\n-# ${list.map((m) => m.bank).join(' • ')}`,
+    });
+  }
   if (qris) {
     e.addFields({
       name: 'QRIS',
@@ -1800,9 +1814,7 @@ function paymentRows(t) {
   if (t.status !== 'open' || isPaid(t)) return [];
   const st = t.payment?.status;
   const cfg = loadConfig();
-  const buttons = [
-    new ButtonBuilder().setCustomId(`store:copyacc:${t.id}`).setLabel('Salin Nomor').setEmoji('📋').setStyle(ButtonStyle.Secondary),
-  ];
+  const buttons = [];
   if (cfg && qrisOf(cfg)) buttons.push(new ButtonBuilder().setCustomId(`store:qris:${t.id}`).setLabel('Tampilkan QRIS').setEmoji(qrisEmoji(cfg)).setStyle(ButtonStyle.Secondary));
   buttons.push(
     new ButtonBuilder()
