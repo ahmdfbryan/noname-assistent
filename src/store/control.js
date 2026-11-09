@@ -230,19 +230,15 @@ function buildPanel(guild, cfg) {
   const compact = [`${info[0]}\n\n${info[1]}`, summary, activity];
 
   // ── Bagian tombol (tiap kelompok punya judul kecil supaya rapi)
-  // Tiap produk punya 2 tombol: 🟢 Buka & 🔴 Tutup. Tombol yang sesuai status sekarang berwarna.
-  // Klik Buka saat produk sudah buka (atau Tutup saat sudah tutup) = kirim ulang pengumumannya.
-  const pair = (p) => {
+  // Satu tombol per produk (5 per baris): hijau 🟢 = sedang BUKA, merah 🔴 = sedang TUTUP.
+  // Klik = balik status & langsung diumumkan ke channel stock.
+  const quick = (p) => {
     const on = isProductOpen(p);
-    return [
-      btn(`store:cpopen:${p.id}`, `Buka ${p.label}`, '🟢', on ? ButtonStyle.Success : ButtonStyle.Secondary),
-      btn(`store:cpclose:${p.id}`, `Tutup ${p.label}`, '🔴', on ? ButtonStyle.Secondary : ButtonStyle.Danger),
-    ];
+    return btn(on ? `store:cpclose:${p.id}` : `store:cpopen:${p.id}`, p.label.slice(0, 80), on ? '🟢' : '🔴', on ? ButtonStyle.Success : ButtonStyle.Danger);
   };
   const toggleRows = [];
   const shown = list.slice(0, 10);
-  const perRow = shown.length <= 6 ? 1 : 2; // 1 produk per baris (rapi); banyak produk → 2 per baris supaya muat
-  for (let i = 0; i < shown.length; i += perRow) toggleRows.push(rowOf(...shown.slice(i, i + perRow).flatMap(pair)));
+  for (let i = 0; i < shown.length; i += 5) toggleRows.push(rowOf(...shown.slice(i, i + 5).map(quick)));
   const select = rowOf(
     new StringSelectMenuBuilder()
       .setCustomId('store:cpsel')
@@ -283,7 +279,7 @@ function buildPanel(guild, cfg) {
       b.addTextDisplayComponents(text(x));
     }
     b.addSeparatorComponents(line());
-    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# Tombol berwarna = status sekarang. Klik 🟢 Buka / 🔴 Tutup → langsung diumumkan ke channel stock (klik lagi = kirim ulang pengumuman).'));
+    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# 🟢 hijau = buka • 🔴 merah = tutup. Klik produknya untuk membalik status — langsung diumumkan ke channel stock.'));
     for (const r of toggleRows) b.addActionRowComponents(r);
     b.addActionRowComponents(rowOf(btn('store:cpstatus', 'Umumkan Status & Stock Semua Produk', '📢')));
     b.addTextDisplayComponents(text('### ⚙️ Kelola Produk'));
