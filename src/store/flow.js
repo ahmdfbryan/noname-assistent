@@ -1837,6 +1837,14 @@ async function onPayModal(interaction, ticketId) {
   const note = (interaction.fields.getTextInputValue('note') || '').trim();
 
   t.payment = { status: 'pending', bank, sender, note: note || null, at: Date.now(), userId: interaction.user.id };
+  // Simpan bukti bayar pembeli — nanti dipakai sebagai gambar di channel testimoni (link Discord bisa kedaluwarsa).
+  try {
+    t.payProofFile = (await saveProof(upload, `pay-${t.id}`)) || null;
+  } catch (e) {
+    t.payProofFile = null;
+    console.warn(`[store] simpan bukti bayar ${t.id}:`, e.message);
+  }
+  t.payProofRemoteUrl = upload.url;
   save();
 
   const staff = isId(cfg.ticket?.staffRoleId) ? cfg.ticket.staffRoleId : null;
@@ -2080,6 +2088,13 @@ async function prepareLogImage(t, status) {
   }
 }
 
+/** Bukti pembayaran yang diunggah pembeli (dari disk, fallback link Discord). */
+function payProofAttachment(t) {
+  if (!t.payProofFile || !fs.existsSync(t.payProofFile)) return { files: [], url: t.payProofRemoteUrl || null };
+  const name = `bukti-bayar-${t.id}${path.extname(t.payProofFile)}`;
+  return { files: [{ attachment: t.payProofFile, name }], url: `attachment://${name}` };
+}
+
 /** Lampiran bukti (dari disk) untuk dikirim bersama embed. */
 function proofAttachment(t) {
   // Fallback: file gagal di-download ke VPS → pakai link gambar asli dari Discord.
@@ -2271,7 +2286,8 @@ async function postTestimony(guild, t) {
   t.testimonyNo = state.stats.testimonies; // disimpan supaya bisa dibuat ulang dengan nomor yang sama
   t.testimonyAt = Date.now();
   const buyer = await guild.members.fetch(V.testimonyUserId(t)).catch(() => null);
-  const proof = proofAttachment(t);
+  // Gambar testimoni = bukti pembayaran yang diunggah pembeli (fallback: bukti dari admin).
+  const proof = payProofAttachment(t).url ? payProofAttachment(t) : proofAttachment(t);
   t.proofUrl = proof.url;
   const msg = await channel.send({ ...V.buildTestimony(guild, cfg, t, buyer), files: proof.files });
   t.testimonyMessageId = msg?.id || null;
@@ -2374,6 +2390,7 @@ async function housekeeping() {
         // Tunggu log selesai (gambar bukti sudah ter-upload) sebelum file bukti dihapus.
         if (guild) await (logQueues.get(t.id) || Promise.resolve());
         if (t.proofFile) fs.rm(t.proofFile, { force: true }, () => {});
+        if (t.payProofFile) fs.rm(t.payProofFile, { force: true }, () => {});
       }
     } catch (err) {
       console.error(`[store] housekeeping ${t.id}:`, err.message);
