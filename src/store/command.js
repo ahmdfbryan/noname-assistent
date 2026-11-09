@@ -21,7 +21,7 @@ function productChoices() {
 /** Pilihan produk yang punya harga per Robux (Robux Visend, Robux Gamepass, ...). */
 function rateChoices() {
   return (loadConfig()?.products || [])
-    .filter((p) => p.type === 'robux' || p.type === 'gamepass')
+    .filter((p) => p.type === 'robux' || p.type === 'gamepass' || p.type === 'gift')
     .slice(0, 25)
     .map((p) => ({ name: `${plain(p.emoji) || '•'} ${p.label}`.slice(0, 100), value: p.id }));
 }
@@ -389,7 +389,7 @@ const storeCommand = {
       const s = state.stats;
       const productLines = (cfg.products || [])
         .filter((p) => p.type !== 'soon')
-        .map((p) => `${isProductOpen(p) ? '🟢' : '🔴'} ${p.label}${p.type === 'robux' || p.type === 'gamepass' ? ` • ${rupiah(V.rateOf(cfg, p))}` : ''}`)
+        .map((p) => `${isProductOpen(p) ? '🟢' : '🔴'} ${p.label}${p.type === 'robux' || p.type === 'gamepass' || p.type === 'gift' ? ` • ${rupiah(V.rateOf(cfg, p))}` : ''}`)
         .join('\n');
       const embed = new EmbedBuilder()
         .setColor(color(cfg, 'brand', 0x3498db))
@@ -423,6 +423,8 @@ const storeCommand = {
                 ? `\`${t.id}\` <#${t.channelId}> • ${CANVA} ${t.plan.label} • <@${t.userId}>`
                 : t.kind === 'boost'
                 ? `\`${t.id}\` <#${t.channelId}> • ${BOOST} ${num(t.qty)} boost ${t.plan.label} • <@${t.userId}>`
+                : t.kind === 'gift'
+                ? `\`${t.id}\` <#${t.channelId}> • 🎁 ${t.item} ×${num(t.qty)} (${num(t.amount)} Robux) • <@${t.userId}>`
                 : t.kind === 'gamepass'
                 ? `\`${t.id}\` <#${t.channelId}> • 🎟️ ${num(t.amount)} Robux (gamepass ${num(t.before)}) • <@${t.userId}>`
                 : t.kind === 'rekber'
