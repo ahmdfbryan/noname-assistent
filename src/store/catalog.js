@@ -146,7 +146,7 @@ function buildCatalogCard(guild, cfg, p) {
   const info = [];
   if (p.type === 'robux') {
     info.push(`💱 **Harga:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, `📦 **Stock:** \`${num(state.stock)} Robux\``);
-  } else if (p.type === 'gamepass') {
+  } else if (p.type === 'gamepass' || p.type === 'gift') {
     info.push(`💱 **Harga:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``);
   } else if (p.type === 'canva') {
     info.push(`💱 **Harga:** \`Mulai ${rupiah(V.minPlanPrice(p))}\``, `📦 **Stock:** \`${num(stockOf(p))} ${stockUnit(p)}\``);
