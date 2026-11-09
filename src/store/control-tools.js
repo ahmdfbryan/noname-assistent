@@ -105,6 +105,7 @@ const itemOf = (t) => {
   const k = kindOf(t);
   if (k === 'instant') return `${t.ins?.product || t.productLabel} — ${t.ins?.variant || ''} ×${num(t.qty || 1)}`;
   if (k === 'rekber') return `Rekber ${rupiah(t.nominal)}`;
+  if (k === 'gift') return `${t.productLabel} ${t.item} ×${num(t.qty)} (${num(t.amount)} Robux)`;
   if (k === 'robux' || k === 'gamepass') return `${t.productLabel} ${num(t.amount)} Robux`;
   return `${t.productLabel}${t.plan ? ` ${t.plan.label}` : ''}`;
 };
@@ -550,7 +551,7 @@ function reportCsv(cfg, id) {
     const inst = kindOf(t) === 'instant' && t.ins;
     const cost = inst ? (Number(t.ins.unitCost) || 0) * (Number(t.ins.qty) || 1) : '';
     const total = kindOf(t) === 'rekber' ? Number(t.nominal) || 0 : Number(t.price) || 0;
-    return [t.id, wibText(t.closedAt), getProduct(cfg, t.productId)?.label || t.productLabel || kindOf(t), itemOf(t), inst ? t.ins.qty : kindOf(t) === 'robux' || kindOf(t) === 'gamepass' ? t.amount : t.qty || 1, total, cost, inst ? total - cost : '', buyerOf(t), t.testimony?.rating || ''];
+    return [t.id, wibText(t.closedAt), getProduct(cfg, t.productId)?.label || t.productLabel || kindOf(t), itemOf(t), inst ? t.ins.qty : ['robux', 'gamepass', 'gift'].includes(kindOf(t)) ? t.amount : t.qty || 1, total, cost, inst ? total - cost : '', buyerOf(t), t.testimony?.rating || ''];
   });
   return `﻿${[head, ...rows].map((x) => x.map(esc).join(',')).join('\n')}\n`;
 }
