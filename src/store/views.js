@@ -275,16 +275,7 @@ function buildTicketMessage(guild, cfg, t) {
 
   const components =
     t.status === 'open'
-      ? [
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId(`store:close:${t.id}`)
-              .setLabel('Tutup Ticket')
-              .setEmoji('🔒')
-              .setStyle(ButtonStyle.Danger),
-          ),
-          ...paymentRows(t),
-        ]
+      ? [...paymentRows(t), closeRow(t)]
       : [];
   return { embeds, components };
 }
@@ -933,6 +924,9 @@ function buildRekberTicket(guild, cfg, t) {
               .setEmoji('🤝')
               .setStyle(ButtonStyle.Success)
               .setDisabled(Boolean(st.agreed)),
+          ),
+          ...(st.agreed ? paymentRows(t) : []),
+          new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId(`store:rbfund:${t.id}`)
               .setLabel(st.funded ? 'Dana Diterima' : 'Konfirmasi Dana (Admin)')
@@ -945,9 +939,8 @@ function buildRekberTicket(guild, cfg, t) {
               .setEmoji('📦')
               .setStyle(ButtonStyle.Primary)
               .setDisabled(!st.funded || Boolean(st.received)),
-            new ButtonBuilder().setCustomId(`store:close:${t.id}`).setLabel('Tutup Ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
           ),
-          ...(st.agreed ? paymentRows(t) : []),
+          closeRow(t),
         ]
       : [];
   return { embeds, components };
@@ -1416,9 +1409,9 @@ function buildGamepassTicket(guild, cfg, t) {
           new ActionRowBuilder().addComponents(
             new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Buka Gamepass').setEmoji('🔗').setURL(gpUrl(gp.id)),
             new ButtonBuilder().setCustomId(`store:gpcheck:${t.id}`).setLabel('Cek Gamepass').setEmoji('🔍').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`store:close:${t.id}`).setLabel('Tutup Ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
           ),
           ...paymentRows(t),
+          closeRow(t),
         ]
       : [];
   return { embeds, components };
@@ -1627,6 +1620,7 @@ function buildCanvaTicket(guild, cfg, t) {
   const components =
     t.status === 'open'
       ? [
+          ...paymentRows(t),
           new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId(`store:cvinvite:${t.id}`)
@@ -1640,9 +1634,8 @@ function buildCanvaTicket(guild, cfg, t) {
               .setEmoji('✅')
               .setStyle(ButtonStyle.Success)
               .setDisabled(!st.invited || Boolean(st.joined)),
-            new ButtonBuilder().setCustomId(`store:close:${t.id}`).setLabel('Tutup Ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
           ),
-          ...paymentRows(t),
+          closeRow(t),
         ]
       : [];
   return { embeds, components };
@@ -1798,20 +1791,26 @@ function paymentEmbeds(guild, cfg, t) {
   return [e];
 }
 
+/** Tombol Tutup Ticket — selalu baris paling bawah (langkah terakhir alur). */
+const closeRow = (t) =>
+  new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`store:close:${t.id}`).setLabel('Tutup Ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger));
+
 /** Tombol pembayaran pembeli (selama belum lunas). */
 function paymentRows(t) {
   if (t.status !== 'open' || isPaid(t)) return [];
   const st = t.payment?.status;
   const cfg = loadConfig();
   const buttons = [
+    new ButtonBuilder().setCustomId(`store:copyacc:${t.id}`).setLabel('Salin Nomor').setEmoji('📋').setStyle(ButtonStyle.Secondary),
+  ];
+  if (cfg && qrisOf(cfg)) buttons.push(new ButtonBuilder().setCustomId(`store:qris:${t.id}`).setLabel('Tampilkan QRIS').setEmoji(qrisEmoji(cfg)).setStyle(ButtonStyle.Secondary));
+  buttons.push(
     new ButtonBuilder()
       .setCustomId(`store:paybtn:${t.id}`)
       .setLabel(st === 'pending' || st === 'rejected' ? 'Kirim Ulang Bukti Pembayaran' : 'Konfirmasi Pembayaran')
       .setEmoji('💳')
       .setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`store:copyacc:${t.id}`).setLabel('Salin Nomor').setEmoji('📋').setStyle(ButtonStyle.Secondary),
-  ];
-  if (cfg && qrisOf(cfg)) buttons.push(new ButtonBuilder().setCustomId(`store:qris:${t.id}`).setLabel('Tampilkan QRIS').setEmoji(qrisEmoji(cfg)).setStyle(ButtonStyle.Secondary));
+  );
   return [new ActionRowBuilder().addComponents(buttons)];
 }
 
@@ -2370,6 +2369,7 @@ function buildBoostTicket(guild, cfg, t) {
   const components =
     t.status === 'open'
       ? [
+          ...paymentRows(t),
           new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId(`store:bssent:${t.id}`)
@@ -2383,9 +2383,8 @@ function buildBoostTicket(guild, cfg, t) {
               .setEmoji('✅')
               .setStyle(ButtonStyle.Success)
               .setDisabled(!st.sent || Boolean(st.received)),
-            new ButtonBuilder().setCustomId(`store:close:${t.id}`).setLabel('Tutup Ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
           ),
-          ...paymentRows(t),
+          closeRow(t),
         ]
       : [];
   return { embeds, components };
