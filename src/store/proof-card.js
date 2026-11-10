@@ -99,7 +99,7 @@ async function blurredName(text, px) {
  * @param {{avatarUrl?:string, username:string, amount:number}} o
  * @returns {Promise<Buffer|null>} PNG, atau null kalau canvas tidak tersedia.
  */
-async function robuxSentProof({ avatarUrl, username, amount }) {
+async function robuxSentProof({ avatarUrl, username, amount, reveal = false }) {
   if (!Canvas) return null;
   const canvas = Canvas.createCanvas(W * S, H * S);
   const ctx = canvas.getContext('2d');
@@ -128,9 +128,16 @@ async function robuxSentProof({ avatarUrl, username, amount }) {
   const lead = 'Sent Robux to ';
   ctx.fillText(lead, tx * S, cy * S);
   const leadW = ctx.measureText(lead).width / S;
-  const name = await blurredName(String(username || 'Roblox'), px);
-  ctx.drawImage(name.img, (tx + leadW - name.pad) * S, (cy - px / 2 - name.pad) * S);
-  ctx.fillText('.', (tx + leadW + name.w) * S, cy * S);
+  if (reveal) {
+    // Versi untuk pembeli: username tampil jelas (tanpa blur).
+    const uname = String(username || 'Roblox');
+    ctx.fillText(uname, (tx + leadW) * S, cy * S);
+    ctx.fillText('.', (tx + leadW + ctx.measureText(uname).width / S) * S, cy * S);
+  } else {
+    const name = await blurredName(String(username || 'Roblox'), px);
+    ctx.drawImage(name.img, (tx + leadW - name.pad) * S, (cy - px / 2 - name.pad) * S);
+    ctx.fillText('.', (tx + leadW + name.w) * S, cy * S);
+  }
 
   // "- ⬡ 200" di ujung kanan (tanda minus pendek, ikon, jumlah — rapat seperti contoh)
   const amt = Math.round(Number(amount) || 0).toLocaleString('en-US');
