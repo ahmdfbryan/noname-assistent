@@ -280,7 +280,7 @@ function buildPanel(guild, cfg) {
       b.addTextDisplayComponents(text(x));
     }
     b.addSeparatorComponents(line());
-    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# 🟢 hijau = buka • 🔴 merah = tutup. Klik produknya → konfirmasi dulu, lalu status dibalik & diumumkan ke channel stock.'));
+    b.addTextDisplayComponents(text('### 🔘 Buka / Tutup Cepat\n-# 🟢 hijau = buka • 🔴 merah = tutup. Klik produknya → konfirmasi dulu, lalu status dibalik & diumumkan ke channel info buka/tutup.'));
     for (const r of toggleRows) b.addActionRowComponents(r);
     b.addActionRowComponents(rowOf(btn('store:cpstatus', 'Umumkan Status & Stock Semua Produk', '📢')));
     b.addTextDisplayComponents(text('### ⚙️ Kelola Produk'));
@@ -569,8 +569,8 @@ async function handle(interaction, action, arg) {
     const on = isProductOpen(p);
     await interaction.reply({
       content: on
-        ? `🔴 Yakin mau **MENUTUP ${p.label}**?\nStatus jadi tutup & **diumumkan ke channel stock**.`
-        : `🟢 Yakin mau **MEMBUKA ${p.label}**?\nStatus jadi buka & **diumumkan ke channel stock**.`,
+        ? `🔴 Yakin mau **MENUTUP ${p.label}**?\nStatus jadi tutup & **diumumkan ke channel info buka/tutup**.`
+        : `🟢 Yakin mau **MEMBUKA ${p.label}**?\nStatus jadi buka & **diumumkan ke channel info buka/tutup**.`,
       components: [
         rowOf(
           btn(on ? `store:cpqclose:${p.id}` : `store:cpqopen:${p.id}`, on ? 'Ya, Tutup' : 'Ya, Buka', on ? '🔴' : '🟢', on ? ButtonStyle.Danger : ButtonStyle.Success),
