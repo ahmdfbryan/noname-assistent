@@ -7,25 +7,22 @@ const { loadConfig: loadStoreConfig, groupOf } = require('./store/config');
 
 /**
  * Server Stats: kategori + voice channel terkunci yang namanya menampilkan angka terkini.
- * Active Tickets / Total Orders + status buka/tutup produk (🟢 buka, 🔴 tutup). Teks di server-stats.json.
+ * Active Tickets / Total Orders + status toko (🟢 Store is OPEN / 🔴 Store is CLOSED). Teks di server-stats.json.
  * Angka dicek tiap 1 menit; nama channel hanya diganti kalau angkanya berubah.
  * Discord membatasi ganti nama channel 2x per 10 menit → tiap channel diganti paling cepat 5 menit sekali
  * (perubahan di antaranya otomatis menyusul begitu jedanya lewat, tidak perlu refresh manual).
  */
 const FILE = path.join(__dirname, '..', 'server-stats.json');
 const DATA = path.join(__dirname, '..', 'data', 'server-stats.json');
-const KEYS = ['tickets', 'orders', 'robux', 'gamepass', 'gift', 'digital', 'premium'];
-const STATUS_KEYS = ['robux', 'gamepass', 'gift', 'digital', 'premium']; // nilainya buka/tutup, bukan angka
+const KEYS = ['tickets', 'orders', 'store'];
+const OLD_KEYS = ['robux', 'gamepass', 'gift', 'digital', 'premium']; // versi lama (status per produk) → channel dihapus otomatis
+const STATUS_KEYS = ['store']; // nilainya buka/tutup, bukan angka
 const DEFAULTS = {
   categoryName: '🟢 STORE STATUS',
   channels: {
     tickets: '🎫 Active Tickets: {count}',
     orders: '✅ Total Orders: {count}',
-    robux: '{status} Robux Visend',
-    gamepass: '{status} Robux Gamepass',
-    gift: '{status} Gift In-Game',
-    digital: '{status} Produk Digital',
-    premium: '{status} Premium App',
+    store: '{status} Store is {state}',
   },
   countBots: false,
   formatNumber: false,
@@ -77,17 +74,10 @@ function activeTickets() {
   return store + ncs;
 }
 
-/** Status buka (true) / tutup (false) tiap produk. Produk Digital & Premium App = buka kalau ada minimal satu produknya yang buka. */
+/** Status toko: BUKA (true) kalau ada minimal satu produk yang buka, TUTUP (false) kalau semua tutup. */
 function productStatus() {
   const products = (loadStoreConfig()?.products || []).filter((p) => p.type !== 'soon');
-  const anyOpen = (list) => list.some((p) => isProductOpen(p));
-  return {
-    robux: anyOpen(products.filter((p) => p.id === 'robux-visend')),
-    gamepass: anyOpen(products.filter((p) => p.id === 'robux-gamepass')),
-    gift: anyOpen(products.filter((p) => p.id === 'gift-ingame')),
-    digital: anyOpen(products.filter((p) => groupOf(p) === 'digital')),
-    premium: anyOpen(products.filter((p) => p.type === 'instant')),
-  };
+  return { store: products.some((p) => isProductOpen(p)) };
 }
 
 async function values(guild, cfg) {
@@ -96,11 +86,16 @@ async function values(guild, cfg) {
   return { tickets, orders, ...productStatus() };
 }
 function nameFor(key, value, cfg) {
-  if (STATUS_KEYS.includes(key)) return String(cfg.channels[key] || `{status} ${key}`).replace(/\{status\}/g, value ? '🟢' : '🔴').slice(0, 100);
+  if (STATUS_KEYS.includes(key)) {
+    return String(cfg.channels[key] || '{status} Store is {state}')
+      .replace(/\{status\}/g, value ? '🟢' : '🔴')
+      .replace(/\{state\}/g, value ? 'OPEN' : 'CLOSED')
+      .slice(0, 100);
+  }
   const n = cfg.formatNumber ? Number(value).toLocaleString('id-ID') : String(value);
   return String(cfg.channels[key] || `${key}: {count}`).replace(/\{count\}/g, n).slice(0, 100);
 }
-const summary = (v) => `🎫 ${v.tickets} • ✅ ${v.orders} • ${v.robux ? '🟢' : '🔴'} Robux • ${v.gamepass ? '🟢' : '🔴'} Gamepass • ${v.gift ? '🟢' : '🔴'} Gift • ${v.digital ? '🟢' : '🔴'} Digital • ${v.premium ? '🟢' : '🔴'} Premium`;
+const summary = (v) => `🎫 ${v.tickets} • ✅ ${v.orders} • ${v.store ? '🟢 Store OPEN' : '🔴 Store CLOSED'}`;
 
 /** Izin: semua bisa melihat tapi tidak bisa masuk (gembok 🔒). */
 function lockedOverwrites(guild) {
@@ -132,6 +127,14 @@ async function update(client, { force = false } = {}) {
       const old = guild.channels.cache.get(data.channels.members) || (await guild.channels.fetch(data.channels.members).catch(() => null));
       if (old) await old.delete('Server stats: Members dihapus').catch(() => {});
       delete data.channels.members;
+      save();
+    }
+    // Channel status per produk (versi lama) dihapus — sekarang cukup 1 channel "Store is OPEN / CLOSED".
+    for (const key of OLD_KEYS) {
+      if (!data.channels?.[key]) continue;
+      const old = guild.channels.cache.get(data.channels[key]) || (await guild.channels.fetch(data.channels[key]).catch(() => null));
+      if (old) await old.delete('Server stats: status per produk diganti Store is OPEN/CLOSED').catch(() => {});
+      delete data.channels[key];
       save();
     }
     if (data.categoryId && data.channels && guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) {
