@@ -257,7 +257,26 @@ const storeCommand = {
       const channel = await resolveChannel(interaction, 'howToOrder');
       if (!channel?.isTextBased()) return interaction.editReply('❌ Channel tidak ditemukan.');
       await placeTracked(interaction, 'howto', channel, H.buildHowToPanel);
-      return interaction.editReply(`✅ Panel **How to Order** dikirim ke ${channel} dan akan ter-update otomatis.`);
+      // Panel "Cara Order" tiap produk → channel masing-masing (config.js DEFAULT_CHANNELS / store.json channels.howto_<id>)
+      const lines = [`✅ Panel **How to Order** dikirim ke ${channel} dan akan ter-update otomatis.`];
+      if (!interaction.options.getChannel('channel')) {
+        for (const p of (cfg.products || []).filter((x) => x.type !== 'soon' && x.howTo)) {
+          const id = channelOf(cfg, `howto_${p.id}`);
+          if (!isId(id)) continue;
+          const ch = await interaction.guild.channels.fetch(id).catch(() => null);
+          if (!ch?.isTextBased()) {
+            lines.push(`⚠️ Channel <#${id}> untuk **${p.label}** tidak ditemukan / bot tidak punya akses.`);
+            continue;
+          }
+          try {
+            await placeTracked(interaction, `howto_${p.id}`, ch, (g, c) => H.buildHowToGuide(g, c, p.id));
+            lines.push(`✅ Cara Order **${p.label}** → ${ch}`);
+          } catch (e) {
+            lines.push(`⚠️ Gagal kirim **${p.label}** ke ${ch}: ${String(e.message).slice(0, 100)}`);
+          }
+        }
+      }
+      return interaction.editReply(lines.join('\n'));
     }
 
     if (sub === 'buka' || sub === 'tutup') {
