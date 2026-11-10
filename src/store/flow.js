@@ -2461,7 +2461,7 @@ async function finishTestimonyReview(interaction, t) {
 /** Hapus file bukti (asli + blur + pengganti) dari disk. */
 function cleanupProofFiles(t) {
   if (t.testiReview && !t.testimonyPosted) return; // masih menunggu cek admin → file dibutuhkan
-  for (const f of [t.proofFile, t.payProofFile, t.payProofBlurFile, t.testiImageFile]) if (f) fs.rm(f, { force: true }, () => {});
+  for (const f of [t.adminProofFile, t.proofFile, t.payProofFile, t.payProofBlurFile, t.testiImageFile]) if (f) fs.rm(f, { force: true }, () => {});
 }
 
 /** Bukti pembayaran yang diunggah pembeli (dari disk, fallback link Discord). */
@@ -2507,6 +2507,23 @@ async function onCloseModal(interaction, ticketId) {
     console.warn(`[store] ${err.message} → pakai link gambar asli.`);
     t.proofFile = null;
     t.proofRemoteUrl = upload?.url || null;
+  }
+
+  // Robux Visend (Completed): pembeli menerima bukti "Sent Robux" buatan bot TANPA blur;
+  // channel history memakai versi yang usernamenya di-blur (lihat prepareLogImage).
+  if (kindOf(t) === 'robux' && status === 'completed') {
+    try {
+      const buf = await robuxSentProof({ avatarUrl: t.roblox?.avatar, username: t.roblox?.name, amount: t.amount, reveal: true });
+      if (buf) {
+        fs.mkdirSync(PROOF_DIR, { recursive: true });
+        t.adminProofFile = t.proofFile || null; // upload admin disimpan sebagai cadangan
+        t.proofFile = path.join(PROOF_DIR, `buyer-${t.id}.png`);
+        fs.writeFileSync(t.proofFile, buf);
+        t.proofRemoteUrl = null;
+      }
+    } catch (e) {
+      console.warn(`[store] bukti pembeli ${t.id}:`, e.message);
+    }
   }
 
   let spenderBefore = null; // diisi saat order Completed (untuk role spender)
