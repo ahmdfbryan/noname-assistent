@@ -165,7 +165,7 @@ const storeCommand = {
       s
         .setName('how-to-order')
         .setDescription('Kirim / pindahkan panel How to Order (panduan cara order + dropdown produk)')
-        .addChannelOption((o) => o.setName('channel').setDescription('Default: channel howToOrder di store.json').addChannelTypes(...TEXT)),
+        .addChannelOption((o) => o.setName('channel').setDescription('Opsional: kirim panel How to Order lama (dropdown) ke channel ini').addChannelTypes(...TEXT)),
     )
     .addSubcommand((s) => s.setName('buka').setDescription('Buka produk (pembeli bisa order)').addStringOption(productOption))
     .addSubcommand((s) =>
@@ -254,12 +254,16 @@ const storeCommand = {
     }
 
     if (sub === 'how-to-order') {
-      const channel = await resolveChannel(interaction, 'howToOrder');
-      if (!channel?.isTextBased()) return interaction.editReply('❌ Channel tidak ditemukan.');
-      await placeTracked(interaction, 'howto', channel, H.buildHowToPanel);
+      // Panel How to Order utama (dropdown) sudah tidak dikirim lagi — hanya kalau admin memilih `channel` secara manual.
+      const lines = [];
+      const picked = interaction.options.getChannel('channel');
+      if (picked) {
+        if (!picked.isTextBased()) return interaction.editReply('❌ Channel tidak ditemukan.');
+        await placeTracked(interaction, 'howto', picked, H.buildHowToPanel);
+        lines.push(`✅ Panel **How to Order** dikirim ke ${picked} dan akan ter-update otomatis.`);
+      }
       // Panel "Cara Order" tiap produk → channel masing-masing (config.js DEFAULT_CHANNELS / store.json channels.howto_<id>)
-      const lines = [`✅ Panel **How to Order** dikirim ke ${channel} dan akan ter-update otomatis.`];
-      if (!interaction.options.getChannel('channel')) {
+      if (!picked) {
         for (const p of (cfg.products || []).filter((x) => x.type !== 'soon' && x.howTo)) {
           const id = channelOf(cfg, `howto_${p.id}`);
           if (!isId(id)) continue;
