@@ -18,7 +18,7 @@ const {
   RESTJSONErrorCodes,
   Events,
 } = require('discord.js');
-const { loadConfig, isId, rupiah, num, getProduct, GROUPS, productsOf } = require('./config');
+const { loadConfig, isId, rupiah, num, getProduct, GROUPS, productsOf, channelOf } = require('./config');
 const { CANVA, BOOST } = require('../emojis');
 const { archiveStoreTicket } = require('../ticket-archive');
 const { openTicketThread, ensureOpen } = require('../ticket-thread');
@@ -198,7 +198,14 @@ const refreshReputation = () => debounce('reputation', () => editTracked('reputa
 async function announce(guild, kind, extra = {}, ping = false) {
   const cfg = loadConfig();
   if (!isId(cfg?.channels?.stock)) return { ok: false, error: 'channels.stock di store.json belum diisi' };
-  const channel = await guild.channels.fetch(cfg.channels.stock).catch(() => null);
+  // Info BUKA / TUTUP toko → channel khusus (channels.storeStatus); pengumuman lain (stock, harga, dll) tetap di channel stock.
+  let channel = null;
+  if (kind === 'open' || kind === 'close') {
+    const sid = channelOf(cfg, 'storeStatus');
+    if (isId(sid)) channel = await guild.channels.fetch(sid).catch(() => null);
+    if (channel && !channel.isTextBased()) channel = null;
+  }
+  if (!channel) channel = await guild.channels.fetch(cfg.channels.stock).catch(() => null);
   if (!channel?.isTextBased()) return { ok: false, error: `channel stock (${cfg.channels.stock}) tidak ditemukan / bot tidak bisa melihatnya` };
   // Components V2 (premium). Kalau gagal dibuat, pakai tampilan embed lama.
   let payload = extra.payload || null; // pengumuman yang sudah disusun (misal Status Toko dari Control Center)
