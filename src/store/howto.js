@@ -50,7 +50,7 @@ function card(cfg, guild, { header, blocks = [], image, rows = [], thumb = true,
   return { components: [box], flags: V2, allowedMentions: { parse: [] } };
 }
 
-const { groupOf } = require('./config');
+const { groupOf, channelOf, isId } = require('./config');
 const { bannerOf } = require('./banner');
 
 function storeLinkButton(guild, label = 'Order di Store', product = null) {
@@ -178,6 +178,11 @@ function buildHowToGuide(guild, cfg, value) {
   const buttons = [];
   const link = storeLinkButton(guild, 'Order di Store', p);
   if (link) buttons.push(link);
+  // Premium App: tombol Catalog (link ke channel katalog) di sebelah tombol Order.
+  if (p.type === 'instant') {
+    const catId = channelOf(cfg, 'instantCatalog');
+    if (isId(catId)) buttons.push(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Catalog').setEmoji('📚').setURL(`https://discord.com/channels/${guild.id}/${catId}`));
+  }
   if (p.type === 'gamepass') {
     buttons.push(
       new ButtonBuilder().setCustomId(`store:gpprice:${p.id}`).setLabel('Cek Harga').setEmoji('💰').setStyle(ButtonStyle.Primary),
