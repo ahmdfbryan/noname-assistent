@@ -123,6 +123,10 @@ const refreshPanel = () => {
   debounce('instantPanel', () => editTracked('instantPanel', I.buildPanel), 3000);
   debounce('controlPanel', () => CP.refresh(), 2500); // 🎛️ Store Control Center (panel admin)
   debounce('howto', () => editTracked('howto', H.buildHowToPanel), 2500);
+  // Panel "Cara Order" per produk (status buka/tutup, rate, stock ikut ter-update)
+  for (const p of loadConfig()?.products || []) {
+    if (state[`howto_${p.id}`]) debounce(`howto_${p.id}`, () => editTracked(`howto_${p.id}`, (g, c) => H.buildHowToGuide(g, c, p.id)), 2800);
+  }
   debounce('catalog', () => refreshCatalog('main'), 3500);
   debounce('digitalCatalog', () => refreshCatalog('digital'), 4500);
 };
