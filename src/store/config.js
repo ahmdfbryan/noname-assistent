@@ -98,6 +98,7 @@ const DEFAULT_CHANNELS = { instantPanel: '1565040089573101588', digitalPanel: '1
   'howto_gift-ingame': '1569517790870900756',
   howto_rekber: '1569518096836988978',
   'howto_produk-instan': '1569521964576407712', // Cara Order Premium App
+  storeStatus: '1569527406803427431', // pengumuman BUKA / TUTUP toko (stock, harga, dll tetap di channels.stock)
   instantCatalog: '1565222699830218863', // katalog Premium App (tombol Catalog di Cara Order)
 };
 /** Grup produk: store.json → products[].group, atau otomatis (Canva = digital). */
