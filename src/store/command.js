@@ -345,7 +345,7 @@ const storeCommand = {
       save();
       refreshPanel();
       if (before !== rate && isId(cfg.channels?.stock)) {
-        await announce(guild, 'price', { product: target, changes: [{ label: 'Rate', before, after: rate, suffix: ' / Robux' }] }, Boolean(cfg.pingEveryone?.price));
+        await announce(guild, 'price', { product: target, changes: [{ label: 'Rate', before, after: rate, suffix: ' / Robux' }] }, cfg.pingEveryone?.price !== false);
       }
       const example =
         target.type === 'gamepass'
