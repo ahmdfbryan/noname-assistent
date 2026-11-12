@@ -2412,7 +2412,7 @@ function testimonyImage(t) {
 }
 
 /** Channel admin untuk cek testimoni: channels.testiReview, kalau kosong pakai Command Center. */
-const reviewChannelId = (cfg) => (isId(cfg?.channels?.testiReview) ? cfg.channels.testiReview : isId(cfg?.channels?.controlPanel) ? cfg.channels.controlPanel : null);
+const reviewChannelId = (cfg) => { const c = channelOf(cfg, 'testiReview') || channelOf(cfg, 'controlPanel'); return isId(c) ? c : null; };
 
 function buildTestiReview(guild, cfg, t) {
   const blur = payBlurAttachment(t);
