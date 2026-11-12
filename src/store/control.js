@@ -329,6 +329,7 @@ function productView(guild, cfg, p, notice) {
       btn(`store:cpopen:${p.id}`, open ? 'Umumkan Buka Lagi' : 'Buka Produk', '🟢', open ? ButtonStyle.Success : ButtonStyle.Secondary),
       btn(`store:cpclose:${p.id}`, open ? 'Tutup Produk' : 'Umumkan Tutup Lagi', '🔴', open ? ButtonStyle.Secondary : ButtonStyle.Danger),
       btn(`store:cpreason:${p.id}`, open ? 'Tutup + Alasan' : 'Buka + Catatan', '📝'),
+      ...(hasStock(p) ? [btn(`store:cpsopen:${p.id}`, 'Stock + Buka', '🚀')] : []),
     ),
   ];
   const edit = [];
@@ -416,20 +417,23 @@ async function setOpen(guild, products, open, reason, by, force = false, opts = 
 }
 
 /** Ubah stock (set / tambah) + pengumuman, tutup / buka otomatis seperti /store stok-set. */
-async function changeStock(guild, p, planId, value, mode, by) {
+async function changeStock(guild, p, planId, value, mode, by, silent = false) {
   const plan = planId ? plansOf(p).find((x) => x.id === planId) : null;
   const before = plan ? planStockOf(p, plan.id) : stockOf(p);
   const after = plan ? setPlanStock(p, plan.id, mode === 'set' ? value : before + value) : setStock(p, mode === 'set' ? value : before + value);
-  if (before === after) return null;
+  if (before === after) return silent ? { label, before, after, same: true } : null;
   if (p.type === 'robux') state.stockBase = after;
   save();
   const label = plan ? `${p.label} (${plan.label})` : p.label;
   ctx.refreshPanel();
-  await ctx.announce(guild, 'stock', { product: p, text: `Stock **${label}** diperbarui: **${num(before)} → ${num(after)} ${stockUnit(p)}**.` }, loadConfig().pingEveryone?.stock !== false);
-  await ctx.closeIfSoldOut(guild, `📦 **Stock ${p.label} sudah HABIS!** ${p.label} otomatis ditutup.`, p);
+  if (!silent) {
+    await ctx.announce(guild, 'stock', { product: p, text: `Stock **${label}** diperbarui: **${num(before)} → ${num(after)} ${stockUnit(p)}**.` }, loadConfig().pingEveryone?.stock !== false);
+    await ctx.closeIfSoldOut(guild, `📦 **Stock ${p.label} sudah HABIS!** ${p.label} otomatis ditutup.`, p);
+  }
   // Update stock mengikuti kondisi produk — TIDAK membuka produk yang sedang tutup. Buka/tutup hanya lewat panel / `/store buka`.
   logAction(`📦 <@${by}> stock **${label}**: ${num(before)} → ${num(after)}`);
   const closedNote = !isProductOpen(p) && stockOf(p) > 0 ? `\n-# ℹ️ ${p.label} masih **TUTUP** — buka lewat panel / \`/store buka\` kalau mau dijual.` : '';
+  if (silent) return { label, before, after, same: false };
   return `📦 **${label}**: ${num(before)} → **${num(after)} ${stockUnit(p)}**${closedNote}`;
 }
 
@@ -465,7 +469,7 @@ const input = (id, label, { value, placeholder, required = true, style = TextInp
 };
 
 function stockModal(p, mode) {
-  const m = new ModalBuilder().setCustomId(`store:${mode === 'add' ? 'cpmadd' : 'cpmstock'}:${p.id}`).setTitle(`${mode === 'add' ? 'Tambah' : 'Atur'} Stock ${p.label}`.slice(0, 45));
+  const m = new ModalBuilder().setCustomId(`store:${mode === 'add' ? 'cpmadd' : mode === 'open' ? 'cpmsopen' : 'cpmstock'}:${p.id}`).setTitle(`${mode === 'add' ? 'Tambah' : mode === 'open' ? 'Stock + Buka' : 'Atur'} Stock ${p.label}`.slice(0, 45));
   if (p.type === 'boost') {
     m.addLabelComponents(...plansOf(p).slice(0, 5).map((x) => input(`plan_${x.id}`, `Stock ${x.label}`, { value: planStockOf(p, x.id), desc: `Sekarang ${num(planStockOf(p, x.id))} ${stockUnit(p)}` })));
   } else if (mode === 'add') {
@@ -541,7 +545,7 @@ async function handle(interaction, action, arg) {
     return true;
   }
   const tool = T.ACTIONS.includes(action);
-  if (!tool && !['cpsel', 'cptog', 'cpqask', 'cpqopen', 'cpqclose', 'cpqno', 'cpopen', 'cpclose', 'cpreset', 'cpstatus', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cprate', 'cpmin', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmrate', 'cpmmin', 'cpmprice', 'cpmreason'].includes(action)) return false;
+  if (!tool && !['cpsel', 'cptog', 'cpqask', 'cpqopen', 'cpqclose', 'cpqno', 'cpopen', 'cpclose', 'cpreset', 'cpstatus', 'cpall', 'cprefresh', 'cpstock', 'cpadd', 'cpsopen', 'cprate', 'cpmin', 'cpprice', 'cpreason', 'cpmstock', 'cpmadd', 'cpmsopen', 'cpmrate', 'cpmmin', 'cpmprice', 'cpmreason'].includes(action)) return false;
   if (!isAdmin(interaction.member)) {
     await interaction.reply({ content: '⛔ Panel ini khusus **Administrator**.', flags: EPH }).catch(() => {});
     return true;
@@ -671,12 +675,12 @@ async function handle(interaction, action, arg) {
     await interaction.showModal(reasonModal(p.id, productState(p.id).open));
     return true;
   }
-  if (action === 'cpstock' || action === 'cpadd') {
+  if (action === 'cpstock' || action === 'cpadd' || action === 'cpsopen') {
     if (!hasStock(p)) {
       await reply('ℹ️ Produk ini tidak memakai stock.');
       return true;
     }
-    await interaction.showModal(stockModal(p, action === 'cpadd' ? 'add' : 'set'));
+    await interaction.showModal(stockModal(p, action === 'cpadd' ? 'add' : action === 'cpsopen' ? 'open' : 'set'));
     return true;
   }
   if (action === 'cprate') {
@@ -714,6 +718,28 @@ async function handle(interaction, action, arg) {
     }
     const res = await setOpen(guild, [p], !productState(p.id).open, reason, by);
     await answer(res);
+    return true;
+  }
+  if (action === 'cpmsopen') {
+    // Atur stock + buka produk → SATU pengumuman "update stok & buka".
+    const parts = [];
+    if (p.type === 'boost') {
+      for (const x of plansOf(p).slice(0, 5)) {
+        const v = parseNum(field(`plan_${x.id}`));
+        if (!Number.isFinite(v) || v < 0) return void (await answer(`❌ Stock **${x.label}** tidak valid.`)) || true;
+      }
+      for (const x of plansOf(p).slice(0, 5)) parts.push(await changeStock(guild, p, x.id, parseNum(field(`plan_${x.id}`)), 'set', by, true));
+    } else {
+      const v = parseNum(field('value'));
+      if (!Number.isFinite(v) || v < 0) return void (await answer('❌ Angka stock tidak valid.')) || true;
+      parts.push(await changeStock(guild, p, null, v, 'set', by, true));
+    }
+    const got = parts.filter(Boolean);
+    const unit = stockUnit(p);
+    const reason = `Update stok & buka — ${got.map((r) => `${r.label}: ${num(r.before)} → ${num(r.after)} ${unit}`).join(' • ')}`;
+    const res = await setOpen(guild, [p], true, reason.slice(0, 900), by, true);
+    await answer(`📦 ${got.map((r) => `**${r.label}**: ${num(r.before)} → **${num(r.after)} ${unit}**`).join(' • ')}\n${res}`);
+    refresh();
     return true;
   }
   if (action === 'cpmstock' || action === 'cpmadd') {
