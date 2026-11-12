@@ -17,6 +17,9 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ContainerBuilder,
   TextDisplayBuilder,
   SectionBuilder,
@@ -150,65 +153,84 @@ const profileUrl = (p) => `https://www.roblox.com/users/${p.userId}/profile`;
 const buyerLine = (p) => `[${esc(p.displayName)} (@${esc(p.username)})](${profileUrl(p)})`;
 const pct = (price, com) => (price > 0 ? Math.round((com / price) * 100) : 0);
 
-async function itemThumb(id) {
+/** Ambil URL gambar dari API thumbnails Roblox (timeout 5 detik; gagal → null). */
+async function fetchThumb(apiPath) {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 5000);
-    const res = await fetch(`https://thumbnails.${DOMAIN}/v1/assets?assetIds=${id}&size=420x420&format=Png`, { signal: ctrl.signal });
+    const res = await fetch(`https://thumbnails.${DOMAIN}/v1/${apiPath}`, { signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) return null;
-    const j = await res.json();
-    const url = j?.data?.[0]?.imageUrl;
+    const url = (await res.json())?.data?.[0]?.imageUrl;
     return typeof url === 'string' && url.startsWith('https://') ? url : null;
   } catch {
     return null;
   }
 }
+const itemThumb = (id) => fetchThumb(`assets?assetIds=${id}&size=420x420&format=Png`);
+const userHead = (id) => fetchThumb(`users/avatar-headshot?userIds=${id}&size=150x150&format=Png&isCircular=false`);
 
-function buildLog(ev, thumb) {
+const linkBtn = (label, emoji, url) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setEmoji(emoji).setURL(url);
+const itemUrl = (it) => it.url || `https://www.roblox.com/catalog/${it.id}`;
+/** Teks + gambar kecil di kanan (kalau gambarnya ada). */
+function withThumb(box, content, url) {
+  if (url) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(content)).setThumbnailAccessory(new ThumbnailBuilder().setURL(url)));
+  else box.addTextDisplayComponents(text(content));
+}
+const stamp = (ev) => [`<t:${ev.time}:f>`, ev.studio ? '🧪 Tes dari Roblox Studio' : null].filter(Boolean).join(' • ');
+
+function buildLog(ev, img = {}) {
   const box = new ContainerBuilder();
-  const footer = [`<t:${ev.time}:f>`, ev.studio ? '🧪 Tes dari Roblox Studio' : null].filter(Boolean).join(' • ');
+  const p = ev.player;
   if (ev.type === 'plus') {
-    box.addTextDisplayComponents(text(`## ⭐ Langganan Roblox Plus\n-# <t:${ev.time}:R>`));
+    withThumb(box, `## ⭐ Langganan Roblox Plus\n-# Member baru berlangganan • <t:${ev.time}:R>\n\n👤 **${esc(p.displayName)}**\n-# @${esc(p.username)}`, img.user);
     box.addSeparatorComponents(sep());
-    box.addTextDisplayComponents(text(`👤 **Pelanggan**\n${buyerLine(ev.player)}`));
+    box.addActionRowComponents(new ActionRowBuilder().addComponents(linkBtn('Profil Pembeli', '👤', profileUrl(p))));
   } else {
-    const head = text(`## 🛍️ Pembelian Baru\n-# <t:${ev.time}:R>`);
-    if (thumb) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(head).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumb)));
-    else box.addTextDisplayComponents(head);
+    const it = ev.item;
+    // Kepala: item (gambar di kanan) — judul + nama item sebagai link
+    withThumb(box, `## 🛍️ Pembelian Baru\n-# <t:${ev.time}:R>\n\n🎁 [**${esc(it.name)}**](${itemUrl(it)})\n-# ID item \`${it.id}\``, img.item);
     box.addSeparatorComponents(sep());
-    const item = ev.item.url ? `[${esc(ev.item.name)}](${ev.item.url})` : `**${esc(ev.item.name)}**`;
-    const lines = [`👤 **Pembeli**\n${buyerLine(ev.player)}`, `🎁 **Item**\n${item}`, `💰 **Harga**\n${rb(ev.item.price)}`];
-    if (process.env.ROBLOX_LOG_HIDE_CASHBACK !== '1') lines.push(`🎯 **Cashback**\n${rb(ev.commission)}${ev.item.price > 0 ? ` (${pct(ev.item.price, ev.commission)}%)` : ''}`);
-    box.addTextDisplayComponents(text(lines.join('\n\n')));
+    // Pembeli (avatar di kanan)
+    withThumb(box, `-# 👤 PEMBELI\n**${esc(p.displayName)}**\n-# @${esc(p.username)} • ID \`${p.userId}\``, img.user);
+    box.addSeparatorComponents(sep());
+    // Angka utama
+    const nums = [`-# 💰 HARGA\n## ${rb(it.price)}`];
+    if (process.env.ROBLOX_LOG_HIDE_CASHBACK !== '1') nums.push(`-# 🎯 CASHBACK${it.price > 0 ? ` • ${pct(it.price, ev.commission)}%` : ''}\n## ${rb(ev.commission)}`);
+    box.addTextDisplayComponents(text(nums.join('\n')));
+    box.addSeparatorComponents(sep());
+    box.addActionRowComponents(new ActionRowBuilder().addComponents(linkBtn('Lihat Item', '🎁', itemUrl(it)), linkBtn('Profil Pembeli', '👤', profileUrl(p))));
   }
-  box.addSeparatorComponents(sep());
-  box.addTextDisplayComponents(text(`-# ${footer}`));
+  box.addTextDisplayComponents(text(`-# ${stamp(ev)}`));
   return { components: [box], flags: V2, allowedMentions: { parse: [] } };
 }
 
-function buildAdmin(ev) {
+function buildAdmin(ev, img = {}) {
   const s = statsNow().today;
+  const p = ev.player;
   const box = new ContainerBuilder();
-  const lines =
-    ev.type === 'plus'
-      ? [`## 🔒 Roblox Plus — Rincian`, `-# <t:${ev.time}:f>`]
-      : [`## 🔒 Rincian Pembelian`, `-# <t:${ev.time}:f>`];
-  box.addTextDisplayComponents(text(lines.join('\n')));
+  box.addTextDisplayComponents(text(`## 🔒 ${ev.type === 'plus' ? 'Roblox Plus' : 'Rincian Pembelian'}\n-# Khusus admin • <t:${ev.time}:f>`));
   box.addSeparatorComponents(sep());
-  const rows = [`👤 ${buyerLine(ev.player)} • ID \`${ev.player.userId}\``];
+  withThumb(box, `-# 👤 PEMBELI\n**${esc(p.displayName)}** • @${esc(p.username)}\n-# User ID \`${p.userId}\``, img.user);
   if (ev.type === 'purchase') {
-    rows.push(
-      `🎁 ${esc(ev.item.name)} • ID \`${ev.item.id}\``,
-      `💰 Harga **${rb(ev.item.price)}**`,
-      `💵 Komisi **${rb(ev.commission)}**${ev.item.price > 0 ? ` (${pct(ev.item.price, ev.commission)}%)` : ''}`,
+    const it = ev.item;
+    box.addSeparatorComponents(sep());
+    box.addTextDisplayComponents(
+      text(
+        `-# 🎁 ITEM\n[**${esc(it.name)}**](${itemUrl(it)})\n-# Asset ID \`${it.id}\`\n\n` +
+          `-# 💰 HARGA  →  💵 KOMISI${it.price > 0 ? ` (${pct(it.price, ev.commission)}%)` : ''}\n## ${rb(it.price)}  →  ${rb(ev.commission)}`,
+      ),
     );
   }
-  rows.push(`🗺️ Place \`${ev.placeId}\` • Server \`${String(ev.serverId).slice(0, 36) || '-'}\``, `🧾 Event \`${ev.eventId.slice(0, 60)}\``);
-  box.addTextDisplayComponents(text(rows.join('\n')));
   box.addSeparatorComponents(sep());
   box.addTextDisplayComponents(
-    text(ev.studio ? '-# 🧪 Tes dari Roblox Studio — tidak dihitung di statistik' : `-# Hari ini: **${s.count}** pembelian • ${rb(s.robux)} • komisi ${rb(s.commission)}`),
+    text(
+      `-# 🧾 TEKNIS\nPlace \`${ev.placeId}\`${ev.universeId ? ` • Universe \`${ev.universeId}\`` : ''}\nServer \`${String(ev.serverId).slice(0, 36) || '-'}\`\nEvent \`${ev.eventId.slice(0, 60)}\``,
+    ),
+  );
+  box.addSeparatorComponents(sep());
+  box.addTextDisplayComponents(
+    text(ev.studio ? '-# 🧪 Tes dari Roblox Studio — tidak dihitung di statistik' : `-# 📈 Hari ini: **${s.count}** pembelian • ${rb(s.robux)} • komisi ${rb(s.commission)}`),
   );
   return { components: [box], flags: V2, allowedMentions: { parse: [] } };
 }
@@ -289,9 +311,10 @@ async function deliver(client, ev) {
       console.warn(`[roblox-log] gagal kirim ke channel ${label}:`, e.message);
     }
   };
-  const thumb = ev.type === 'purchase' ? await itemThumb(ev.item.id) : null;
-  await send(idOf(process.env.ROBLOX_LOG_CHANNEL_ID), buildLog(ev, thumb), 'log');
-  await send(idOf(process.env.ROBLOX_ADMIN_CHANNEL_ID), buildAdmin(ev), 'admin');
+  const [item, user] = await Promise.all([ev.type === 'purchase' ? itemThumb(ev.item.id) : null, userHead(ev.player.userId)]);
+  const img = { item, user };
+  await send(idOf(process.env.ROBLOX_LOG_CHANNEL_ID), buildLog(ev, img), 'log');
+  await send(idOf(process.env.ROBLOX_ADMIN_CHANNEL_ID), buildAdmin(ev, img), 'admin');
 }
 
 function record(ev) {
