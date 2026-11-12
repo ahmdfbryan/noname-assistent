@@ -325,7 +325,7 @@ const storeCommand = {
       await announce(guild, 'stock', {
         product: target,
         text: `Stock **${label}** diperbarui: **${num(before)} → ${num(after)} ${unit}**.`,
-      });
+      }, cfg.pingEveryone?.stock !== false);
       await closeIfSoldOut(guild, `📦 **Stock ${target.label} sudah HABIS!** ${target.label} otomatis ditutup.`, target);
       // Update stock mengikuti kondisi produk — TIDAK membuka produk yang sedang tutup. Buka/tutup hanya lewat panel / `/store buka`.
       return interaction.editReply(
