@@ -198,19 +198,19 @@ function withThumb(box, content, url) {
   if (url) box.addSectionComponents(new SectionBuilder().addTextDisplayComponents(text(content)).setThumbnailAccessory(new ThumbnailBuilder().setURL(url)));
   else box.addTextDisplayComponents(text(content));
 }
-const stamp = (ev) => [`<t:${ev.time}:f>`, ev.studio ? '🧪 Tes dari Roblox Studio' : null].filter(Boolean).join(' • ');
+const stamp = (ev) => ['Noname Studios Creative', `<t:${ev.time}:f>`, ev.studio ? '🧪 Tes dari Roblox Studio' : null].filter(Boolean).join(' • ');
 
 function buildLogText(ev, img = {}) {
   const box = new ContainerBuilder();
   const p = ev.player;
   if (ev.type === 'plus') {
-    withThumb(box, `## ⭐ Langganan Roblox Plus\n-# Member baru berlangganan • <t:${ev.time}:R>\n\n👤 **${esc(p.displayName)}**\n-# @${esc(p.username)}`, img.user);
+    withThumb(box, `## ⭐ Roblox Plus Subscription\n-# Member baru berlangganan • <t:${ev.time}:R>\n\n👤 **${esc(p.displayName)}**\n-# @${esc(p.username)}`, img.user);
     box.addSeparatorComponents(sep());
     box.addActionRowComponents(new ActionRowBuilder().addComponents(linkBtn('Profil Pembeli', '👤', profileUrl(p))));
   } else {
     const it = ev.item;
     // Kepala: item (gambar di kanan) — judul + nama item sebagai link
-    withThumb(box, `## 🛍️ Pembelian Baru\n-# <t:${ev.time}:R>\n\nA bulk cart checkout has been completed in the Noname Hub marketplace.\n\n🎁 [**${esc(it.name)}**](${itemUrl(it)})\n-# ID item \`${it.id}\``, img.item);
+    withThumb(box, `## 🛍️ New Purchase\n-# <t:${ev.time}:R>\n\nA bulk cart checkout has been completed in the Noname Hub marketplace.\n\n🎁 [**${esc(it.name)}**](${itemUrl(it)})\n-# ID item \`${it.id}\``, img.item);
     box.addSeparatorComponents(sep());
     // Pembeli (avatar di kanan)
     withThumb(box, `-# 👤 PEMBELI\n**${esc(p.displayName)}**\n-# @${esc(p.username)} • ID \`${p.userId}\``, img.user);
@@ -266,9 +266,9 @@ function buildLogCard(ev, png) {
   const box = new ContainerBuilder();
   const p = ev.player;
   if (ev.type === 'plus') {
-    box.addTextDisplayComponents(text(`⭐ **Langganan Roblox Plus** • <t:${ev.time}:R>\n-# Seorang member baru saja berlangganan Roblox Plus.`));
+    box.addTextDisplayComponents(text(`# ⭐ Roblox Plus Subscription\n-# <t:${ev.time}:R> • A member just subscribed to Roblox Plus.`));
   } else {
-    box.addTextDisplayComponents(text(`🛍️ **Pembelian Baru** • <t:${ev.time}:R>\n-# A bulk cart checkout has been completed in the Noname Hub marketplace.`));
+    box.addTextDisplayComponents(text(`# 🛍️ New Purchase\n-# <t:${ev.time}:R> • A bulk cart checkout has been completed in the Noname Hub marketplace.`));
   }
   box.addMediaGalleryComponents(cardGallery(ev));
   const btns = ev.type === 'plus' ? [linkBtn('Profil Pembeli', '👤', profileUrl(p))] : [linkBtn('Lihat Item', '🎁', itemUrl(ev.item)), linkBtn('Profil Pembeli', '👤', profileUrl(p))];
