@@ -20,6 +20,7 @@ const { serverCheckCommand } = require('./server-check');
 const { botPanelCommand } = require('./bot-panel');
 const { canvaCommand } = require('./canva-manager');
 const { pesanCommand } = require('./pesan');
+const { robloxStatsCommand } = require('./roblox-log');
 
 const TEXT_CHANNELS = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 
@@ -76,6 +77,7 @@ const commands = [
   botPanelCommand,
   canvaCommand,
   pesanCommand,
+  robloxStatsCommand,
 ];
 
 module.exports = { commands };
