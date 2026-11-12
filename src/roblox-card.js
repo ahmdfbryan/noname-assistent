@@ -231,7 +231,7 @@ async function renderPurchase(d) {
 
   const X = 396;
   const R = W - 40;
-  label(ctx, 'Pembelian Baru', X, 66);
+  label(ctx, 'New Purchase', X, 66);
   if (d.studio) badge(ctx, 'STUDIO TEST', R, 44);
   // Nama item (maks. 2 baris)
   ctx.fillStyle = C.text;
@@ -293,7 +293,7 @@ async function renderPlus(d) {
   }
   ctx.closePath();
   ctx.fill();
-  label(ctx, 'Langganan Roblox Plus', X + 32, 69, C.amber);
+  label(ctx, 'Roblox Plus Subscription', X + 32, 69, C.amber);
   if (d.studio) badge(ctx, 'STUDIO TEST', R, 44);
   ctx.fillStyle = C.text;
   ctx.font = f7(44);
