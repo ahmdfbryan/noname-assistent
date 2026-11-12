@@ -93,7 +93,7 @@ const statsNow = () => {
 
 // ─────────────────────────── Validasi ───────────────────────────
 const isStr = (v, max, min = 1) => typeof v === 'string' && v.length >= min && v.length <= max;
-const isInt = (v, max = 1e12) => Number.isInteger(v) && v >= 0 && v <= max;
+const isInt = (v, max = Number.MAX_SAFE_INTEGER) => Number.isSafeInteger(v) && v >= 0 && v <= max;
 const isNum = (v, max = 1e12) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max;
 const safeUrl = (u) => {
   try {
