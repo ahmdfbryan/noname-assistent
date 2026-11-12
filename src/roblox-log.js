@@ -18,6 +18,9 @@ const http = require('http');
 const path = require('path');
 const {
   ActionRowBuilder,
+  AttachmentBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
@@ -41,6 +44,7 @@ const DOMAIN = process.env.ROBLOX_DOMAIN || 'roblox.com';
 
 const idOf = (v) => String(v || '').trim();
 const { ROBUX } = require('./emojis');
+const card = require('./roblox-card');
 const MIN_CASHBACK = Number(process.env.ROBLOX_MIN_CASHBACK ?? 30); // item di bawah ini (Robux) tidak mendapat cashback
 const rb = (n) => `${ROBUX} ${Math.round(Number(n || 0)).toLocaleString('id-ID')}`; // ikon Robux + format Indonesia
 const wibKeys = (unix) => {
@@ -173,6 +177,20 @@ async function fetchThumb(apiPath) {
 const itemThumb = (id) => fetchThumb(`assets?assetIds=${id}&size=420x420&format=Png`);
 const userHead = (id) => fetchThumb(`users/avatar-headshot?userIds=${id}&size=150x150&format=Png&isCircular=false`);
 
+/** Unduh gambar (hanya https & domain Roblox, maks. 3 MB, timeout 8 detik) → Buffer atau null. */
+async function fetchBuf(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:' || !/(^|\.)(rbxcdn\.com|roblox\.com|roproxy\.com)$/i.test(u.hostname)) return null;
+    const res = await fetch(u, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.length <= 3 * 1024 * 1024 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
 const linkBtn = (label, emoji, url) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setEmoji(emoji).setURL(url);
 const itemUrl = (it) => it.url || `https://www.roblox.com/catalog/${it.id}`;
 /** Teks + gambar kecil di kanan (kalau gambarnya ada). */
@@ -182,7 +200,7 @@ function withThumb(box, content, url) {
 }
 const stamp = (ev) => [`<t:${ev.time}:f>`, ev.studio ? '🧪 Tes dari Roblox Studio' : null].filter(Boolean).join(' • ');
 
-function buildLog(ev, img = {}) {
+function buildLogText(ev, img = {}) {
   const box = new ContainerBuilder();
   const p = ev.player;
   if (ev.type === 'plus') {
@@ -208,7 +226,7 @@ function buildLog(ev, img = {}) {
   return { components: [box], flags: V2, allowedMentions: { parse: [] } };
 }
 
-function buildAdmin(ev, img = {}) {
+function buildAdminText(ev, img = {}) {
   const s = statsNow().today;
   const p = ev.player;
   const box = new ContainerBuilder();
@@ -236,6 +254,40 @@ function buildAdmin(ev, img = {}) {
     text(ev.studio ? '-# 🧪 Tes dari Roblox Studio — tidak dihitung di statistik' : `-# 📈 Hari ini: **${s.count}** pembelian • ${rb(s.robux)} • komisi ${rb(s.commission)}`),
   );
   return { components: [box], flags: V2, allowedMentions: { parse: [] } };
+}
+
+/** Kartu gambar premium → payload V2 (gambar + deskripsi + tombol). png = Buffer dari roblox-card. */
+const CARD_NAME = 'noname-purchase.png';
+const cardGallery = (ev) =>
+  new MediaGalleryBuilder().addItems(
+    new MediaGalleryItemBuilder().setURL(`attachment://${CARD_NAME}`).setDescription(ev.type === 'plus' ? `Langganan Roblox Plus — ${ev.player.displayName}` : `Pembelian ${ev.item.name} oleh ${ev.player.displayName}`),
+  );
+function buildLogCard(ev, png) {
+  const box = new ContainerBuilder();
+  const p = ev.player;
+  if (ev.type === 'plus') {
+    box.addTextDisplayComponents(text(`⭐ **Langganan Roblox Plus** • <t:${ev.time}:R>\n-# Seorang member baru saja berlangganan Roblox Plus.`));
+  } else {
+    box.addTextDisplayComponents(text(`🛍️ **Pembelian Baru** • <t:${ev.time}:R>\n-# A bulk cart checkout has been completed in the Noname Hub marketplace.`));
+  }
+  box.addMediaGalleryComponents(cardGallery(ev));
+  const btns = ev.type === 'plus' ? [linkBtn('Profil Pembeli', '👤', profileUrl(p))] : [linkBtn('Lihat Item', '🎁', itemUrl(ev.item)), linkBtn('Profil Pembeli', '👤', profileUrl(p))];
+  box.addActionRowComponents(new ActionRowBuilder().addComponents(...btns));
+  box.addTextDisplayComponents(text(`-# ${stamp(ev)}`));
+  return { components: [box], files: [new AttachmentBuilder(png, { name: CARD_NAME })], flags: V2, allowedMentions: { parse: [] } };
+}
+function buildAdminCard(ev, png) {
+  const s = statsNow().today;
+  const box = new ContainerBuilder();
+  box.addTextDisplayComponents(text(`🔒 **${ev.type === 'plus' ? 'Roblox Plus' : 'Rincian Pembelian'}** • khusus admin • <t:${ev.time}:R>`));
+  box.addMediaGalleryComponents(cardGallery(ev));
+  const rows = [`-# 👤 User ID \`${ev.player.userId}\``];
+  if (ev.type === 'purchase') rows.push(`-# 🎁 Asset ID \`${ev.item.id}\` • ${ev.noCashback ? 'tanpa cashback' : `komisi ${rb(ev.commission)}`}`);
+  rows.push(`-# 🗺️ Place \`${ev.placeId}\`${ev.universeId ? ` • Universe \`${ev.universeId}\`` : ''} • Server \`${String(ev.serverId).slice(0, 36) || '-'}\``, `-# 🧾 Event \`${ev.eventId.slice(0, 60)}\``);
+  box.addTextDisplayComponents(text(rows.join('\n')));
+  box.addSeparatorComponents(sep());
+  box.addTextDisplayComponents(text(ev.studio ? '-# 🧪 Tes dari Roblox Studio — tidak dihitung di statistik' : `-# 📈 Hari ini: **${s.count}** pembelian • ${rb(s.robux)} • komisi ${rb(s.commission)}`));
+  return { components: [box], files: [new AttachmentBuilder(png, { name: CARD_NAME })], flags: V2, allowedMentions: { parse: [] } };
 }
 
 function buildStats() {
@@ -316,8 +368,24 @@ async function deliver(client, ev) {
   };
   const [item, user] = await Promise.all([ev.type === 'purchase' ? itemThumb(ev.item.id) : null, userHead(ev.player.userId)]);
   const img = { item, user };
-  await send(idOf(process.env.ROBLOX_LOG_CHANNEL_ID), buildLog(ev, img), 'log');
-  await send(idOf(process.env.ROBLOX_ADMIN_CHANNEL_ID), buildAdmin(ev, img), 'admin');
+  // Kartu gambar premium (roblox-card.js). Kalau gagal dibuat → tampilan teks biasa.
+  let logMsg;
+  let adminMsg;
+  try {
+    const [itemBuf, userBuf] = await Promise.all([item ? fetchBuf(item) : null, user ? fetchBuf(user) : null]);
+    const data = { itemImg: itemBuf, avatarImg: userBuf, displayName: ev.player.displayName, username: ev.player.username, studio: ev.studio };
+    if (ev.type === 'purchase') Object.assign(data, { itemName: ev.item.name, price: ev.item.price, commission: ev.commission, noCashback: ev.noCashback, minCashback: MIN_CASHBACK });
+    const render = (extra) => (ev.type === 'plus' ? card.renderPlus({ ...data, ...extra }) : card.renderPurchase({ ...data, ...extra }));
+    const hide = process.env.ROBLOX_LOG_HIDE_CASHBACK === '1';
+    const logPng = await render({ hideCommission: hide });
+    const adminPng = hide ? await render({}) : logPng;
+    if (logPng) logMsg = buildLogCard(ev, logPng);
+    if (adminPng) adminMsg = buildAdminCard(ev, adminPng);
+  } catch (e) {
+    console.warn('[roblox-log] kartu gambar gagal dibuat, pakai tampilan teks:', e.message);
+  }
+  await send(idOf(process.env.ROBLOX_LOG_CHANNEL_ID), logMsg || buildLogText(ev, img), 'log');
+  await send(idOf(process.env.ROBLOX_ADMIN_CHANNEL_ID), adminMsg || buildAdminText(ev, img), 'admin');
 }
 
 function record(ev) {
@@ -394,4 +462,4 @@ function registerRobloxLog(client) {
   });
 }
 
-module.exports = { registerRobloxLog, robloxStatsCommand, __t: { validate, buildLog, buildAdmin, buildStats, handle } };
+module.exports = { registerRobloxLog, robloxStatsCommand, __t: { validate, buildLogText, buildAdminText, buildLogCard, buildAdminCard, buildStats, handle, deliver } };
