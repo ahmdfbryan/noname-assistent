@@ -2063,13 +2063,14 @@ const row = (label, value) => `» **${label} :** ${value}`;
  * Premium App (QRIS otomatis) → "`🔳 QRIS • Otomatis`". Tidak diketahui (misal Dana Masuk manual tanpa bukti) → null.
  */
 function paidWith(cfg, t) {
-  if (kindOf(t) === 'instant' && t.ins?.mode && t.ins.mode !== 'manual') return '`🔳 QRIS • Automatic`';
+  // Emoji ditulis DI LUAR kotak `code` — emoji custom tidak tampil kalau berada di dalam backtick.
+  if (kindOf(t) === 'instant' && t.ins?.mode && t.ins.mode !== 'manual') return `${qrisEmoji(cfg)} \`QRIS • Automatic\``;
   const b = t.payment?.bank;
   if (!b || b === '-') return null;
-  if (/^qris$/i.test(b)) return '`🔳 QRIS`';
+  if (/^qris$/i.test(b)) return `${qrisEmoji(cfg)} \`QRIS\``;
   const m = payMethods(cfg).find((x) => x.bank === b);
-  if (!m) return `\`💳 ${b}\``;
-  return `\`${m.emoji || (isWallet(m) ? '📱' : '🏦')} ${m.bank} • ${isWallet(m) ? 'E-Wallet' : 'Bank Transfer'}\``;
+  if (!m) return `💳 \`${b}\``;
+  return `${m.emoji || (isWallet(m) ? '📱' : '🏦')} \`${m.bank} • ${isWallet(m) ? 'E-Wallet' : 'Bank Transfer'}\``;
 }
 /** Isi komentar aman di dalam kotak code block. */
 const boxed = (s) => '```\n' + String(s || '-').replace(/`/g, 'ˋ').slice(0, 900) + '\n```';
