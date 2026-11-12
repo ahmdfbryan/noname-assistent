@@ -109,9 +109,10 @@ function validate(b) {
   if (!b || typeof b !== 'object' || Array.isArray(b)) return { ok: false, error: 'body harus objek JSON' };
   if (b.type !== 'purchase' && b.type !== 'plus') return { ok: false, error: 'type tidak dikenal' };
   if (!isStr(b.eventId, 100)) return { ok: false, error: 'eventId tidak valid' };
-  if (!isInt(b.placeId)) return { ok: false, error: 'placeId tidak valid' };
-  if (!isStr(b.serverId, 100, 0)) return { ok: false, error: 'serverId tidak valid' };
   if (b.studio !== undefined && typeof b.studio !== 'boolean') return { ok: false, error: 'studio harus boolean' };
+  // studio = true → placeId boleh 0 (tes di Roblox Studio) • studio = false → placeId wajib > 0
+  if (!isInt(b.placeId) || (b.studio !== true && b.placeId <= 0)) return { ok: false, error: 'placeId tidak valid' };
+  if (!isStr(b.serverId, 100, 0)) return { ok: false, error: 'serverId tidak valid' }; // studio: boleh "studio"
   const nowS = Math.floor(Date.now() / 1000);
   // time di luar akal sehat (kosong / jauh di masa depan / sangat lama) → pakai waktu sekarang
   const time = isInt(b.time, 4e9) && b.time > 1e9 && b.time <= nowS + 86400 ? b.time : nowS;
@@ -126,6 +127,7 @@ function validate(b) {
     serverId: b.serverId,
     time,
     studio: b.studio === true,
+    universeId: isInt(b.universeId) ? b.universeId : null, // opsional; kalau tidak ada / tidak valid → diabaikan, event tidak ditolak
     player: { userId: p.userId, username: p.username, displayName: p.displayName || p.username },
   };
   if (b.type === 'purchase') {
