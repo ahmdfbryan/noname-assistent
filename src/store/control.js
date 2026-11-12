@@ -425,7 +425,7 @@ async function changeStock(guild, p, planId, value, mode, by) {
   save();
   const label = plan ? `${p.label} (${plan.label})` : p.label;
   ctx.refreshPanel();
-  await ctx.announce(guild, 'stock', { product: p, text: `Stock **${label}** diperbarui: **${num(before)} → ${num(after)} ${stockUnit(p)}**.` });
+  await ctx.announce(guild, 'stock', { product: p, text: `Stock **${label}** diperbarui: **${num(before)} → ${num(after)} ${stockUnit(p)}**.` }, loadConfig().pingEveryone?.stock !== false);
   await ctx.closeIfSoldOut(guild, `📦 **Stock ${p.label} sudah HABIS!** ${p.label} otomatis ditutup.`, p);
   // Update stock mengikuti kondisi produk — TIDAK membuka produk yang sedang tutup. Buka/tutup hanya lewat panel / `/store buka`.
   logAction(`📦 <@${by}> stock **${label}**: ${num(before)} → ${num(after)}`);
