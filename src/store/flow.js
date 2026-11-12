@@ -198,14 +198,7 @@ const refreshReputation = () => debounce('reputation', () => editTracked('reputa
 async function announce(guild, kind, extra = {}, ping = false) {
   const cfg = loadConfig();
   if (!isId(cfg?.channels?.stock)) return { ok: false, error: 'channels.stock di store.json belum diisi' };
-  // Info BUKA / TUTUP toko → channel khusus (channels.storeStatus); pengumuman lain (stock, harga, dll) tetap di channel stock.
-  let channel = null;
-  if (kind === 'open' || kind === 'close') {
-    const sid = channelOf(cfg, 'storeStatus');
-    if (isId(sid)) channel = await guild.channels.fetch(sid).catch(() => null);
-    if (channel && !channel.isTextBased()) channel = null;
-  }
-  if (!channel) channel = await guild.channels.fetch(cfg.channels.stock).catch(() => null);
+  const channel = await guild.channels.fetch(cfg.channels.stock).catch(() => null);
   if (!channel?.isTextBased()) return { ok: false, error: `channel stock (${cfg.channels.stock}) tidak ditemukan / bot tidak bisa melihatnya` };
   // Components V2 (premium). Kalau gagal dibuat, pakai tampilan embed lama.
   let payload = extra.payload || null; // pengumuman yang sudah disusun (misal Status Toko dari Control Center)
@@ -236,8 +229,31 @@ async function announce(guild, kind, extra = {}, ping = false) {
  * otomatis saat stock kembali (cancel / refund / stock ditambah). Produk yang ditutup manual
  * lewat /store tutup tetap tutup sampai admin membukanya.
  */
+/** Toko dianggap BUKA kalau minimal satu produk (selain Coming Soon) sedang buka. */
+const storeIsOpen = (cfg) => (cfg?.products || []).filter((p) => p.type !== 'soon').some((p) => isProductOpen(p));
+
+/** Info BUKA / TUTUP TOKO (bukan per produk) → channel khusus channels.storeStatus. */
+async function announceStoreStatus(guild, cfg, open) {
+  const id = channelOf(cfg, 'storeStatus');
+  if (!isId(id)) return;
+  const channel = await guild.channels.fetch(id).catch(() => null);
+  if (!channel?.isTextBased()) return;
+  const openList = (cfg.products || []).filter((p) => p.type !== 'soon' && isProductOpen(p));
+  const embed = new EmbedBuilder()
+    .setTitle(open ? '🟢 Store is OPEN' : '🔴 Store is CLOSED')
+    .setDescription(
+      open
+        ? `**${cfg.storeName || guild.name}** sekarang **BUKA** — kamu bisa order lewat channel Store.\n\n${openList.map((p) => `🟢 ${p.label}`).join('\n')}`
+        : `**${cfg.storeName || guild.name}** sedang **TUTUP** — semua produk tidak melayani order.\nKami akan mengabari di sini begitu toko buka kembali.`,
+    )
+    .setFooter({ text: 'Noname Studios Creative' })
+    .setTimestamp();
+  await channel.send(v2({ embeds: [embed] })).catch((e) => console.warn('[store] gagal kirim status toko:', e.message));
+}
+
 async function setProductsOpen(guild, products, open, { reason, auto = false, statusGif = false } = {}) {
   const cfg = loadConfig();
+  const wasOpen = storeIsOpen(cfg);
   for (const p of products) {
     const ps = productState(p.id);
     ps.open = open;
@@ -246,7 +262,11 @@ async function setProductsOpen(guild, products, open, { reason, auto = false, st
   save();
   refreshPanel();
   if (products.length) {
-    return announce(guild, open ? 'open' : 'close', { reason, products, statusGif }, Boolean(cfg?.pingEveryone?.[open ? 'open' : 'close']));
+    const res = await announce(guild, open ? 'open' : 'close', { reason, products, statusGif }, Boolean(cfg?.pingEveryone?.[open ? 'open' : 'close']));
+    // Status TOKO berubah (ada yang buka / semua tutup) → kabari di channel status toko.
+    const nowOpen = storeIsOpen(cfg);
+    if (nowOpen !== wasOpen) await announceStoreStatus(guild, cfg, nowOpen);
+    return res;
   }
   return null;
 }
@@ -353,6 +373,32 @@ async function getTicketCategory(guild, cfg, base = cfg.ticket?.categoryName || 
  * atau cara lama (channel baru di kategori ticket) kalau thread tidak bisa dibuat / dimatikan (store.json → ticket.useThreads: false).
  * opts: { name, topic, overwrites, userIds, categoryName }
  */
+/**
+ * Pemilik bot ikut ditambahkan ke thread ticket & di-tag, supaya thread langsung muncul di dia
+ * (tanpa menunggu pembeli di-tag). Siapa yang di-tag: store.json → ticket.notifyUserIds (array ID user);
+ * kalau kosong → pemilik aplikasi bot (Developer Portal).
+ */
+let ownerIdCache = null;
+async function notifyIds(cfg) {
+  const set = (cfg.ticket?.notifyUserIds || []).filter(isId);
+  if (set.length) return set;
+  if (ownerIdCache === null) {
+    try {
+      const app = await client.application.fetch();
+      ownerIdCache = app.owner?.ownerId || app.owner?.id || '';
+    } catch {
+      ownerIdCache = '';
+    }
+  }
+  return isId(ownerIdCache) ? [ownerIdCache] : [];
+}
+async function notifyOwner(thread, interaction) {
+  const ids = (await notifyIds(loadConfig())).filter((id) => id !== interaction?.user?.id);
+  if (!ids.length) return;
+  for (const id of ids) await thread.members.add(id).catch(() => {});
+  await thread.send({ content: `🔔 ${ids.map((id) => `<@${id}>`).join(' ')} — ticket baru`, allowedMentions: { users: ids } });
+}
+
 async function createTicketChannel(guild, interaction, cfg, opts) {
   if (cfg.ticket?.useThreads !== false) {
     const thread = await openTicketThread(guild, interaction, {
@@ -361,7 +407,10 @@ async function createTicketChannel(guild, interaction, cfg, opts) {
       reason: opts.topic,
       fallbackIds: [cfg.channels?.panel, cfg.channels?.instantPanel],
     });
-    if (thread) return thread;
+    if (thread) {
+      await notifyOwner(thread, interaction).catch(() => {});
+      return thread;
+    }
   }
   const category = await getTicketCategory(guild, cfg, opts.categoryName);
   return guild.channels.create({
