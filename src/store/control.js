@@ -324,22 +324,36 @@ function productView(guild, cfg, p, notice) {
     box.addTextDisplayComponents(text(b));
   }
   const open = ps.open;
+  // Tata letak rapi desktop & mobile: maksimal 2 tombol per baris, dikelompokkan per fungsi.
+  const S = ButtonStyle.Secondary;
+  const pairs = (arr) => {
+    const out = [];
+    for (let k = 0; k < arr.length; k += 2) out.push(rowOf(...arr.slice(k, k + 2)));
+    return out;
+  };
   const rows = [
+    // 1) Status
     rowOf(
-      btn(`store:cpopen:${p.id}`, open ? 'Umumkan Buka Lagi' : 'Buka Produk', '🟢', open ? ButtonStyle.Success : ButtonStyle.Secondary),
-      btn(`store:cpclose:${p.id}`, open ? 'Tutup Produk' : 'Umumkan Tutup Lagi', '🔴', open ? ButtonStyle.Secondary : ButtonStyle.Danger),
-      btn(`store:cpreason:${p.id}`, open ? 'Tutup + Alasan' : 'Buka + Catatan', '📝'),
-      ...(hasStock(p) ? [btn(`store:cpsopen:${p.id}`, 'Stock + Buka', '🚀')] : []),
+      btn(`store:cpopen:${p.id}`, open ? 'Umumkan Buka' : 'Buka Produk', '🟢', open ? ButtonStyle.Success : S),
+      btn(`store:cpclose:${p.id}`, open ? 'Tutup Produk' : 'Umumkan Tutup', '🔴', open ? S : ButtonStyle.Danger),
     ),
   ];
-  const edit = [];
-  if (hasStock(p)) edit.push(btn(`store:cpstock:${p.id}`, p.type === 'boost' ? 'Atur Stock per Paket' : 'Atur Stock', '📦', ButtonStyle.Primary));
-  if (hasStock(p) && p.type !== 'boost') edit.push(btn(`store:cpadd:${p.id}`, 'Tambah Stock', '➕', ButtonStyle.Primary));
-  if (p.type === 'robux' || p.type === 'gamepass' || p.type === 'gift') edit.push(btn(`store:cprate:${p.id}`, 'Ubah Rate', '💱', ButtonStyle.Primary));
-  if (p.type === 'robux') edit.push(btn(`store:cpmin:${p.id}`, 'Minimal Order', '🔻', ButtonStyle.Primary));
-  if (p.type === 'canva' || p.type === 'boost') edit.push(btn(`store:cpprice:${p.id}`, 'Ubah Harga Paket', '💱', ButtonStyle.Primary));
-  if (custom) edit.push(btn(`store:cpreset:${p.id}`, 'Reset Harga', '↩️'));
-  if (edit.length) rows.push(rowOf(...edit));
+  // 2) Aksi + keterangan
+  const withNote = [btn(`store:cpreason:${p.id}`, open ? 'Tutup + Alasan' : 'Buka + Catatan', '📝', S)];
+  if (hasStock(p)) withNote.push(btn(`store:cpsopen:${p.id}`, 'Stock + Buka', '🚀', S));
+  rows.push(...pairs(withNote));
+  // 3) Stock
+  const stockBtns = [];
+  if (hasStock(p)) stockBtns.push(btn(`store:cpstock:${p.id}`, p.type === 'boost' ? 'Stock per Paket' : 'Atur Stock', '📦', S));
+  if (hasStock(p) && p.type !== 'boost') stockBtns.push(btn(`store:cpadd:${p.id}`, 'Tambah Stock', '➕', S));
+  rows.push(...pairs(stockBtns));
+  // 4) Harga
+  const priceBtns = [];
+  if (p.type === 'robux' || p.type === 'gamepass' || p.type === 'gift') priceBtns.push(btn(`store:cprate:${p.id}`, 'Ubah Rate', '💱', S));
+  if (p.type === 'robux') priceBtns.push(btn(`store:cpmin:${p.id}`, 'Min. Order', '🔻', S));
+  if (p.type === 'canva' || p.type === 'boost') priceBtns.push(btn(`store:cpprice:${p.id}`, 'Harga Paket', '💱', S));
+  if (custom) priceBtns.push(btn(`store:cpreset:${p.id}`, 'Reset Harga', '↩️', S));
+  rows.push(...pairs(priceBtns));
   for (const r of rows) box.addActionRowComponents(r);
   return { components: [box], flags: V2F, allowedMentions: { parse: [] } };
 }
