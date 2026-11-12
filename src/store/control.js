@@ -436,7 +436,7 @@ async function changeStock(guild, p, planId, value, mode, by) {
 /** Umumkan perubahan harga ke channel stock (store.json → pingEveryone.price untuk @everyone). */
 async function announcePrice(guild, cfg, p, changes) {
   if (!changes.length || !isId(cfg?.channels?.stock)) return false;
-  await ctx.announce(guild, 'price', { product: p, changes }, Boolean(cfg.pingEveryone?.price));
+  await ctx.announce(guild, 'price', { product: p, changes }, cfg.pingEveryone?.price !== false);
   return true;
 }
 
