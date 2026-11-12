@@ -40,7 +40,9 @@ const DATA_FILE = path.join(__dirname, '..', 'data', 'roblox-sales.json');
 const DOMAIN = process.env.ROBLOX_DOMAIN || 'roblox.com';
 
 const idOf = (v) => String(v || '').trim();
-const rb = (n) => `R$ ${Number(n || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 })}`; // komisi bisa berkoma → tampil apa adanya (maks. 2 desimal)
+const { ROBUX } = require('./emojis');
+const MIN_CASHBACK = Number(process.env.ROBLOX_MIN_CASHBACK ?? 30); // item di bawah ini (Robux) tidak mendapat cashback
+const rb = (n) => `${ROBUX} ${Math.round(Number(n || 0)).toLocaleString('id-ID')}`; // ikon Robux + format Indonesia
 const wibKeys = (unix) => {
   const iso = new Date(unix * 1000 + 7 * 3600 * 1000).toISOString();
   return { day: iso.slice(0, 10), month: iso.slice(0, 7) };
@@ -84,7 +86,7 @@ function summarize(keyFn, key) {
   return {
     count: rows.length,
     robux: rows.reduce((a, r) => a + r[1], 0),
-    commission: Math.round(rows.reduce((a, r) => a + r[2], 0) * 100) / 100,
+    commission: rows.reduce((a, r) => a + r[2], 0),
     plus: sales.plus.filter((t) => keyFn(wibKeys(t)) === key).length,
     top: [...items.values()].sort((a, b) => b.count - a.count || b.robux - a.robux).slice(0, 3),
   };
@@ -140,7 +142,9 @@ function validate(b) {
     }
     if (!isNum(b.commission, 1e9)) return { ok: false, error: 'commission tidak valid' };
     ev.item = { id: it.id, name: it.name, price: Math.round(it.price), url: it.url ? safeUrl(it.url) : null };
-    ev.commission = Math.round(b.commission * 100) / 100; // sesuai komisi yang masuk (tiap item berbeda), tidak dibulatkan ke bilangan bulat
+    // Komisi sesuai yang dikirim map (beda tiap jenis item), dibulatkan. Item di bawah MIN_CASHBACK Robux → tanpa cashback.
+    ev.commission = ev.item.price < MIN_CASHBACK ? 0 : Math.round(b.commission);
+    ev.noCashback = ev.item.price < MIN_CASHBACK;
   }
   return { ok: true, event: ev };
 }
@@ -188,14 +192,14 @@ function buildLog(ev, img = {}) {
   } else {
     const it = ev.item;
     // Kepala: item (gambar di kanan) — judul + nama item sebagai link
-    withThumb(box, `## 🛍️ Pembelian Baru\n-# <t:${ev.time}:R>\n\n🎁 [**${esc(it.name)}**](${itemUrl(it)})\n-# ID item \`${it.id}\``, img.item);
+    withThumb(box, `## 🛍️ Pembelian Baru\n-# <t:${ev.time}:R>\n\nA bulk cart checkout has been completed in the Noname Hub marketplace.\n\n🎁 [**${esc(it.name)}**](${itemUrl(it)})\n-# ID item \`${it.id}\``, img.item);
     box.addSeparatorComponents(sep());
     // Pembeli (avatar di kanan)
     withThumb(box, `-# 👤 PEMBELI\n**${esc(p.displayName)}**\n-# @${esc(p.username)} • ID \`${p.userId}\``, img.user);
     box.addSeparatorComponents(sep());
     // Angka utama
     const nums = [`-# 💰 HARGA\n## ${rb(it.price)}`];
-    if (process.env.ROBLOX_LOG_HIDE_CASHBACK !== '1') nums.push(`-# 💵 KOMISI\n## ${rb(ev.commission)}`);
+    if (process.env.ROBLOX_LOG_HIDE_CASHBACK !== '1') nums.push(ev.noCashback ? `-# 💵 KOMISI\n## Tanpa cashback\n-# Item di bawah ${rb(MIN_CASHBACK)} tidak mendapat cashback` : `-# 💵 KOMISI\n## ${rb(ev.commission)}`);
     box.addTextDisplayComponents(text(nums.join('\n')));
     box.addSeparatorComponents(sep());
     box.addActionRowComponents(new ActionRowBuilder().addComponents(linkBtn('Lihat Item', '🎁', itemUrl(it)), linkBtn('Profil Pembeli', '👤', profileUrl(p))));
@@ -217,7 +221,7 @@ function buildAdmin(ev, img = {}) {
     box.addTextDisplayComponents(
       text(
         `-# 🎁 ITEM\n[**${esc(it.name)}**](${itemUrl(it)})\n-# Asset ID \`${it.id}\`\n\n` +
-          `-# 💰 HARGA  →  💵 KOMISI\n## ${rb(it.price)}  →  ${rb(ev.commission)}`,
+          `-# 💰 HARGA  →  💵 KOMISI\n## ${rb(it.price)}  →  ${ev.noCashback ? 'Tanpa cashback' : rb(ev.commission)}`,
       ),
     );
   }
