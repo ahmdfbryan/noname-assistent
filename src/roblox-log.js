@@ -40,7 +40,7 @@ const DATA_FILE = path.join(__dirname, '..', 'data', 'roblox-sales.json');
 const DOMAIN = process.env.ROBLOX_DOMAIN || 'roblox.com';
 
 const idOf = (v) => String(v || '').trim();
-const rb = (n) => `R$ ${Number(n || 0).toLocaleString('id-ID')}`;
+const rb = (n) => `R$ ${Number(n || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 })}`; // komisi bisa berkoma → tampil apa adanya (maks. 2 desimal)
 const wibKeys = (unix) => {
   const iso = new Date(unix * 1000 + 7 * 3600 * 1000).toISOString();
   return { day: iso.slice(0, 10), month: iso.slice(0, 7) };
@@ -84,7 +84,7 @@ function summarize(keyFn, key) {
   return {
     count: rows.length,
     robux: rows.reduce((a, r) => a + r[1], 0),
-    commission: rows.reduce((a, r) => a + r[2], 0),
+    commission: Math.round(rows.reduce((a, r) => a + r[2], 0) * 100) / 100,
     plus: sales.plus.filter((t) => keyFn(wibKeys(t)) === key).length,
     top: [...items.values()].sort((a, b) => b.count - a.count || b.robux - a.robux).slice(0, 3),
   };
@@ -140,7 +140,7 @@ function validate(b) {
     }
     if (!isNum(b.commission, 1e9)) return { ok: false, error: 'commission tidak valid' };
     ev.item = { id: it.id, name: it.name, price: Math.round(it.price), url: it.url ? safeUrl(it.url) : null };
-    ev.commission = Math.round(b.commission);
+    ev.commission = Math.round(b.commission * 100) / 100; // sesuai komisi yang masuk (tiap item berbeda), tidak dibulatkan ke bilangan bulat
   }
   return { ok: true, event: ev };
 }
@@ -151,7 +151,6 @@ const sep = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSp
 const V2 = MessageFlags.IsComponentsV2;
 const profileUrl = (p) => `https://www.roblox.com/users/${p.userId}/profile`;
 const buyerLine = (p) => `[${esc(p.displayName)} (@${esc(p.username)})](${profileUrl(p)})`;
-const pct = (price, com) => (price > 0 ? Math.round((com / price) * 100) : 0);
 
 /** Ambil URL gambar dari API thumbnails Roblox (timeout 5 detik; gagal → null). */
 async function fetchThumb(apiPath) {
@@ -196,7 +195,7 @@ function buildLog(ev, img = {}) {
     box.addSeparatorComponents(sep());
     // Angka utama
     const nums = [`-# 💰 HARGA\n## ${rb(it.price)}`];
-    if (process.env.ROBLOX_LOG_HIDE_CASHBACK !== '1') nums.push(`-# 🎯 CASHBACK${it.price > 0 ? ` • ${pct(it.price, ev.commission)}%` : ''}\n## ${rb(ev.commission)}`);
+    if (process.env.ROBLOX_LOG_HIDE_CASHBACK !== '1') nums.push(`-# 💵 KOMISI\n## ${rb(ev.commission)}`);
     box.addTextDisplayComponents(text(nums.join('\n')));
     box.addSeparatorComponents(sep());
     box.addActionRowComponents(new ActionRowBuilder().addComponents(linkBtn('Lihat Item', '🎁', itemUrl(it)), linkBtn('Profil Pembeli', '👤', profileUrl(p))));
@@ -218,7 +217,7 @@ function buildAdmin(ev, img = {}) {
     box.addTextDisplayComponents(
       text(
         `-# 🎁 ITEM\n[**${esc(it.name)}**](${itemUrl(it)})\n-# Asset ID \`${it.id}\`\n\n` +
-          `-# 💰 HARGA  →  💵 KOMISI${it.price > 0 ? ` (${pct(it.price, ev.commission)}%)` : ''}\n## ${rb(it.price)}  →  ${rb(ev.commission)}`,
+          `-# 💰 HARGA  →  💵 KOMISI\n## ${rb(it.price)}  →  ${rb(ev.commission)}`,
       ),
     );
   }
