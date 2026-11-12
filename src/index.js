@@ -23,6 +23,7 @@ const canvaManager = require('./canva-manager');
 const { registerPrefix } = require('./prefix');
 const aiCs = require('./ai-cs');
 const pesan = require('./pesan');
+const { registerRobloxLog } = require('./roblox-log');
 
 const byName = new Map(commands.map((c) => [c.data.name, c]));
 // GuildMembers wajib untuk fitur welcome → aktifkan "Server Members Intent" di Discord Developer Portal.
@@ -55,6 +56,7 @@ botPanel.registerBotPanel(client);
 canvaManager.registerCanvaManager(client);
 registerPrefix(client);
 aiCs.registerAiCs(client);
+registerRobloxLog(client); // 🛍️ Log Pembelian Roblox (server HTTP POST /roblox/event)
 
 const wib = () => new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'medium' });
 client.once(Events.ClientReady, (c) => {
