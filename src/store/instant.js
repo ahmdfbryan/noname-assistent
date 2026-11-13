@@ -389,7 +389,7 @@ function buildPanel(guild, cfg) {
           : open
             ? '### 🛍️ Kategori Tersedia\n_Produk sedang dimuat..._'
             : null,
-      [`🧾 **Total Transaksi:** \`${num(ps.orders)} transaksi\``, `⭐ **Rating Toko:** ${stars} \`${avg} / 5\` (${num(st.ratingCount)} ulasan)`].join('\n'),
+      [V.storeStatusLine(open), `🧾 **Total Transaksi:** \`${num(ps.orders)} transaksi\``, `⭐ **Rating Toko:** ${stars} \`${avg} / 5\` (${num(st.ratingCount)} ulasan)`].join('\n'),
     ],
     footer: `${name.name} • Diperbarui <t:${Math.floor(Date.now() / 1000)}:R>`,
     rows: [
