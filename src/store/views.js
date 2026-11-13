@@ -2664,7 +2664,7 @@ function panelUrlFor(guild, group = 'main') {
 }
 
 /** Baris "Status Toko" di atas Total Transaksi (semua panel store). */
-const storeStatusLine = (open) => `<a:status:1570846765543067900> **Status Toko:** \`${open ? '🟢 Buka' : '🔴 Tutup'}\``;
+const storeStatusLine = (open) => `<a:status:1570846765543067900> **Status:** \`${open ? '🟢 Buka' : '🔴 Tutup'}\``;
 
 /** Panel store (V2): judul, keterangan, total transaksi, rating, tombol produk. group = main | digital. */
 function buildPanelV2(guild, cfg, group = 'main') {
