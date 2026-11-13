@@ -2663,6 +2663,9 @@ function panelUrlFor(guild, group = 'main') {
   return loc ? `https://discord.com/channels/${guild.id}/${loc.channelId}/${loc.messageId}` : null;
 }
 
+/** Baris "Status Toko" di atas Total Transaksi (semua panel store). */
+const storeStatusLine = (open) => `<a:status:1570846765543067900> **Status Toko:** \`${open ? '🟢 Buka' : '🔴 Tutup'}\``;
+
 /** Panel store (V2): judul, keterangan, total transaksi, rating, tombol produk. group = main | digital. */
 function buildPanelV2(guild, cfg, group = 'main') {
   const p = groupText(cfg, group, 'panel');
@@ -2680,10 +2683,11 @@ function buildPanelV2(guild, cfg, group = 'main') {
       .setDisabled(!isProductOpen(prod)),
   );
   const digital = group === 'digital';
+  const anyOpen = products.some((x) => x.type !== 'soon' && isProductOpen(x));
   const orders = products.reduce((a, x) => a + (productStatsOf(x.id).orders || 0), 0);
   const stats = digital
-    ? [`🧾 **Total Transaksi:** \`${num(orders)} transaksi\``, ratingLine()] // total order semua produk di panel Produk Digital
-    : [`🧾 **Total Transaksi:** \`${num((s.transactions || 0) + (s.rekber || 0))} transaksi\``, ratingLine()];
+    ? [storeStatusLine(anyOpen), `🧾 **Total Transaksi:** \`${num(orders)} transaksi\``, ratingLine()] // total order semua produk di panel Produk Digital
+    : [storeStatusLine(anyOpen), `🧾 **Total Transaksi:** \`${num((s.transactions || 0) + (s.rekber || 0))} transaksi\``, ratingLine()];
   // Banner bawah: store.json → panel.bottomBanner (Produk Digital: digitalPanel.bottomBanner, kosong = ikut panel utama).
   const bottom = bannerOf(p.bottomBanner || (digital ? cfg.panel?.bottomBanner : null), digital ? 'digital-banner' : 'store-banner');
   const payload = pcard({
@@ -2961,6 +2965,7 @@ function dm(payload) {
 }
 
 module.exports = {
+  storeStatusLine,
   toV2,
   dm,
   boostPrice,
