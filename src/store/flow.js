@@ -198,8 +198,12 @@ const refreshReputation = () => debounce('reputation', () => editTracked('reputa
 async function announce(guild, kind, extra = {}, ping = false) {
   const cfg = loadConfig();
   if (!isId(cfg?.channels?.stock)) return { ok: false, error: 'channels.stock di store.json belum diisi' };
-  const channel = await guild.channels.fetch(cfg.channels.stock).catch(() => null);
-  if (!channel?.isTextBased()) return { ok: false, error: `channel stock (${cfg.channels.stock}) tidak ditemukan / bot tidak bisa melihatnya` };
+  // "<Toko> Sementara Ditutup" / "<Toko> Telah Dibuka!" (bukan 1 produk) → channel status toko; selain itu tetap channel stock.
+  const storeLevel = (kind === 'open' || kind === 'close') && (extra.products || []).length !== 1;
+  const statusId = storeLevel ? channelOf(cfg, 'storeStatus') : null;
+  const targetId = isId(statusId) ? statusId : cfg.channels.stock;
+  const channel = await guild.channels.fetch(targetId).catch(() => null) || (targetId !== cfg.channels.stock ? await guild.channels.fetch(cfg.channels.stock).catch(() => null) : null);
+  if (!channel?.isTextBased()) return { ok: false, error: `channel pengumuman (${targetId}) tidak ditemukan / bot tidak bisa melihatnya` };
   // Components V2 (premium). Kalau gagal dibuat, pakai tampilan embed lama.
   let payload = extra.payload || null; // pengumuman yang sudah disusun (misal Status Toko dari Control Center)
   try {
@@ -265,7 +269,8 @@ async function setProductsOpen(guild, products, open, { reason, auto = false, st
     const res = await announce(guild, open ? 'open' : 'close', { reason, products, statusGif }, Boolean(cfg?.pingEveryone?.[open ? 'open' : 'close']));
     // Status TOKO berubah (ada yang buka / semua tutup) → kabari di channel status toko.
     const nowOpen = storeIsOpen(cfg);
-    if (nowOpen !== wasOpen) await announceStoreStatus(guild, cfg, nowOpen);
+    // (kartu 'Store is OPEN/CLOSED' terpisah dimatikan — pengumuman toko-level sudah dikirim ke channel status toko)
+    void nowOpen; void wasOpen;
     return res;
   }
   return null;
