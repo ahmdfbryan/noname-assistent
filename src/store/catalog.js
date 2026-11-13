@@ -122,6 +122,7 @@ function buildCatalogHeader(guild, cfg, group = 'main') {
       fill(c.description || '', name) || null,
       [
         `🛒 **Produk Buka:** \`${open} / ${sellable.length} produk\``,
+        V.storeStatusLine(open > 0),
         group === 'digital'
           ? `🧾 **Order Produk Digital:** \`${num(sellable.reduce((a, p) => a + (productStatsOf(p.id).orders || 0), 0))} order\``
           : `🧾 **Total Transaksi:** \`${num((s.transactions || 0) + (s.rekber || 0))} transaksi\``,
