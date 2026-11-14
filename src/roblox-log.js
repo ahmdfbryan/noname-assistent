@@ -300,7 +300,7 @@ const CB_PREFIX = 'rbcb:';
 let cb = { orders: {} };
 try {
   const d = JSON.parse(fs.readFileSync(CB_FILE, 'utf8'));
-  if (d && typeof d.orders === 'object') cb = { orders: d.orders, panel: d.panel || null };
+  if (d && typeof d.orders === 'object') cb = { orders: d.orders, panel: d.panel || null, seq: Number(d.seq) || Object.keys(d.orders).length };
 } catch {
   /* belum ada data */
 }
@@ -343,7 +343,7 @@ function buildQueuePanel() {
       box.addSectionComponents(
         new SectionBuilder()
           .addTextDisplayComponents(
-            text(`**${i + 1}. ${esc(String(o.itemName).slice(0, 60))}**${o.studio ? ' 🧪' : ''}\n${rb(o.price)} ➜ 💵 **${rb(o.commission)}**\n-# 👤 ${esc(o.displayName)} (@${esc(o.username)}) • <t:${o.time}:R>`),
+            text(`**${i + 1}. ${esc(String(o.itemName).slice(0, 60))}**${o.studio ? ' 🧪' : ''}\n${rb(o.price)} ➜ 💵 **${rb(o.commission)}**\n-# ${o.no ? `${o.no} • ` : ''}👤 ${esc(o.displayName)} (@${esc(o.username)}) • <t:${o.time}:R>`),
           )
           .setButtonAccessory(new ButtonBuilder().setCustomId(`${CB_PREFIX}${k}`).setLabel('Terkirim').setEmoji('✅').setStyle(ButtonStyle.Secondary)),
       );
@@ -377,16 +377,57 @@ async function doRefreshPanel(client) {
   saveCb();
 }
 
-function buildSentLog(o, by, img = {}) {
+const maskName = (n) => {
+  const str = String(n || '');
+  if (str.length <= 4) return `${str[0] || ''}${'*'.repeat(Math.max(str.length - 1, 0))}`;
+  return `${str.slice(0, 2)}${'*'.repeat(str.length - 4)}${str.slice(-2)}`;
+};
+const durText = (sec) => {
+  const m = Math.max(1, Math.round(sec / 60));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h} hr ${m % 60} min` : `${Math.floor(h / 24)} d ${h % 24} hr`;
+};
+const cbNo = (o, key) => o.no || `CB-${String(key).slice(0, 6).toUpperCase()}`;
+const crow = (label, value) => `» **${label} :** ${value}`;
+
+/** Log "cashback terkirim" bergaya Order Log: info pesanan + Progress = gambar bukti pengiriman Robux (username di-blur). */
+function buildSentLog(o, by, img = {}, png = null, key = '') {
+  const no = cbNo(o, key);
   const box = new ContainerBuilder();
-  box.addTextDisplayComponents(text(`# ✅ Cashback Sent\n-# <t:${o.sentAt}:R> • Cashback has been delivered to the buyer.`));
+  box.addTextDisplayComponents(text(`## 💸 ${no} • Cashback Sent\n-# Cashback Log`));
   box.addSeparatorComponents(sep());
-  withThumb(box, `-# 👤 PEMBELI\n**${esc(o.displayName)}** • @${esc(o.username)}\n-# User ID \`${o.userId}\``, img.user);
+  const lines = [
+    crow('Buyer', `**${esc(o.displayName)}**`),
+    crow('Item', `\`${String(o.itemName).replace(/`/g, "'").slice(0, 60)}\``),
+    crow('Item Price', rb(o.price)),
+    crow('Cashback', `**${rb(o.commission)}**`),
+    crow('Roblox Account', `\`@${maskName(o.username)}\``),
+  ].join('\n');
+  withThumb(box, lines, img.user);
   box.addSeparatorComponents(sep());
-  box.addTextDisplayComponents(text(`-# 🎁 ITEM\n[**${esc(o.itemName)}**](https://www.roblox.com/catalog/${o.itemId})\n\n-# 💰 HARGA  →  💵 CASHBACK DIKIRIM\n## ${rb(o.price)}  →  ${rb(o.commission)}`));
+  box.addTextDisplayComponents(
+    text(
+      [
+        crow('Status', '**✅ Cashback Sent**'),
+        crow('Order Placed', `<t:${o.time}:f>`),
+        crow('Sent At', `<t:${o.sentAt}:f>`),
+        crow('Processing Time', `\`${durText(o.sentAt - o.time)}\``),
+        crow('Confirmed By', `<@${by}>`),
+      ].join('\n'),
+    ),
+  );
+  const files = [];
+  if (png) {
+    const name = `progress-${no}.png`;
+    box.addSeparatorComponents(sep());
+    box.addTextDisplayComponents(text('**🗂️ Progress**'));
+    box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(`attachment://${name}`).setDescription(`Cashback ${Math.round(o.commission)} Robux dikirim`)));
+    files.push(new AttachmentBuilder(png, { name }));
+  }
   box.addSeparatorComponents(sep());
-  box.addTextDisplayComponents(text(`-# 🛡️ Dikonfirmasi oleh <@${by}> • Pesanan <t:${o.time}:f>\n-# Noname Studios Creative`));
-  return { components: [box], flags: V2, allowedMentions: { parse: [] } };
+  box.addTextDisplayComponents(text(`-# 🛒 Noname Studios Creative • <t:${o.sentAt}:f>`));
+  return { components: [box], files, flags: V2, allowedMentions: { parse: [] } };
 }
 
 const cbBusy = new Set();
@@ -411,7 +452,14 @@ async function onCashbackButton(interaction) {
       const ch = await interaction.client.channels.fetch(SENT_CH());
       if (!ch?.isTextBased()) throw new Error('channel log cashback tidak bisa diakses');
       const user = await userHead(o.userId).catch(() => null);
-      await ch.send(buildSentLog(o, o.sentBy, { user }));
+      // Gambar progres: "Sent Robux to ▒▒▒ — ⬡ <cashback>" (sama seperti history store; username di-blur).
+      let png = null;
+      try {
+        png = await require('./store/proof-card').robuxSentProof({ avatarUrl: user, username: o.username, amount: Math.round(o.commission) });
+      } catch (e) {
+        console.warn('[roblox-log] gambar progres cashback gagal dibuat:', e.message);
+      }
+      await ch.send(buildSentLog(o, o.sentBy, { user }, png, key));
     } catch (e) {
       console.warn('[roblox-log] gagal kirim log cashback terkirim:', e.message);
       await interaction.followUp({ content: `⚠️ Cashback sudah ditandai terkirim, tapi **log gagal dikirim** ke <#${SENT_CH()}>: \`${String(e.message).slice(0, 150)}\``, flags: MessageFlags.Ephemeral }).catch(() => {});
@@ -519,7 +567,9 @@ async function deliver(client, ev) {
   // Pembelian yang berhak cashback → masuk Antrian Cashback (satu panel berbentuk daftar + tombol per baris).
   let queued = false;
   if (owesCashback(ev)) {
+    cb.seq = (cb.seq || 0) + 1;
     cb.orders[cbKey(ev.eventId)] = {
+      no: `CB-${String(cb.seq).padStart(4, '0')}`,
       userId: ev.player.userId, username: ev.player.username, displayName: ev.player.displayName,
       itemId: ev.item.id, itemName: ev.item.name, price: ev.item.price, commission: ev.commission, time: ev.time, studio: Boolean(ev.studio), sent: false,
     };
