@@ -377,11 +377,6 @@ async function doRefreshPanel(client) {
   saveCb();
 }
 
-const maskName = (n) => {
-  const str = String(n || '');
-  if (str.length <= 4) return `${str[0] || ''}${'*'.repeat(Math.max(str.length - 1, 0))}`;
-  return `${str.slice(0, 2)}${'*'.repeat(str.length - 4)}${str.slice(-2)}`;
-};
 const durText = (sec) => {
   const m = Math.max(1, Math.round(sec / 60));
   if (m < 60) return `${m} min`;
@@ -402,7 +397,7 @@ function buildSentLog(o, by, img = {}, png = null, key = '') {
     crow('Item', `\`${String(o.itemName).replace(/`/g, "'").slice(0, 60)}\``),
     crow('Item Price', rb(o.price)),
     crow('Cashback', `**${rb(o.commission)}**`),
-    crow('Roblox Account', `\`@${maskName(o.username)}\``),
+    crow('Roblox Account', `\`@${o.username}\``),
   ].join('\n');
   withThumb(box, lines, img.user);
   box.addSeparatorComponents(sep());
@@ -452,10 +447,10 @@ async function onCashbackButton(interaction) {
       const ch = await interaction.client.channels.fetch(SENT_CH());
       if (!ch?.isTextBased()) throw new Error('channel log cashback tidak bisa diakses');
       const user = await userHead(o.userId).catch(() => null);
-      // Gambar progres: "Sent Robux to ▒▒▒ — ⬡ <cashback>" (sama seperti history store; username di-blur).
+      // Gambar progres: "Sent Robux to <username> — ⬡ <cashback>" (tanpa sensor).
       let png = null;
       try {
-        png = await require('./store/proof-card').robuxSentProof({ avatarUrl: user, username: o.username, amount: Math.round(o.commission) });
+        png = await require('./store/proof-card').robuxSentProof({ avatarUrl: user, username: o.username, amount: Math.round(o.commission), reveal: true });
       } catch (e) {
         console.warn('[roblox-log] gambar progres cashback gagal dibuat:', e.message);
       }
