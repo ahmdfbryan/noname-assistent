@@ -316,7 +316,7 @@ function saveCb() {
   }
 }
 const cbKey = (eventId) => crypto.createHash('sha1').update(String(eventId)).digest('hex').slice(0, 24); // customId pendek & aman
-const owesCashback = (ev) => ev.type === 'purchase' && !ev.studio && !ev.noCashback && Number(ev.commission) > 0;
+const owesCashback = (ev) => ev.type === 'purchase' && (!ev.studio || process.env.ROBLOX_CASHBACK_TEST === '1') && !ev.noCashback && Number(ev.commission) > 0; // ROBLOX_CASHBACK_TEST=1 → tes dari Studio ikut masuk daftar (untuk uji coba)
 
 /** Tambah tombol konfirmasi ke kartu admin (payload V2 dengan 1 container). */
 function withConfirmButton(payload, ev) {
