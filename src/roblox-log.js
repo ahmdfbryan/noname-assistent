@@ -332,7 +332,7 @@ function buildQueuePanel() {
   box.addTextDisplayComponents(
     text(
       `# 💸 Antrian Cashback\n-# Noname Studios Creative • diperbarui <t:${Math.floor(Date.now() / 1000)}:R>\n\n` +
-        `⏳ **Menunggu:** \`${pending.length} pesanan\`　•　💵 **Total:** ${rb(owed)}\n✅ **Terkirim hari ini:** \`${sentToday.length} pesanan\``,
+        `⏳ **Menunggu:** \`${pending.length} pesanan\`　•　**Total:** ${rb(owed)}\n✅ **Terkirim hari ini:** \`${sentToday.length} pesanan\``,
     ),
   );
   box.addSeparatorComponents(sep());
@@ -343,7 +343,7 @@ function buildQueuePanel() {
       box.addSectionComponents(
         new SectionBuilder()
           .addTextDisplayComponents(
-            text(`**${i + 1}. ${esc(String(o.itemName).slice(0, 60))}**${o.studio ? ' 🧪' : ''}\n${rb(o.price)} ➜ 💵 **${rb(o.commission)}**\n-# ${o.no ? `${o.no} • ` : ''}👤 ${esc(o.displayName)} (@${esc(o.username)}) • <t:${o.time}:R>`),
+            text(`**${i + 1}. ${esc(String(o.itemName).slice(0, 60))}**${o.studio ? ' 🧪' : ''}\n${rb(o.price)} ➜ **${rb(o.commission)}**\n-# ${o.no ? `${o.no} • ` : ''}👤 ${esc(o.displayName)} (@${esc(o.username)}) • <t:${o.time}:R>`),
           )
           .setButtonAccessory(new ButtonBuilder().setCustomId(`${CB_PREFIX}${k}`).setLabel('Terkirim').setEmoji('✅').setStyle(ButtonStyle.Secondary)),
       );
