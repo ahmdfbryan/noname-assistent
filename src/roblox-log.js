@@ -290,6 +290,100 @@ function buildAdminCard(ev, png) {
   return { components: [box], files: [new AttachmentBuilder(png, { name: CARD_NAME })], flags: V2, allowedMentions: { parse: [] } };
 }
 
+// ─────────────────────────── Antrian cashback (data/roblox-cashback.json) ───────────────────────────
+// Tiap pembelian yang berhak cashback masuk daftar pesanan di channel antrian dengan tombol "Cashback Terkirim".
+// Setelah admin menekan tombol → pesan diperbarui + log "cashback terkirim" dikirim ke channel log cashback.
+const CB_FILE = path.join(__dirname, '..', 'data', 'roblox-cashback.json');
+const QUEUE_CH = () => idOf(process.env.ROBLOX_CASHBACK_CHANNEL_ID) || '1570292563729191023'; // daftar pesanan cashback + tombol
+const SENT_CH = () => idOf(process.env.ROBLOX_CASHBACK_SENT_CHANNEL_ID) || '1571066602785476653'; // log cashback terkirim
+const CB_PREFIX = 'rbcb:';
+let cb = { orders: {} };
+try {
+  const d = JSON.parse(fs.readFileSync(CB_FILE, 'utf8'));
+  if (d && typeof d.orders === 'object') cb = { orders: d.orders };
+} catch {
+  /* belum ada data */
+}
+function saveCb() {
+  try {
+    const cut = Math.floor(Date.now() / 1000) - 120 * 86400; // pesanan yang sudah terkirim > 120 hari dibuang
+    for (const [k, o] of Object.entries(cb.orders)) if (o.sent && o.time < cut) delete cb.orders[k];
+    fs.mkdirSync(path.dirname(CB_FILE), { recursive: true });
+    fs.writeFileSync(`${CB_FILE}.tmp`, JSON.stringify(cb));
+    fs.renameSync(`${CB_FILE}.tmp`, CB_FILE);
+  } catch (e) {
+    console.warn('[roblox-log] gagal simpan antrian cashback:', e.message);
+  }
+}
+const cbKey = (eventId) => crypto.createHash('sha1').update(String(eventId)).digest('hex').slice(0, 24); // customId pendek & aman
+const owesCashback = (ev) => ev.type === 'purchase' && !ev.studio && !ev.noCashback && Number(ev.commission) > 0;
+
+/** Tambah tombol konfirmasi ke kartu admin (payload V2 dengan 1 container). */
+function withConfirmButton(payload, ev) {
+  const box = payload.components[0];
+  box.addSeparatorComponents(sep());
+  box.addActionRowComponents(
+    new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${CB_PREFIX}${cbKey(ev.eventId)}`).setLabel('Cashback Terkirim').setEmoji('✅').setStyle(ButtonStyle.Secondary)),
+  );
+  box.addTextDisplayComponents(text(`-# ⏳ Menunggu cashback ${rb(ev.commission)} dikirim ke **${esc(ev.player.displayName)}**`));
+  return payload;
+}
+
+function buildSentLog(o, by, img = {}) {
+  const box = new ContainerBuilder();
+  box.addTextDisplayComponents(text(`# ✅ Cashback Sent\n-# <t:${o.sentAt}:R> • Cashback has been delivered to the buyer.`));
+  box.addSeparatorComponents(sep());
+  withThumb(box, `-# 👤 PEMBELI\n**${esc(o.displayName)}** • @${esc(o.username)}\n-# User ID \`${o.userId}\``, img.user);
+  box.addSeparatorComponents(sep());
+  box.addTextDisplayComponents(text(`-# 🎁 ITEM\n[**${esc(o.itemName)}**](https://www.roblox.com/catalog/${o.itemId})\n\n-# 💰 HARGA  →  💵 CASHBACK DIKIRIM\n## ${rb(o.price)}  →  ${rb(o.commission)}`));
+  box.addSeparatorComponents(sep());
+  box.addTextDisplayComponents(text(`-# 🛡️ Dikonfirmasi oleh <@${by}> • Pesanan <t:${o.time}:f>\n-# Noname Studios Creative`));
+  return { components: [box], flags: V2, allowedMentions: { parse: [] } };
+}
+
+const cbBusy = new Set();
+async function onCashbackButton(interaction) {
+  const key = interaction.customId.slice(CB_PREFIX.length);
+  const isAdminUser = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) || interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+  if (!isAdminUser) return interaction.reply({ content: '⛔ Tombol ini khusus **Administrator**.', flags: MessageFlags.Ephemeral });
+  const o = cb.orders[key];
+  if (!o) return interaction.reply({ content: '❌ Data pesanan ini tidak ditemukan (mungkin dibuat sebelum fitur ini aktif).', flags: MessageFlags.Ephemeral });
+  if (o.sent || cbBusy.has(key)) return interaction.reply({ content: `ℹ️ Cashback ini sudah dikonfirmasi${o.sentBy ? ` oleh <@${o.sentBy}>` : ''}.`, flags: MessageFlags.Ephemeral });
+  cbBusy.add(key);
+  try {
+    await interaction.deferUpdate();
+    o.sent = true;
+    o.sentBy = interaction.user.id;
+    o.sentAt = Math.floor(Date.now() / 1000);
+    saveCb();
+    // 1) Perbarui pesan pesanan: tombol diganti keterangan terkirim.
+    try {
+      const raw = interaction.message.components.map((c) => c.toJSON());
+      const box = raw[0];
+      box.components = box.components.filter((c) => c.type !== 1); // buang baris tombol
+      const last = box.components[box.components.length - 1];
+      const done = `-# ✅ **Cashback ${rb(o.commission)} terkirim** • oleh <@${o.sentBy}> • <t:${o.sentAt}:R>`;
+      if (last?.type === 10 && String(last.content).startsWith('-# ⏳')) last.content = done;
+      else box.components.push({ type: 10, content: done });
+      await interaction.editReply({ components: raw, allowedMentions: { parse: [] } });
+    } catch (e) {
+      console.warn('[roblox-log] gagal memperbarui pesan pesanan:', e.message);
+    }
+    // 2) Log cashback terkirim → channel log cashback.
+    try {
+      const ch = await interaction.client.channels.fetch(SENT_CH());
+      if (!ch?.isTextBased()) throw new Error('channel log cashback tidak bisa diakses');
+      const user = await userHead(o.userId).catch(() => null);
+      await ch.send(buildSentLog(o, o.sentBy, { user }));
+    } catch (e) {
+      console.warn('[roblox-log] gagal kirim log cashback terkirim:', e.message);
+      await interaction.followUp({ content: `⚠️ Cashback sudah ditandai terkirim, tapi **log gagal dikirim** ke <#${SENT_CH()}>: \`${String(e.message).slice(0, 150)}\``, flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+  } finally {
+    cbBusy.delete(key);
+  }
+}
+
 function buildStats() {
   const { today, month } = statsNow();
   const block = (title, s) => {
@@ -385,7 +479,27 @@ async function deliver(client, ev) {
     console.warn('[roblox-log] kartu gambar gagal dibuat, pakai tampilan teks:', e.message);
   }
   await send(idOf(process.env.ROBLOX_LOG_CHANNEL_ID), logMsg || buildLogText(ev, img), 'log');
-  await send(idOf(process.env.ROBLOX_ADMIN_CHANNEL_ID), adminMsg || buildAdminText(ev, img), 'admin');
+  // Pembelian yang berhak cashback → daftar pesanan di channel antrian + tombol "Cashback Terkirim".
+  let queued = false;
+  if (owesCashback(ev)) {
+    try {
+      const ch = await client.channels.fetch(QUEUE_CH());
+      if (ch?.isTextBased()) {
+        const m = await ch.send(withConfirmButton(adminMsg || buildAdminText(ev, img), ev));
+        cb.orders[cbKey(ev.eventId)] = {
+          channelId: ch.id, messageId: m.id, userId: ev.player.userId, username: ev.player.username, displayName: ev.player.displayName,
+          itemId: ev.item.id, itemName: ev.item.name, price: ev.item.price, commission: ev.commission, time: ev.time, sent: false,
+        };
+        saveCb();
+        queued = true;
+      }
+    } catch (e) {
+      console.warn('[roblox-log] gagal kirim ke antrian cashback:', e.message);
+    }
+  }
+  // Rincian admin biasa (tanpa tombol): dilewati kalau channel-nya sama dengan antrian & pesannya sudah terkirim.
+  const adminId = idOf(process.env.ROBLOX_ADMIN_CHANNEL_ID);
+  if (!(queued && adminId === QUEUE_CH())) await send(adminId, adminMsg || buildAdminText(ev, img), 'admin');
 }
 
 function record(ev) {
@@ -435,6 +549,9 @@ function handle(client, req, res) {
 }
 
 function registerRobloxLog(client) {
+  client.on(Events.InteractionCreate, (i) => {
+    if (i.isButton() && i.customId.startsWith(CB_PREFIX)) onCashbackButton(i).catch((e) => console.warn('[roblox-log] tombol cashback:', e.message));
+  });
   client.once(Events.ClientReady, () => {
     if (!idOf(process.env.ROBLOX_API_KEY)) {
       console.warn('[roblox-log] ROBLOX_API_KEY belum diisi di .env → server HTTP Log Pembelian Roblox TIDAK dijalankan.');
