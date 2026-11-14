@@ -3066,6 +3066,30 @@ async function handleInteraction(interaction) {
   return true;
 }
 
+/**
+ * Pemulihan sekali jalan: testimoni yang ditahan untuk cek admin tapi belum terkirim DAN pesan ceknya
+ * sudah tidak punya tombol (bug lama menghapus tombolnya) → kirim ulang pesan cek dengan tombol baru.
+ */
+async function recoverTestiReviews() {
+  for (const t of Object.values(state.tickets)) {
+    try {
+      if (!t.testiReview || testiDone(t) || t.testiRecovered || !t.testimony) continue;
+      const guild = client.guilds.cache.get(t.guildId) || client.guilds.cache.first();
+      if (!guild) continue;
+      const ch = await guild.channels.fetch(t.testiReview.channelId).catch(() => null);
+      const old = ch?.isTextBased() ? await ch.messages.fetch(t.testiReview.messageId).catch(() => null) : null;
+      const hasButtons = old && JSON.stringify((old.components || []).map((x) => x.toJSON?.() || x)).includes('store:trvraw');
+      if (hasButtons) continue; // pesan cek masih utuh → admin tinggal klik
+      t.testiRecovered = true;
+      if (!(await sendTestiReview(guild, t))) t.testiRecovered = false;
+      else console.log(`[store] pesan cek testimoni ${t.id} dikirim ulang`);
+      save();
+    } catch (e) {
+      console.warn(`[store] pulihkan testimoni ${t.id}:`, e.message);
+    }
+  }
+}
+
 function registerStore(c) {
   client = c;
   F.register(c);
@@ -3074,6 +3098,7 @@ function registerStore(c) {
   c.once(Events.ClientReady, () => {
     housekeeping();
     setInterval(housekeeping, 30 * 1000);
+    setTimeout(() => recoverTestiReviews().catch(() => {}), 15 * 1000);
     I.start();
     F.start(); // 👑 katalog Premium App di forum
     CP.start(); // 🎛️ panel admin dikirim / diperbarui otomatis
