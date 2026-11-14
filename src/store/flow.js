@@ -2473,10 +2473,13 @@ async function sendTestiReview(guild, t) {
 }
 
 /** Tombol admin pada pesan review. */
+/** Testimoni sudah benar-benar terkirim? (menunggu cek admin ≠ terkirim, walau flag testimonyPosted sempat true) */
+const testiDone = (t) => Boolean(t?.testimonyMessageId) || Boolean(t?.testimonyPosted && !t?.testiReview);
+
 async function onTestiReviewButton(interaction, action, ticketId) {
   if (!isAdmin(interaction.member)) return interaction.reply({ content: '⛔ Hanya **Administrator** yang bisa meninjau testimoni.', flags: EPH });
   const t = state.tickets[ticketId];
-  if (!t || t.testimonyPosted) {
+  if (!t || testiDone(t)) {
     await stripRows(interaction.message);
     return interaction.reply({ content: 'ℹ️ Testimoni ini sudah dikirim / tidak ditemukan.', flags: EPH });
   }
@@ -2501,7 +2504,7 @@ async function onTestiReviewButton(interaction, action, ticketId) {
 async function onTestiReviewModal(interaction, ticketId) {
   if (!isAdmin(interaction.member)) return interaction.reply({ content: '⛔ Hanya **Administrator**.', flags: EPH });
   const t = state.tickets[ticketId];
-  if (!t || t.testimonyPosted) return interaction.reply({ content: 'ℹ️ Testimoni ini sudah dikirim / tidak ditemukan.', flags: EPH });
+  if (!t || testiDone(t)) return interaction.reply({ content: 'ℹ️ Testimoni ini sudah dikirim / tidak ditemukan.', flags: EPH });
   const upload = interaction.fields.getUploadedFiles('img')?.first?.() || null;
   if (!upload || (upload.contentType && !upload.contentType.startsWith('image/'))) return interaction.reply({ content: '❌ Upload sebuah **gambar**.', flags: EPH });
   await interaction.deferUpdate();
@@ -2525,7 +2528,7 @@ async function finishTestimonyReview(interaction, t) {
 
 /** Hapus file bukti (asli + blur + pengganti) dari disk. */
 function cleanupProofFiles(t) {
-  if (t.testiReview && !t.testimonyPosted) return; // masih menunggu cek admin → file dibutuhkan
+  if (t.testiReview && !testiDone(t)) return; // masih menunggu cek admin → file dibutuhkan
   for (const f of [t.adminProofFile, t.proofFile, t.payProofFile, t.payProofBlurFile, t.testiImageFile]) if (f) fs.rm(f, { force: true }, () => {});
 }
 
@@ -2813,10 +2816,12 @@ async function housekeeping() {
         t.testimony = { rating, comment: auto.comment || 'Tidak ada ulasan dari pembeli.', at: now, auto: true };
         state.stats.ratingSum += rating;
         state.stats.ratingCount += 1;
-        t.testimonyPosted = true;
         t.deleteAt = now;
         save();
+        // testimonyPosted diisi oleh postTestimony setelah benar-benar terkirim (kalau ditahan untuk cek admin, belum dianggap terkirim).
         if (cfg?.ticket?.postWithoutReview !== false && guild) await postTestimony(guild, t).catch((e) => console.warn(`[store] testimoni otomatis ${t.id}:`, e.message));
+        else t.testimonyPosted = true;
+        save();
         logOrder(guild, t, `⏰ No review — automatically rated ${rating}/5`);
         refreshPanel();
         refreshLeaderboard();
