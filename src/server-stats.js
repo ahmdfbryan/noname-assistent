@@ -22,7 +22,7 @@ const DEFAULTS = {
   channels: {
     tickets: '🎫 Active Tickets: {count}',
     orders: '✅ Total Orders: {count}',
-    store: '{status} Store is {state}',
+    store: '{status} Store is {state}!',
   },
   countBots: false,
   formatNumber: false,
@@ -87,7 +87,7 @@ async function values(guild, cfg) {
 }
 function nameFor(key, value, cfg) {
   if (STATUS_KEYS.includes(key)) {
-    return String(cfg.channels[key] || '{status} Store is {state}')
+    return String(cfg.channels[key] || '{status} Store is {state}!')
       .replace(/\{status\}/g, value ? '🟢' : '🔴')
       .replace(/\{state\}/g, value ? 'OPEN' : 'CLOSED')
       .slice(0, 100);
