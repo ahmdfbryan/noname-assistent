@@ -94,6 +94,7 @@ const GROUPS = {
 const DEFAULT_CHANNELS = { instantPanel: '1565040089573101588', digitalPanel: '1560602559062999120', digitalCatalog: '1560602363553775686', reputation: '1561325807559901234',
   // Panel "Cara Order" per produk (bisa diganti lewat store.json → channels.howto_<idProduk>)
   'howto_robux-visend': '1569517330428465313',
+  'howto_robux-visend-2': '1569517330428465313', // Visend 2 → channel Visend yang sama (panel terpisah)
   'howto_robux-gamepass': '1569517537790656593',
   'howto_gift-ingame': '1569517790870900756',
   howto_rekber: '1569518096836988978',
