@@ -158,8 +158,22 @@ function buildHowToGuide(guild, cfg, value) {
   const open = isProductOpen(p);
 
   // Info singkat (live dari data toko)
+  // Robux Visend 1 & 2 → SATU panel Cara Order; info status/rate/stock ditampilkan untuk masing-masing.
+  const robuxAll = p.type === 'robux' ? (cfg.products || []).filter((x) => x.type === 'robux') : [];
+  const multiRobux = robuxAll.length > 1;
   const info = [`🏪 **Status:** ${open ? '`🟢 BUKA`' : '`🔴 TUTUP`'}`];
-  if (p.type === 'robux') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, `📦 **Stock:** \`${num(stockOf(p))} Robux\``);
+  if (multiRobux) {
+    info.length = 0;
+    robuxAll.forEach((rp, i) => {
+      if (i) info.push('');
+      info.push(
+        `**${rp.emoji || ''} ${rp.label}**`.replace('** ', '**'),
+        `🏪 **Status:** ${isProductOpen(rp) ? '`🟢 BUKA`' : '`🔴 TUTUP`'}`,
+        `💱 **Rate:** \`${rupiah(V.rateOf(cfg, rp))} / Robux\``,
+        `📦 **Stock:** \`${num(stockOf(rp))} Robux\``,
+      );
+    });
+  } else if (p.type === 'robux') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, `📦 **Stock:** \`${num(stockOf(p))} Robux\``);
   else if (p.type === 'gamepass') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, `⏱️ **Estimasi:** \`± ${num(p.pendingDays || 5)} hari\``);
   else if (p.type === 'gift') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, '🎁 **Pengiriman:** `Sistem Gift In-Game`');
   else if (p.type === 'boost') info.push(`💱 **Harga:** \`Mulai ${rupiah(V.minPlanPrice(p))} / boost\``, `⏱️ **Estimasi:** \`${p.estimate || '1x24 jam'}\``, `🚀 **Stock per Paket:**\n${V.boostStockLines(p)}`);
@@ -197,11 +211,11 @@ function buildHowToGuide(guild, cfg, value) {
   }
 
   return card(cfg, guild, {
-    header: `## ${p.emoji || '🛒'} Cara Order ${p.label}\n${fill(ht.intro || '', name)}`,
+    header: `## ${p.emoji || '🛒'} Cara Order ${multiRobux ? String(p.label).replace(/\s+\d+$/, '') : p.label}\n${fill(ht.intro || '', name)}`,
     blocks: [
       info.join('\n'),
       ht.requirements?.length ? `### 📋 Yang Perlu Disiapkan\n${bullets(ht.requirements)}` : null,
-      ht.steps?.length ? `### 🧭 Langkah Order\n${steps(ht.steps)}` : null,
+      ht.steps?.length ? `### 🧭 Langkah Order\n${steps(multiRobux ? ht.steps.map((x) => String(x).replace(/(Robux Visend) \d+\b/, '$1 1 / 2')) : ht.steps)}` : null,
       ht.tips?.length ? `### 💡 Tips\n${bullets(ht.tips)}` : null,
     ],
     image: ht.image || null,
