@@ -23,7 +23,7 @@ const { CANVA, BOOST } = require('../emojis');
 const { archiveStoreTicket } = require('../ticket-archive');
 const { openTicketThread, ensureOpen } = require('../ticket-thread');
 const REP = require('./reputation');
-const { state, save, productState, productStatsOf, hasStock, stockOf, setStock, stockUnit, isProductOpen, kindOf, activeTicketOf, nextTicketId, planStockOf, setPlanStock } = require('./state');
+const { state, save, productState, productStatsOf, hasStock, stockOf, setStock, stockUnit, isProductOpen, kindOf, activeTicketOf, nextTicketId, planStockOf, setPlanStock, adjustStock } = require('./state');
 const { lookupRobloxUser, lookupGamepass, parseGamepassId } = require('./roblox');
 const V = require('./views');
 const SP = require('./spender');
@@ -277,6 +277,11 @@ async function setProductsOpen(guild, products, open, { reason, auto = false, st
 }
 
 const robuxProduct = (cfg) => (cfg?.products || []).find((p) => p.type === 'robux') || null;
+/** Kembalikan stock Robux ke produk yang dipesan ticket (Visend 1 / Visend 2 punya stock sendiri-sendiri). */
+function returnRobux(cfg, t) {
+  const p = getProduct(cfg, t.productId) || robuxProduct(cfg);
+  if (p) adjustStock(p, t.amount);
+}
 
 /**
  * Stock kembali tersedia & produk sebelumnya tutup karena stock habis → buka lagi otomatis.
@@ -556,7 +561,7 @@ async function onAmountSelect(interaction, productId) {
       .addLabelComponents(
         new LabelBuilder()
           .setLabel('Jumlah Robux')
-          .setDescription(`Minimal ${num(product ? V.minAmountOf(product) : 1)}, maksimal ${num(max)} Robux${product && V.stepOf(product) > 1 ? `, kelipatan ${num(V.stepOf(product))}` : ''}. Sisa stock: ${num(state.stock)}.`)
+          .setDescription(`Minimal ${num(product ? V.minAmountOf(product) : 1)}, maksimal ${num(max)} Robux${product && V.stepOf(product) > 1 ? `, kelipatan ${num(V.stepOf(product))}` : ''}. Sisa stock: ${num(stockOf(product))}.`)
           .setTextInputComponent(
             new TextInputBuilder()
               .setCustomId('amount')
@@ -600,9 +605,9 @@ async function createOrder(interaction, productId, amount) {
     return fail(`❌ Jumlah harus **kelipatan ${num(step)}** Robux (contoh: ${num(min)}, ${num(min + step)}, ${num(min + step * 2)}).`, true);
   }
   if (!isProductOpen(product)) return fail(`🔴 Maaf, **${product.label}** sedang **TUTUP** atau stock sudah habis.`);
-  if (amount > state.stock) {
+  if (amount > stockOf(product)) {
     return fail(
-      `⚠️ **Stock tidak mencukupi.** Sisa stock saat ini hanya **${num(state.stock)} Robux**.\nSilakan pilih jumlah **maksimal ${num(state.stock)} Robux**.`,
+      `⚠️ **Stock tidak mencukupi.** Sisa stock ${product.label} saat ini hanya **${num(stockOf(product))} Robux**.\nSilakan pilih jumlah **maksimal ${num(stockOf(product))} Robux**.`,
       true,
     );
   }
@@ -613,7 +618,7 @@ async function createOrder(interaction, productId, amount) {
   // Kunci stock SEKARANG (sebelum proses async) supaya tidak bisa terjual dobel.
   const rate = V.rateOf(cfg, product);
   const id = nextTicketId(cfg.ticket?.idPrefix);
-  state.stock -= amount;
+  adjustStock(product, -amount);
   const ticket = {
     id,
     guildId: guild.id,
@@ -707,7 +712,7 @@ async function createOrder(interaction, productId, amount) {
   } catch (err) {
     // Gagal membuat ticket → kembalikan stock & hapus data ticket.
     console.error('[store] gagal membuat ticket:', err);
-    state.stock += amount;
+    adjustStock(product, amount);
     delete state.tickets[id];
     save();
     await interaction
@@ -718,7 +723,7 @@ async function createOrder(interaction, productId, amount) {
   }
 
   refreshPanel();
-  const closed = await closeIfSoldOut(guild, `📦 **Stock Robux hari ini sudah HABIS!** ${product.label} otomatis ditutup.`);
+  const closed = await closeIfSoldOut(guild, `📦 **Stock Robux hari ini sudah HABIS!** ${product.label} otomatis ditutup.`, product);
   // Info sisa stock di channel stock (kalau habis → sudah diumumkan lewat pengumuman tutup).
   if (!closed) announceSold(guild, product, amount);
 }
@@ -2631,7 +2636,7 @@ async function onCloseModal(interaction, ticketId) {
     if (kindOf(t) === 'canva' || kindOf(t) === 'boost') t.expiresAt = t.closedAt + (Number(t.plan?.days) || 30) * 86400000;
     t.testimonyDeadline = Date.now() + testimonyTimeoutMs(cfg);
   } else {
-    if (kindOf(t) === 'robux') state.stock += t.amount; // stock Robux dikembalikan (gamepass tidak memakai stock)
+    if (kindOf(t) === 'robux') returnRobux(cfg, t); // stock Robux dikembalikan ke produknya (gamepass tidak memakai stock)
     if (kindOf(t) === 'canva' || kindOf(t) === 'boost') returnSlot(cfg, t); // slot Canva / stock boost dikembalikan
     t.deleteAt = Date.now() + (Number(cfg.ticket?.deleteAfterSeconds) || 15) * 1000;
   }
@@ -2747,6 +2752,10 @@ async function postTestimony(guild, t, opts = {}) {
   const hasImage = kindOf(t) !== 'instant' && (t.payProofFile || t.payProofRemoteUrl || t.proofFile || t.proofRemoteUrl);
   if (!opts.approved && hasImage && cfg?.ticket?.reviewTestimonyImage !== false && !t.testiReview) {
     if (await sendTestiReview(guild, t)) return;
+    // Pesan cek admin gagal terkirim → JANGAN pernah memposting bukti bayar asli (belum disensor) ke publik:
+    // pakai hasil blur kalau ada, kalau tidak testimoni dikirim tanpa gambar.
+    if (!payBlurAttachment(t).url) t.testiImageMode = 'none';
+    console.warn(`[store] pesan cek testimoni ${t.id} gagal terkirim — testimoni dikirim ${t.testiImageMode === 'none' ? 'tanpa gambar' : 'dengan hasil blur'}`);
   }
   state.stats.testimonies += 1;
   t.testimonyNo = state.stats.testimonies; // disimpan supaya bisa dibuat ulang dengan nomor yang sama
@@ -2881,7 +2890,7 @@ async function onChannelDelete(channel) {
       save();
     } else {
       if (kindOf(t) === 'canva' || kindOf(t) === 'boost') returnSlot(loadConfig(), t);
-      else state.stock += t.amount;
+      else returnRobux(loadConfig(), t);
       save();
       await announce(channel.guild, 'returned', { ticket: t });
       await reopenIfAutoClosed(channel.guild);
