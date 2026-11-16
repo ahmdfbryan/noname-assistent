@@ -417,7 +417,7 @@ function answerCard(cfg, guild, answer, msgId) {
   box.addSeparatorComponents(line());
   box.addTextDisplayComponents(text(`-# 🤖 ${cfg.botName} • Jawaban otomatis AI berdasarkan info resmi toko — untuk kepastian, hubungi admin lewat ticket.`));
   const buttons = [];
-  if (isId(tk?.panelChannelId)) buttons.push(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${guild.id}/${tk.panelChannelId}`).setLabel('Bicara dengan Admin').setEmoji('🎫'));
+  if (isId(tk?.panelChannelId)) buttons.push(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${guild.id}/${tk.panelChannelId}`).setLabel('Buat Ticket').setEmoji('🎫'));
   buttons.push(
     new ButtonBuilder().setCustomId(`ai:fb:up:${msgId}`).setEmoji('👍').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`ai:fb:down:${msgId}`).setEmoji('👎').setStyle(ButtonStyle.Secondary),
