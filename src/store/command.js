@@ -264,7 +264,20 @@ const storeCommand = {
       }
       // Panel "Cara Order" tiap produk → channel masing-masing (config.js DEFAULT_CHANNELS / store.json channels.howto_<id>)
       if (!picked) {
+        // Robux Visend 1 & 2 berbagi SATU panel Cara Order (produk Robux pertama); panel Visend lain dihapus kalau ada.
+        const firstRobux = (cfg.products || []).find((x) => x.type === 'robux');
         for (const p of (cfg.products || []).filter((x) => x.type !== 'soon' && x.howTo)) {
+          if (p.type === 'robux' && p.id !== firstRobux?.id) {
+            const old = state[`howto_${p.id}`];
+            if (old) {
+              const oc = await interaction.guild.channels.fetch(old.channelId).catch(() => null);
+              await oc?.messages.delete(old.messageId).catch(() => {});
+              delete state[`howto_${p.id}`];
+              save();
+              lines.push(`🧹 Panel lama **${p.label}** dihapus (digabung ke panel ${firstRobux.label}).`);
+            }
+            continue;
+          }
           const id = channelOf(cfg, `howto_${p.id}`);
           if (!isId(id)) continue;
           const ch = await interaction.guild.channels.fetch(id).catch(() => null);
