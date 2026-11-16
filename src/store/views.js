@@ -20,7 +20,7 @@ const { ROBUX: RBX, CANVA, BOOST } = require('../emojis');
 const { color, rupiah, num, fill, ts, loadConfig, GROUPS, groupOf, productsOf, groupText } = require('./config');
 const SP = require('./spender');
 const { bannerOf } = require('./banner');
-const { state, productState, productStatsOf, hasStock, stockOf, stockUnit, isProductOpen, kindOf, planStockOf } = require('./state');
+const { state, productState, productStatsOf, hasStock, stockOf, stockUnit, isProductOpen, kindOf, planStockOf, stockBaseOf } = require('./state');
 
 const STATUS_LABEL = {
   open: '⏳ Menunggu Pembayaran / Proses',
@@ -106,7 +106,7 @@ function buildProductInfo(guild, cfg, product) {
     .setThumbnail(guild.iconURL({ extension: 'png', size: 256 }) || null)
     .addFields(
       { name: `${RBX} Harga ${product.label}`, value: `\`${rupiah(rateOf(cfg, product))} / Robux\``, inline: true },
-      { name: '📦 Sisa Stock', value: `\`${num(state.stock)} Robux\``, inline: true },
+      { name: '📦 Sisa Stock', value: `\`${num(stockOf(product))} Robux\``, inline: true },
       { name: '🏪 Status', value: open ? '`🟢 BUKA`' : '`🔴 TUTUP`', inline: true },
       { name: '🧾 Total Transaksi', value: `\`${num(s.transactions)} transaksi\``, inline: true },
       { name: `${RBX} ${product.label} Terjual`, value: `\`${num(productStatsOf(product.id).robux)} Robux\``, inline: true },
@@ -201,13 +201,14 @@ function buildConfirmAccount(cfg, roblox) {
 // ───────────────────────── Pilih jumlah Robux ─────────────────────────
 function buildAmountPicker(cfg, product, roblox) {
   const rate = rateOf(cfg, product);
-  const max = Math.min(Number(product.maxAmount) || 5000, state.stock);
+  const have = stockOf(product);
+  const max = Math.min(Number(product.maxAmount) || 5000, have);
   const embed = new EmbedBuilder()
     .setColor(color(cfg, 'brand', 0x3498db))
     .setTitle(`${product.emoji || RBX} Pilih Jumlah ${product.label}`)
     .setDescription(
       `Akun Roblox: **${roblox.displayName}** (\`@${roblox.name}\`)\n\n` +
-        `💱 Rate: **${rupiah(rate)} / Robux**\n📦 Sisa stock: **${num(state.stock)} Robux**\n\n` +
+        `💱 Rate: **${rupiah(rate)} / Robux**\n📦 Sisa stock: **${num(have)} Robux**\n\n` +
         `Pilih jumlah di bawah, atau pilih **✏️ Jumlah Lain** untuk memasukkan jumlah sendiri ` +
         `(${num(minAmountOf(product))} – ${num(Math.max(max, 0))} Robux${stepOf(product) > 1 ? `, kelipatan ${num(stepOf(product))}` : ''}).`,
     );
@@ -215,9 +216,9 @@ function buildAmountPicker(cfg, product, roblox) {
 
   const options = (product.presets || []).filter((a) => a >= minAmountOf(product)).slice(0, 24).map((amount) => ({
     label: `${num(amount)} Robux`,
-    description: `${rupiah(amount * rate)}${amount > state.stock ? ' • stock tidak cukup' : ''}`,
+    description: `${rupiah(amount * rate)}${amount > have ? ' • stock tidak cukup' : ''}`,
     value: String(amount),
-    emoji: amount > state.stock ? '⛔' : RBX,
+    emoji: amount > have ? '⛔' : RBX,
   }));
   options.push({ label: 'Jumlah Lain', description: `Min ${num(minAmountOf(product))}, maks ${num(product.maxAmount || 5000)} Robux${stepOf(product) > 1 ? ` • kelipatan ${num(stepOf(product))}` : ''}`, value: 'custom', emoji: '✏️' });
 
@@ -452,6 +453,7 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
   const label = single ? single.label : name;
   const listText = products.map((p) => `${p.emoji || '•'} **${p.label}**`).join('\n');
   const robuxIncluded = products.some((p) => p.type === 'robux');
+  const robuxProducts = products.filter((p) => p.type === 'robux');
   const gamepassOpened = products.filter((p) => p.type === 'gamepass' || p.type === 'gift');
   const slotProducts = products.filter((p) => hasStock(p) && p.type !== 'robux');
 
@@ -464,10 +466,10 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
           : `**${name}** sekarang **BUKA** dan siap menerima pesanan! 🎉\n\n${listText}`) +
           (panelLink ? `\n\n🛒 Order sekarang: ${panelLink}` : ''),
       );
-    if (robuxIncluded) {
+    for (const rp of robuxProducts) {
       e.addFields(
-        { name: '📦 Stock Robux', value: `\`${num(state.stock)} Robux\``, inline: true },
-        { name: '💱 Rate', value: `\`${rupiah(rate)} / Robux\``, inline: true },
+        { name: `📦 Stock ${rp.label}`, value: `\`${num(stockOf(rp))} Robux\``, inline: true },
+        { name: `💱 Rate ${rp.label}`, value: `\`${rupiah(rateOf(cfg, rp))} / Robux\``, inline: true },
       );
     }
     for (const gp of gamepassOpened) {
@@ -483,7 +485,7 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
         `${extra.reason || (single ? `**${single.label}** di **${name}** saat ini **TUTUP** dan tidak menerima pesanan baru.` : `**${name}** saat ini **TUTUP** dan tidak menerima pesanan baru.\n\n${listText}`)}\n\n` +
           'Pantau terus channel ini untuk info buka berikutnya. Terima kasih! 💜',
       );
-    if (robuxIncluded) e.addFields({ name: '📦 Sisa Stock Robux', value: `\`${num(state.stock)} Robux\``, inline: true });
+    for (const rp of robuxProducts) e.addFields({ name: `📦 Sisa Stock ${rp.label}`, value: `\`${num(stockOf(rp))} Robux\``, inline: true });
     for (const sp of slotProducts) {
       e.addFields({ name: `📦 Sisa Slot ${sp.label}`, value: `\`${num(stockOf(sp))} ${stockUnit(sp)}\``, inline: true });
     }
@@ -505,7 +507,7 @@ function buildStoreAnnouncement(guild, cfg, kind, extra = {}) {
     const unit = stockUnit(sp);
     const left = stockOf(sp);
     const sold = Number(extra.amount) || 0;
-    const total = Math.max(Number(state.stockBase) || 0, left + sold); // patokan = stock yang terakhir dibuka admin
+    const total = Math.max(stockBaseOf(sp), left + sold); // patokan = stock yang terakhir dibuka admin
     const pct = total > 0 ? Math.round((left / total) * 100) : 0;
     const filled = Math.round(pct / 10);
     const bar = `${'🟦'.repeat(filled)}${'⬛'.repeat(10 - filled)} \`${pct}%\``;
@@ -588,6 +590,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
   const single = products.length === 1 ? products[0] : null;
   const listText = products.map((p) => `▸ ${p.emoji || '🛒'} **${p.label}**`).join('\n');
   const robuxIncluded = products.some((p) => p.type === 'robux');
+  const robuxProducts = products.filter((p) => p.type === 'robux');
   const gamepass = products.filter((p) => p.type === 'gamepass' || p.type === 'gift');
   const slotProducts = products.filter((p) => hasStock(p) && p.type !== 'robux');
   const now = `<t:${Math.floor(Date.now() / 1000)}:f>`;
@@ -617,7 +620,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
 
   if (kind === 'open') {
     const info = [];
-    if (robuxIncluded) info.push(`**${RBX} Stock Robux:** \`${num(state.stock)} Robux\``, `**💱 Rate Visend:** \`${rupiah(robux ? rateOf(cfg, robux) : 0)} / Robux\``);
+    for (const rp of robuxProducts) info.push(`**${rp.emoji || RBX} ${rp.label}:** \`${rupiah(rateOf(cfg, rp))} / Robux\` • Stock \`${num(stockOf(rp))} Robux\``);
     for (const gp of gamepass) info.push(`**${gp.emoji || '🎟️'} Rate ${gp.label}:** \`${rupiah(rateOf(cfg, gp))} / Robux\``);
     for (const sp of slotProducts) info.push(`**${sp.emoji || '📦'} Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
     const gallery = statusGif ? [statusGif] : multiImages(products);
@@ -638,7 +641,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     });
   } else if (kind === 'close') {
     const left = [];
-    if (robuxIncluded) left.push(`**${RBX} Sisa Stock Robux:** \`${num(state.stock)} Robux\``);
+    for (const rp of robuxProducts) left.push(`**${rp.emoji || RBX} Sisa Stock ${rp.label}:** \`${num(stockOf(rp))} Robux\``);
     for (const sp of slotProducts) left.push(`**${sp.emoji || '📦'} Sisa Slot ${sp.label}:** \`${num(stockOf(sp))} ${stockUnit(sp)}\``);
     const gallery = statusGif ? [statusGif] : multiImages(products);
     card = pcard({
@@ -683,7 +686,7 @@ function buildStoreAnnouncementV2(guild, cfg, kind, extra = {}, ping = false) {
     const unit = stockUnit(sp);
     const left = stockOf(sp);
     const sold = Number(extra.amount) || 0;
-    const total = Math.max(Number(state.stockBase) || 0, left + sold);
+    const total = Math.max(stockBaseOf(sp), left + sold);
     card = pcard({
       accent: color(cfg, 'brand', 0x3498db),
       thumb: icon,
@@ -2713,7 +2716,7 @@ function buildProductInfoV2(guild, cfg, product) {
     thumb: product.thumbnail || icon256(guild),
     header: `## ${product.emoji || RBX} ${product.label}\n${fill(product.description || '', name)}`,
     blocks: [
-      [`${RBX} **Harga:** \`${rupiah(rateOf(cfg, product))} / Robux\``, `📦 **Sisa Stock:** \`${num(state.stock)} Robux\``, `🏪 **Status:** ${openBadge(open)}`].join('\n'),
+      [`${RBX} **Harga:** \`${rupiah(rateOf(cfg, product))} / Robux\``, `📦 **Sisa Stock:** \`${num(stockOf(product))} Robux\``, `🏪 **Status:** ${openBadge(open)}`].join('\n'),
       [
         `🧾 **Total Transaksi:** \`${num(state.stats.transactions)} transaksi\``,
         `${RBX} **${product.label} Terjual:** \`${num(productStatsOf(product.id).robux)} Robux\``,
