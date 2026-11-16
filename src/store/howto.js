@@ -65,7 +65,7 @@ const linkRow = (guild, label) => {
 
 /** Ringkasan singkat produk (tampil di dropdown). */
 function productSummary(cfg, p) {
-  if (p.type === 'robux') return `${rupiah(V.rateOf(cfg, p))}/Robux • Stock ${num(state.stock)}`;
+  if (p.type === 'robux') return `${rupiah(V.rateOf(cfg, p))}/Robux • Stock ${num(stockOf(p))}`;
   if (p.type === 'gamepass') return `${rupiah(V.rateOf(cfg, p))}/Robux • ± ${num(p.pendingDays || 5)} hari`;
   if (p.type === 'gift') return `${rupiah(V.rateOf(cfg, p))}/Robux • Dikirim via gift`;
   if (p.type === 'rekber') return `Mulai ${rupiah(p.minNominal || 0)} • Dana aman`;
@@ -159,7 +159,7 @@ function buildHowToGuide(guild, cfg, value) {
 
   // Info singkat (live dari data toko)
   const info = [`🏪 **Status:** ${open ? '`🟢 BUKA`' : '`🔴 TUTUP`'}`];
-  if (p.type === 'robux') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, `📦 **Stock:** \`${num(state.stock)} Robux\``);
+  if (p.type === 'robux') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, `📦 **Stock:** \`${num(stockOf(p))} Robux\``);
   else if (p.type === 'gamepass') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, `⏱️ **Estimasi:** \`± ${num(p.pendingDays || 5)} hari\``);
   else if (p.type === 'gift') info.push(`💱 **Rate:** \`${rupiah(V.rateOf(cfg, p))} / Robux\``, '🎁 **Pengiriman:** `Sistem Gift In-Game`');
   else if (p.type === 'boost') info.push(`💱 **Harga:** \`Mulai ${rupiah(V.minPlanPrice(p))} / boost\``, `⏱️ **Estimasi:** \`${p.estimate || '1x24 jam'}\``, `🚀 **Stock per Paket:**\n${V.boostStockLines(p)}`);
