@@ -95,6 +95,16 @@ function buildPanel(guild, cfg) {
 }
 
 // ───────────────────────── Info produk (hanya terlihat pembeli) ─────────────────────────
+/** Total Robux terjual — semua produk Robux Visend (1, 2, ...) digabung jadi satu angka; labelnya "Robux Visend" tanpa nomor. */
+function soldSummary(cfg, product) {
+  if (product?.type !== 'robux') return { label: product?.label, robux: productStatsOf(product?.id).robux };
+  const all = (cfg.products || []).filter((x) => x.type === 'robux');
+  return {
+    label: all.length > 1 ? String(product.label).replace(/\s+\d+$/, '') : product.label,
+    robux: all.reduce((n, x) => n + (Number(productStatsOf(x.id).robux) || 0), 0),
+  };
+}
+
 function buildProductInfo(guild, cfg, product) {
   const open = isProductOpen(product);
   const s = state.stats;
@@ -109,7 +119,7 @@ function buildProductInfo(guild, cfg, product) {
       { name: '📦 Sisa Stock', value: `\`${num(stockOf(product))} Robux\``, inline: true },
       { name: '🏪 Status', value: open ? '`🟢 BUKA`' : '`🔴 TUTUP`', inline: true },
       { name: '🧾 Total Transaksi', value: `\`${num(s.transactions)} transaksi\``, inline: true },
-      { name: `${RBX} ${product.label} Terjual`, value: `\`${num(productStatsOf(product.id).robux)} Robux\``, inline: true },
+      { name: `${RBX} ${soldSummary(cfg, product).label} Terjual`, value: `\`${num(soldSummary(cfg, product).robux)} Robux\``, inline: true },
       { name: '⭐ Rating Pembeli', value: `\`${avg} / 5 (${num(s.ratingCount)} ulasan)\``, inline: true },
     );
 
@@ -2719,7 +2729,7 @@ function buildProductInfoV2(guild, cfg, product) {
       [`${RBX} **Harga:** \`${rupiah(rateOf(cfg, product))} / Robux\``, `📦 **Sisa Stock:** \`${num(stockOf(product))} Robux\``, `🏪 **Status:** ${openBadge(open)}`].join('\n'),
       [
         `🧾 **Total Transaksi:** \`${num(state.stats.transactions)} transaksi\``,
-        `${RBX} **${product.label} Terjual:** \`${num(productStatsOf(product.id).robux)} Robux\``,
+        `${RBX} **${soldSummary(cfg, product).label} Terjual:** \`${num(soldSummary(cfg, product).robux)} Robux\``,
         ratingLine(),
       ].join('\n'),
     ],
