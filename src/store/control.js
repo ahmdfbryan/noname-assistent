@@ -19,7 +19,7 @@ const {
 } = require('discord.js');
 const UI = require('../ui');
 const { loadConfig, isId, rupiah, num, getProduct, setPlanPrices, clearPlanPrices, hasPlanOverride } = require('./config');
-const { state, save, productState, hasStock, stockOf, setStock, stockUnit, planStockOf, setPlanStock, isProductOpen } = require('./state');
+const { state, save, productState, hasStock, stockOf, setStock, setStockBase, stockUnit, planStockOf, setPlanStock, isProductOpen } = require('./state');
 const V = require('./views');
 const W = require('./waroengkuy');
 const T = require('./control-tools');
@@ -436,7 +436,7 @@ async function changeStock(guild, p, planId, value, mode, by, silent = false) {
   const before = plan ? planStockOf(p, plan.id) : stockOf(p);
   const after = plan ? setPlanStock(p, plan.id, mode === 'set' ? value : before + value) : setStock(p, mode === 'set' ? value : before + value);
   if (before === after) return silent ? { label, before, after, same: true } : null;
-  if (p.type === 'robux') state.stockBase = after;
+  if (p.type === 'robux') setStockBase(p, after);
   save();
   const label = plan ? `${p.label} (${plan.label})` : p.label;
   ctx.refreshPanel();
