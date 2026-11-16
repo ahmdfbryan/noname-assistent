@@ -78,8 +78,11 @@ function productState(productId) {
 /** Produk yang memakai stock: Robux Visend (Robux) & Canva Pro (slot). */
 const hasStock = (product) => ['robux', 'canva', 'boost'].includes(product?.type);
 const stockUnit = (product) => (product?.type === 'robux' ? 'Robux' : product?.stockUnit || 'slot');
+// Produk Robux pertama ("robux-visend") memakai state.stock (data lama); Robux lain (Visend 2, dst) punya stock sendiri di state.stocks[id].
+const LEGACY_ROBUX_ID = 'robux-visend';
+const legacyRobux = (product) => product?.type === 'robux' && (!product.id || product.id === LEGACY_ROBUX_ID);
 function stockOf(product) {
-  if (product?.type === 'robux') return state.stock;
+  if (legacyRobux(product)) return Number(state.stock) || 0;
   // Server Boost: stock terpisah per paket (1 Bulan / 3 Bulan) → total = jumlah semua paket.
   if (product?.type === 'boost') return (product.plans || []).reduce((a, x) => a + planStockOf(product, x.id), 0);
   return Number(state.stocks?.[product?.id]) || 0;
@@ -97,12 +100,28 @@ function setPlanStock(product, planId, n) {
 }
 function setStock(product, n) {
   const v = Math.max(0, Math.floor(n));
-  if (product.type === 'robux') state.stock = v;
+  if (legacyRobux(product)) state.stock = v;
   else {
     state.stocks = state.stocks || {};
     state.stocks[product.id] = v;
   }
   return v;
+}
+
+/** Tambah / kurangi stock satu produk (delta boleh negatif). */
+function adjustStock(product, delta) {
+  return setStock(product, stockOf(product) + Number(delta || 0));
+}
+/** Patokan bar "Ketersediaan Stock" (stock terakhir yang dibuka admin) per produk Robux. */
+function stockBaseOf(product) {
+  return Number(legacyRobux(product) ? state.stockBase : state.stockBases?.[product?.id]) || 0;
+}
+function setStockBase(product, v) {
+  if (legacyRobux(product)) state.stockBase = v;
+  else {
+    state.stockBases = state.stockBases || {};
+    state.stockBases[product.id] = v;
+  }
 }
 
 /** Produk bisa dipesan sekarang? (produk ber-stock juga butuh stock > 0, Coming Soon selalu tidak.) */
@@ -139,4 +158,4 @@ function nextTicketId(prefix, key = 'seq') {
   return `${prefix || 'NCS'}-${String(state[key]).padStart(4, '0')}`;
 }
 
-module.exports = { state, save, productState, productStatsOf, hasStock, stockUnit, stockOf, setStock, planStockOf, setPlanStock, isProductOpen, kindOf, activeTicketOf, nextTicketId };
+module.exports = { state, save, productState, productStatsOf, hasStock, stockUnit, stockOf, setStock, adjustStock, stockBaseOf, setStockBase, planStockOf, setPlanStock, isProductOpen, kindOf, activeTicketOf, nextTicketId };
